@@ -1,0 +1,410 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USUÁRIOS E SEGURANÇA
+// ============================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  name          String
+  active        Boolean   @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  roles         UserRole[]
+  auditLogs     AuditLog[]
+  productionPointings ProductionPointing[]
+  
+  @@map("users")
+}
+
+model Role {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  description   String?
+  active        Boolean   @default(true)
+  
+  users         UserRole[]
+  permissions   RolePermission[]
+  
+  @@map("roles")
+}
+
+model Permission {
+  id            String    @id @default(uuid())
+  resource      String
+  action        String
+  description   String?
+  
+  roles         RolePermission[]
+  
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model UserRole {
+  userId        String
+  roleId        String
+  assignedAt    DateTime  @default(now())
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role          Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId        String
+  permissionId  String
+  
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model AuditLog {
+  id            String    @id @default(uuid())
+  userId        String
+  action        String
+  resource      String
+  resourceId    String?
+  oldValues     Json?
+  newValues     Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+  
+  user          User      @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ============================================
+// CADASTROS BÁSICOS
+// ============================================
+
+model WorkCenter {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  description   String?
+  type          String
+  capacity      Float?
+  efficiency    Float     @default(1.0)
+  costPerHour   Float?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  operations    RoutingOperation[]
+  productionOperations ProductionOrderOperation[]
+  
+  @@map("work_centers")
+}
+
+model UnitOfMeasure {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  type          String
+  symbol        String?
+  
+  products      Product[]
+  bomItems      BOMItem[]
+  
+  @@map("units_of_measure")
+}
+
+model Supplier {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  legalName     String?
+  document      String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  country       String    @default("BR")
+  paymentTerms  String?
+  leadTime      Int?
+  rating        Float?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@map("suppliers")
+}
+
+model Customer {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  legalName     String?
+  document      String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  country       String    @default("BR")
+  paymentTerms  String?
+  creditLimit   Float?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  @@map("customers")
+}
+
+// ============================================
+// ENGENHARIA DE PRODUTOS
+// ============================================
+
+model Product {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  description   String?   @db.Text
+  type          String
+  unitId        String
+  categoryId    String?
+  
+  leadTime      Int       @default(0)
+  lotSize       Float?
+  
+  minStock      Float     @default(0)
+  maxStock      Float?
+  safetyStock   Float     @default(0)
+  reorderPoint  Float?
+  
+  standardCost  Float?
+  lastCost      Float?
+  averageCost   Float?
+  
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
+  category      ProductCategory? @relation(fields: [categoryId], references: [id])
+  
+  boms          BOM[]
+  bomItems      BOMItem[]
+  routings      Routing[]
+  productionOrders ProductionOrder[]
+  
+  @@index([type])
+  @@index([active])
+  @@map("products")
+}
+
+model ProductCategory {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  description   String?
+  parentId      String?
+  
+  parent        ProductCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children      ProductCategory[] @relation("CategoryHierarchy")
+  products      Product[]
+  
+  @@map("product_categories")
+}
+
+model BOM {
+  id            String    @id @default(uuid())
+  productId     String
+  version       Int       @default(1)
+  description   String?
+  validFrom     DateTime  @default(now())
+  validTo       DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  product       Product   @relation(fields: [productId], references: [id])
+  items         BOMItem[]
+  
+  @@unique([productId, version])
+  @@index([productId, active])
+  @@map("boms")
+}
+
+model BOMItem {
+  id            String    @id @default(uuid())
+  bomId         String
+  componentId   String
+  quantity      Float
+  unitId        String
+  scrapFactor   Float     @default(0)
+  sequence      Int
+  notes         String?
+  
+  bom           BOM       @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  component     Product   @relation(fields: [componentId], references: [id])
+  unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
+  
+  @@index([bomId])
+  @@map("bom_items")
+}
+
+model Routing {
+  id            String    @id @default(uuid())
+  productId     String
+  version       Int       @default(1)
+  description   String?
+  validFrom     DateTime  @default(now())
+  validTo       DateTime?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  product       Product   @relation(fields: [productId], references: [id])
+  operations    RoutingOperation[]
+  
+  @@unique([productId, version])
+  @@index([productId, active])
+  @@map("routings")
+}
+
+model RoutingOperation {
+  id            String    @id @default(uuid())
+  routingId     String
+  sequence      Int
+  workCenterId  String
+  description   String
+  setupTime     Float
+  runTime       Float
+  queueTime     Float     @default(0)
+  moveTime      Float     @default(0)
+  notes         String?
+  
+  routing       Routing   @relation(fields: [routingId], references: [id], onDelete: Cascade)
+  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
+  
+  @@index([routingId])
+  @@map("routing_operations")
+}
+
+// ============================================
+// PRODUÇÃO
+// ============================================
+
+model ProductionOrder {
+  id            String    @id @default(uuid())
+  orderNumber   String    @unique
+  productId     String
+  quantity      Float
+  producedQty   Float     @default(0)
+  scrapQty      Float     @default(0)
+  priority      Int       @default(5)
+  status        String    @default("PLANNED")
+  
+  scheduledStart DateTime
+  scheduledEnd  DateTime
+  actualStart   DateTime?
+  actualEnd     DateTime?
+  
+  plannedCost   Float?
+  actualCost    Float?
+  
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdBy     String
+  
+  product       Product   @relation(fields: [productId], references: [id])
+  operations    ProductionOrderOperation[]
+  pointings     ProductionPointing[]
+  
+  @@index([status])
+  @@index([scheduledStart])
+  @@index([productId])
+  @@map("production_orders")
+}
+
+model ProductionOrderOperation {
+  id            String    @id @default(uuid())
+  productionOrderId String
+  sequence      Int
+  workCenterId  String
+  description   String
+  
+  plannedQty    Float
+  completedQty  Float     @default(0)
+  scrapQty      Float     @default(0)
+  
+  setupTime     Float
+  runTime       Float
+  totalPlannedTime Float
+  actualTime    Float     @default(0)
+  
+  status        String    @default("PENDING")
+  scheduledStart DateTime?
+  scheduledEnd  DateTime?
+  actualStart   DateTime?
+  actualEnd     DateTime?
+  
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
+  pointings     ProductionPointing[]
+  
+  @@index([productionOrderId])
+  @@index([workCenterId])
+  @@index([status])
+  @@map("production_order_operations")
+}
+
+model ProductionPointing {
+  id            String    @id @default(uuid())
+  productionOrderId String
+  operationId   String
+  userId        String
+  
+  quantityGood  Float
+  quantityScrap Float     @default(0)
+  
+  setupTime     Float     @default(0)
+  runTime       Float
+  
+  startTime     DateTime
+  endTime       DateTime
+  
+  notes         String?
+  createdAt     DateTime  @default(now())
+  
+  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
+  operation     ProductionOrderOperation @relation(fields: [operationId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
+  
+  @@index([productionOrderId])
+  @@index([operationId])
+  @@index([userId])
+  @@index([startTime])
+  @@map("production_pointings")
+}

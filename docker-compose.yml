@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: fabric-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: fabric
+      MYSQL_USER: fabric
+      MYSQL_PASSWORD: fabric123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - fabric-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fabric-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "mysql://fabric:fabric123@mysql:3306/fabric"
+      JWT_SECRET: "fabric-jwt-secret-key"
+      JWT_REFRESH_SECRET: "fabric-jwt-refresh-secret-key"
+      PORT: 3001
+      NODE_ENV: development
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mysql
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - fabric-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fabric-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - fabric-network
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
+
+networks:
+  fabric-network:
+    driver: bridge
