@@ -16,4 +16,8 @@ export const config = {
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  audit: {
+    mode: process.env.AUDIT_LOG_MODE || 'write_only', // all, write_only, errors_only, none
+    includeReads: process.env.AUDIT_LOG_INCLUDE_READS === 'true',
+  },
 };

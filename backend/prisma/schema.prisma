@@ -81,20 +81,34 @@ model RolePermission {
 
 model AuditLog {
   id            String    @id @default(uuid())
-  userId        String
-  action        String
-  resource      String
+  userId        String?
+  action        String    @db.VarChar(100)
+  resource      String    @db.VarChar(100)
   resourceId    String?
+  description   String?   @db.Text
+  
+  // Dados da requisição HTTP
+  ipAddress     String?   @db.VarChar(45)
+  userAgent     String?   @db.Text
+  method        String?   @db.VarChar(10)
+  endpoint      String?   @db.VarChar(500)
+  statusCode    Int?
+  
+  // Dados de auditoria
+  requestBody   Json?
+  responseBody  Json?
   oldValues     Json?
   newValues     Json?
-  ipAddress     String?
-  userAgent     String?
+  errorMessage  String?   @db.Text
+  durationMs    Int?
+  
   createdAt     DateTime  @default(now())
   
-  user          User      @relation(fields: [userId], references: [id])
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   
   @@index([userId])
-  @@index([resource, resourceId])
+  @@index([resource])
+  @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
 }
@@ -126,8 +140,11 @@ model UnitOfMeasure {
   id            String    @id @default(uuid())
   code          String    @unique
   name          String
-  type          String
+  type          String    // length, weight, volume, quantity, time
   symbol        String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   
   products      Product[]
   bomItems      BOMItem[]
