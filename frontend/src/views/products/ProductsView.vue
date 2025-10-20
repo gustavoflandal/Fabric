@@ -88,6 +88,8 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                   <button @click="openEditModal(product)" class="text-primary-600 hover:text-primary-900">Editar</button>
+                  <button @click="openBomManager(product)" class="text-indigo-600 hover:text-indigo-900">BOMs</button>
+                  <button @click="openRoutingManager(product)" class="text-purple-600 hover:text-purple-900">Roteiros</button>
                   <button @click="handleToggleActive(product)" class="text-yellow-600 hover:text-yellow-900">{{ product.active ? 'Desativar' : 'Ativar' }}</button>
                   <button @click="handleDelete(product)" class="text-red-600 hover:text-red-900">Excluir</button>
                 </td>
@@ -96,6 +98,8 @@
           </table>
         </div>
       </Card>
+      <BomManagerModal v-model="showBomModal" :product="selectedProduct" />
+      <RoutingManagerModal v-model="showRoutingModal" :product="selectedProduct" />
     </main>
 
     <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="closeModal">
@@ -124,10 +128,23 @@
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Unidade *</label>
-                <input v-model="formData.unitId" type="text" required placeholder="ID da unidade" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+                <select v-model="formData.unitId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                  <option value="">Selecione...</option>
+                  <option v-for="unit in unitStore.units" :key="unit.id" :value="unit.id">
+                    {{ unit.code }} - {{ unit.name }}
+                  </option>
+                </select>
               </div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label><input v-model="formData.categoryId" type="text" placeholder="ID da categoria" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+              <select v-model="formData.categoryId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                <option value="">Nenhuma</option>
+                <option v-for="category in categoryStore.categories" :key="category.id" :value="category.id">
+                  {{ category.code }} - {{ category.name }}
+                </option>
+              </select>
+            </div>
             <div class="grid grid-cols-3 gap-4">
               <div><label class="block text-sm font-medium text-gray-700 mb-1">Lead Time (dias)</label><input v-model.number="formData.leadTime" type="number" min="0" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
               <div><label class="block text-sm font-medium text-gray-700 mb-1">Lote Econômico</label><input v-model.number="formData.lotSize" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
@@ -156,22 +173,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth.store';
 import { useProductStore } from '@/stores/product.store';
+import { useUnitOfMeasureStore } from '@/stores/unit-of-measure.store';
+import { useProductCategoryStore } from '@/stores/product-category.store';
 import type { Product } from '@/services/product.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import BomManagerModal from '@/components/products/BomManagerModal.vue';
+import RoutingManagerModal from '@/components/products/RoutingManagerModal.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const productStore = useProductStore();
+const unitStore = useUnitOfMeasureStore();
+const categoryStore = useProductCategoryStore();
 
 const products = ref<Product[]>([]);
 const loading = ref(false);
 const showModal = ref(false);
+const showBomModal = ref(false);
+const showRoutingModal = ref(false);
 const editingProduct = ref<Product | null>(null);
+const selectedProduct = ref<Product | null>(null);
 const filters = ref({ search: '', type: '', categoryId: '', active: '' });
 const pagination = ref({ page: 1, limit: 100, total: 0, pages: 0 });
 const formData = ref({
@@ -274,6 +300,24 @@ const closeModal = () => {
   editingProduct.value = null;
 };
 
+const openBomManager = (product: Product) => {
+  selectedProduct.value = product;
+  showBomModal.value = true;
+};
+
+const openRoutingManager = (product: Product) => {
+  selectedProduct.value = product;
+  showRoutingModal.value = true;
+};
+
+watch(products, (list) => {
+  if (!selectedProduct.value) return;
+  const updated = list.find((item) => item.id === selectedProduct.value?.id);
+  if (updated) {
+    selectedProduct.value = updated;
+  }
+});
+
 const handleSubmit = async () => {
   try {
     const payload = {
@@ -286,6 +330,7 @@ const handleSubmit = async () => {
       lastCost: formData.value.lastCost ?? undefined,
       averageCost: formData.value.averageCost ?? undefined,
     };
+
     if (editingProduct.value) {
       await productStore.updateProduct(editingProduct.value.id, payload);
       alert('Produto atualizado com sucesso!');
@@ -293,6 +338,7 @@ const handleSubmit = async () => {
       await productStore.createProduct(payload);
       alert('Produto criado com sucesso!');
     }
+
     closeModal();
     await loadProducts();
   } catch (error: any) {
@@ -301,25 +347,27 @@ const handleSubmit = async () => {
 };
 
 const handleToggleActive = async (product: Product) => {
-  if (confirm(`Deseja ${product.active ? 'desativar' : 'ativar'} o produto "${product.name}"?`)) {
-    try {
-      await productStore.toggleActive(product.id);
-      await loadProducts();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
-    }
+  if (!confirm(`Deseja ${product.active ? 'desativar' : 'ativar'} o produto "${product.name}"?`)) {
+    return;
+  }
+  try {
+    await productStore.toggleActive(product.id);
+    await loadProducts();
+  } catch (error: any) {
+    alert(error.response?.data?.message || 'Erro ao alterar status');
   }
 };
 
 const handleDelete = async (product: Product) => {
-  if (confirm(`Deseja realmente excluir o produto "${product.name}"?`)) {
-    try {
-      await productStore.deleteProduct(product.id);
-      alert('Produto excluído com sucesso!');
-      await loadProducts();
-    } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao excluir produto');
-    }
+  if (!confirm(`Deseja realmente excluir o produto "${product.name}"?`)) {
+    return;
+  }
+  try {
+    await productStore.deleteProduct(product.id);
+    alert('Produto excluído com sucesso!');
+    await loadProducts();
+  } catch (error: any) {
+    alert(error.response?.data?.message || 'Erro ao excluir produto');
   }
 };
 
@@ -338,6 +386,12 @@ const handleLogout = async () => {
   router.push('/login');
 };
 
-onMounted(() => loadProducts());
+onMounted(async () => {
+  await Promise.all([
+    unitStore.fetchUnits(1, 1000, { active: true }),
+    categoryStore.fetchCategories(),
+  ]);
+  await loadProducts();
+});
 </script>
 

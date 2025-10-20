@@ -34,8 +34,8 @@
         <!-- Permissions by Resource -->
         <div v-else class="space-y-6">
           <div v-for="(perms, resource) in groupedPermissions" :key="resource">
-            <h4 class="text-lg font-semibold text-gray-900 mb-3 capitalize">
-              {{ resource }}
+            <h4 class="text-lg font-semibold text-gray-900 mb-3">
+              {{ getResourceLabel(resource) }}
             </h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg">
               <div
@@ -184,6 +184,25 @@ watch(() => props.isOpen, (newValue, oldValue) => {
   }
 });
 
+const getResourceLabel = (resource: string) => {
+  const labels: Record<string, string> = {
+    users: 'Usuários',
+    roles: 'Perfis',
+    products: 'Produtos',
+    boms: 'BOMs (Estruturas de Produto)',
+    routings: 'Roteiros de Produção',
+    production_orders: 'Ordens de Produção',
+    production_pointings: 'Apontamentos de Produção',
+    work_centers: 'Centros de Trabalho',
+    suppliers: 'Fornecedores',
+    customers: 'Clientes',
+    stock: 'Estoque',
+    reports: 'Relatórios',
+    audit_logs: 'Logs de Auditoria',
+  };
+  return labels[resource] || resource;
+};
+
 const getActionLabel = (action: string) => {
   const labels: Record<string, string> = {
     create: 'Criar',
@@ -191,6 +210,7 @@ const getActionLabel = (action: string) => {
     update: 'Editar',
     delete: 'Excluir',
     export: 'Exportar',
+    execute: 'Executar',
   };
   return labels[action] || action;
 };

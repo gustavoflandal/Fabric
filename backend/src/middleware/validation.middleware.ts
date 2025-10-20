@@ -3,8 +3,8 @@ import Joi from 'joi';
 import { AppError } from './error.middleware';
 
 export const validate = (schema: Joi.ObjectSchema) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const { error } = schema.validate(req.body, {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const { error, value } = schema.validate(req.body, {
       abortEarly: false,
       stripUnknown: true,
     });
@@ -15,11 +15,10 @@ export const validate = (schema: Joi.ObjectSchema) => {
         message: detail.message,
       }));
 
-      return next(
-        new AppError(400, 'Erro de validação', true)
-      );
+      return next(new AppError(400, 'Erro de validação', true, errors));
     }
 
+    req.body = value;
     next();
   };
 };

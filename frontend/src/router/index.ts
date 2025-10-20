@@ -72,6 +72,36 @@ const routes: RouteRecordRaw[] = [
     name: 'products',
     component: () => import('../views/products/ProductsView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/production-orders',
+    name: 'production-orders',
+    component: () => import('../views/production/ProductionOrdersView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/production-pointings',
+    name: 'production-pointings',
+    component: () => import('../views/production/ProductionPointingsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/mrp',
+    name: 'mrp',
+    component: () => import('../views/mrp/MRPView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/stock',
+    name: 'stock',
+    component: () => import('../views/stock/StockView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/reports',
+    name: 'reports',
+    component: () => import('../views/reports/ReportsView.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

@@ -9,6 +9,15 @@ import supplierRoutes from './supplier.routes';
 import customerRoutes from './customer.routes';
 import workCenterRoutes from './work-center.routes';
 import productRoutes from './product.routes';
+import productCategoryRoutes from './product-category.routes';
+import bomRoutes from './bom.routes';
+import routingRoutes from './routing.routes';
+import productionOrderRoutes from './production-order.routes';
+import productionPointingRoutes from './production-pointing.routes';
+import dashboardRoutes from './dashboard.routes';
+import mrpRoutes from './mrp.routes';
+import stockRoutes from './stock.routes';
+import reportsRoutes from './reports.routes';
 
 const router = Router();
 
@@ -31,9 +40,24 @@ router.use('/work-centers', workCenterRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);
+router.use('/product-categories', productCategoryRoutes);
+router.use('/boms', bomRoutes);
+router.use('/routings', routingRoutes);
+
+// Rotas de produção
+router.use('/production-orders', productionOrderRoutes);
+router.use('/production-pointings', productionPointingRoutes);
+
+// Rotas de dashboard
+router.use('/dashboard', dashboardRoutes);
+
+// Rotas de MRP, Estoque e Relatórios
+router.use('/mrp', mrpRoutes);
+router.use('/stock', stockRoutes);
+router.use('/reports', reportsRoutes);
 
 // Health check
-router.get('/health', (req, res) => {
+router.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),

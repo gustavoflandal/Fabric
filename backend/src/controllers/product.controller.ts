@@ -5,9 +5,9 @@ export class ProductController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const product = await productService.create(req.body);
-      res.status(201).json({ status: 'success', data: product });
+      return res.status(201).json({ status: 'success', data: product, message: 'Produto criado com sucesso' });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -22,9 +22,9 @@ export class ProductController {
         search: req.query.search as string,
       };
       const result = await productService.getAll(page, limit, filters);
-      res.status(200).json({ status: 'success', data: result.data, pagination: result.pagination });
+      return res.status(200).json({ status: 'success', data: result.data, pagination: result.pagination });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
@@ -34,36 +34,36 @@ export class ProductController {
       if (!product) {
         return res.status(404).json({ status: 'error', message: 'Produto não encontrado' });
       }
-      res.status(200).json({ status: 'success', data: product });
+      return res.status(200).json({ status: 'success', data: product });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
   async update(req: Request, res: Response, next: NextFunction) {
     try {
       const product = await productService.update(req.params.id, req.body);
-      res.status(200).json({ status: 'success', data: product });
+      return res.status(200).json({ status: 'success', data: product, message: 'Produto atualizado com sucesso' });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
   async delete(req: Request, res: Response, next: NextFunction) {
     try {
       await productService.delete(req.params.id);
-      res.status(204).send();
+      return res.status(204).send();
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 
   async toggleActive(req: Request, res: Response, next: NextFunction) {
     try {
       const product = await productService.toggleActive(req.params.id);
-      res.status(200).json({ status: 'success', data: product });
+      return res.status(200).json({ status: 'success', data: product });
     } catch (error) {
-      next(error);
+      return next(error);
     }
   }
 }

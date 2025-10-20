@@ -20,7 +20,7 @@ import { computed } from 'vue'
 
 interface Props {
   type?: 'button' | 'submit' | 'reset'
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success'
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'success' | 'light'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   loading?: boolean
@@ -55,6 +55,7 @@ const buttonClasses = computed(() => {
     outline: 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 focus:ring-primary-500',
     danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500',
     success: 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500',
+    light: 'bg-primary-100 hover:bg-primary-200 text-primary-800 border-2 border-primary-200 hover:border-primary-300 focus:ring-primary-500',
   }
   
   const width = props.fullWidth ? 'w-full' : ''

@@ -233,6 +233,7 @@ model Product {
   bomItems      BOMItem[]
   routings      Routing[]
   productionOrders ProductionOrder[]
+  stockMovements StockMovement[]
   
   @@index([type])
   @@index([active])
@@ -424,4 +425,25 @@ model ProductionPointing {
   @@index([userId])
   @@index([startTime])
   @@map("production_pointings")
+}
+
+// ============================================
+// ESTOQUE
+// ============================================
+
+model StockMovement {
+  id            String    @id @default(uuid())
+  productId     String
+  type          String    // IN, OUT, ADJUSTMENT
+  quantity      Float
+  reason        String
+  reference     String?
+  userId        String
+  createdAt     DateTime  @default(now())
+  
+  product       Product   @relation(fields: [productId], references: [id])
+  
+  @@index([productId])
+  @@index([createdAt])
+  @@map("stock_movements")
 }

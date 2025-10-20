@@ -1,0 +1,12 @@
+{
+  "name": "fabric-mes",
+  "version": "1.0.0",
+  "description": "Sistema MES Fabric - Manufacturing Execution System",
+  "scripts": {
+    "backup": "node backup-database.js",
+    "backup:restore": "node restore-database.js"
+  },
+  "keywords": ["mes", "manufacturing", "production", "erp"],
+  "author": "",
+  "license": "MIT"
+}
