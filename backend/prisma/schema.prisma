@@ -27,6 +27,7 @@ model User {
   roles         UserRole[]
   auditLogs     AuditLog[]
   productionPointings ProductionPointing[]
+  stockMovements StockMovement[]
   
   @@map("users")
 }
@@ -172,6 +173,9 @@ model Supplier {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
+  quotations    PurchaseQuotation[]
+  purchaseOrders PurchaseOrder[]
+  
   @@map("suppliers")
 }
 
@@ -234,6 +238,9 @@ model Product {
   routings      Routing[]
   productionOrders ProductionOrder[]
   stockMovements StockMovement[]
+  quotationItems PurchaseQuotationItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  receiptItems  PurchaseReceiptItem[]
   
   @@index([type])
   @@index([active])
@@ -437,13 +444,153 @@ model StockMovement {
   type          String    // IN, OUT, ADJUSTMENT
   quantity      Float
   reason        String
-  reference     String?
+  reference     String?   // ID da OP, Pedido, etc
+  referenceType String?   // PRODUCTION, PURCHASE, ADJUSTMENT
   userId        String
+  notes         String?
   createdAt     DateTime  @default(now())
   
   product       Product   @relation(fields: [productId], references: [id])
+  user          User      @relation(fields: [userId], references: [id])
   
   @@index([productId])
+  @@index([type])
   @@index([createdAt])
+  @@index([reference])
   @@map("stock_movements")
+}
+
+// ============================================
+// COMPRAS
+// ============================================
+
+model PurchaseQuotation {
+  id            String    @id @default(uuid())
+  quotationNumber String  @unique
+  supplierId    String
+  requestDate   DateTime  @default(now())
+  dueDate       DateTime
+  status        String    @default("PENDING") // PENDING, SENT, RECEIVED, APPROVED, REJECTED, EXPIRED
+  notes         String?   @db.Text
+  totalValue    Float     @default(0)
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  items         PurchaseQuotationItem[]
+  purchaseOrders PurchaseOrder[]
+  
+  @@index([supplierId])
+  @@index([status])
+  @@index([requestDate])
+  @@map("purchase_quotations")
+}
+
+model PurchaseQuotationItem {
+  id            String    @id @default(uuid())
+  quotationId   String
+  productId     String
+  quantity      Float
+  unitPrice     Float
+  discount      Float     @default(0)
+  totalPrice    Float
+  deliveryDays  Int?
+  notes         String?
+  
+  quotation     PurchaseQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product       Product   @relation(fields: [productId], references: [id])
+  
+  @@index([quotationId])
+  @@index([productId])
+  @@map("purchase_quotation_items")
+}
+
+model PurchaseOrder {
+  id            String    @id @default(uuid())
+  orderNumber   String    @unique
+  supplierId    String
+  quotationId   String?
+  orderDate     DateTime  @default(now())
+  expectedDate  DateTime
+  receivedDate  DateTime?
+  status        String    @default("PENDING") // PENDING, CONFIRMED, PARTIAL, RECEIVED, CANCELLED
+  paymentTerms  String?
+  paymentMethod String?
+  shippingCost  Float     @default(0)
+  discount      Float     @default(0)
+  totalValue    Float
+  notes         String?   @db.Text
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  quotation     PurchaseQuotation? @relation(fields: [quotationId], references: [id])
+  items         PurchaseOrderItem[]
+  receipts      PurchaseReceipt[]
+  
+  @@index([supplierId])
+  @@index([quotationId])
+  @@index([status])
+  @@index([orderDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id            String    @id @default(uuid())
+  orderId       String
+  productId     String
+  quantity      Float
+  receivedQty   Float     @default(0)
+  unitPrice     Float
+  discount      Float     @default(0)
+  totalPrice    Float
+  notes         String?
+  
+  order         PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product   @relation(fields: [productId], references: [id])
+  receiptItems  PurchaseReceiptItem[]
+  
+  @@index([orderId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
+model PurchaseReceipt {
+  id            String    @id @default(uuid())
+  receiptNumber String    @unique
+  orderId       String
+  receiptDate   DateTime  @default(now())
+  receivedBy    String
+  notes         String?   @db.Text
+  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt     DateTime  @default(now())
+  
+  order         PurchaseOrder @relation(fields: [orderId], references: [id])
+  items         PurchaseReceiptItem[]
+  
+  @@index([orderId])
+  @@index([receiptDate])
+  @@map("purchase_receipts")
+}
+
+model PurchaseReceiptItem {
+  id            String    @id @default(uuid())
+  receiptId     String
+  orderItemId   String
+  productId     String
+  quantity      Float
+  acceptedQty   Float
+  rejectedQty   Float     @default(0)
+  notes         String?
+  
+  receipt       PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  orderItem     PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
+  product       Product   @relation(fields: [productId], references: [id])
+  
+  @@index([receiptId])
+  @@index([orderItemId])
+  @@index([productId])
+  @@map("purchase_receipt_items")
 }

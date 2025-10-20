@@ -1,4 +1,6 @@
 import { prisma } from '../config/database';
+import materialConsumptionService from './material-consumption.service';
+import { eventBus, SystemEvents } from '../events/event-bus';
 
 export interface CreateProductionPointingDto {
   productionOrderId: string;
@@ -45,6 +47,18 @@ export class ProductionPointingService {
     if (!operation) {
       throw new Error('Operação não encontrada');
     }
+
+    // VALIDAÇÃO 1: Quantidade não pode exceder OP
+    const totalPointed = await this.getTotalPointed(data.productionOrderId);
+    if (totalPointed + data.goodQuantity > order.quantity) {
+      throw new Error(
+        `Quantidade apontada (${totalPointed + data.goodQuantity}) excede quantidade da OP (${order.quantity})`
+      );
+    }
+
+    // VALIDAÇÃO 2: Verificar refugo alto
+    const scrapRate = data.scrapQuantity ? (data.scrapQuantity / data.goodQuantity) * 100 : 0;
+    const hasHighScrap = scrapRate > 10;
 
     // Calcular tempo decorrido se endTime foi fornecido
     let elapsedTime = 0;
@@ -100,9 +114,52 @@ export class ProductionPointingService {
       },
     });
 
-    // Se o apontamento foi finalizado, atualizar a operação
+    // ✅ INTEGRAÇÃO: Consumir materiais automaticamente
+    try {
+      await materialConsumptionService.consumeMaterials(pointing.id, userId);
+      console.log(`[ProductionPointing] Materiais consumidos para apontamento ${pointing.id}`);
+    } catch (error: any) {
+      console.error(`[ProductionPointing] Erro ao consumir materiais:`, error.message);
+      // Não quebra o processo, mas registra o erro
+      await eventBus.emit(SystemEvents.SYSTEM_WARNING, {
+        type: 'MATERIAL_CONSUMPTION_FAILED',
+        pointingId: pointing.id,
+        error: error.message,
+      });
+    }
+
+    // ✅ INTEGRAÇÃO: Atualizar status da operação
+    await this.updateOperationStatus(data.operationId);
+
+    // ✅ INTEGRAÇÃO: Verificar conclusão da OP
+    await this.checkOrderCompletion(data.productionOrderId);
+
+    // ✅ EVENT: Emitir evento de apontamento criado
+    await eventBus.emit(SystemEvents.PRODUCTION_POINTING_CREATED, {
+      pointingId: pointing.id,
+      productionOrderId: data.productionOrderId,
+      operationId: data.operationId,
+      goodQuantity: data.goodQuantity,
+      scrapQuantity: data.scrapQuantity || 0,
+    });
+
+    // ✅ EVENT: Alerta de refugo alto
+    if (hasHighScrap) {
+      await eventBus.emit(SystemEvents.QUALITY_SCRAP_HIGH, {
+        pointingId: pointing.id,
+        productionOrderId: data.productionOrderId,
+        scrapRate,
+        threshold: 10,
+      });
+    }
+
+    // Se o apontamento foi finalizado, emitir evento
     if (data.endTime) {
-      await this.updateOperationProgress(data.operationId);
+      await eventBus.emit(SystemEvents.PRODUCTION_POINTING_FINISHED, {
+        pointingId: pointing.id,
+        productionOrderId: data.productionOrderId,
+        operationId: data.operationId,
+      });
     }
 
     return pointing;
@@ -508,6 +565,94 @@ export class ProductionPointingService {
         scrapQty,
       },
     });
+  }
+
+  /**
+   * Calcula total já apontado para uma OP
+   */
+  private async getTotalPointed(productionOrderId: string): Promise<number> {
+    const pointings = await prisma.productionPointing.findMany({
+      where: { productionOrderId },
+    });
+
+    return pointings.reduce((sum, p) => sum + p.quantityGood, 0);
+  }
+
+  /**
+   * Atualiza status da operação baseado nos apontamentos
+   */
+  private async updateOperationStatus(operationId: string): Promise<void> {
+    const operation = await prisma.productionOrderOperation.findUnique({
+      where: { id: operationId },
+      include: { productionOrder: true },
+    });
+
+    if (!operation) return;
+
+    const totalPointed = await prisma.productionPointing.aggregate({
+      where: { operationId },
+      _sum: { quantityGood: true },
+    });
+
+    const pointed = totalPointed._sum.quantityGood || 0;
+    const required = operation.productionOrder.quantity;
+
+    let status = 'PENDING';
+    if (pointed >= required) {
+      status = 'COMPLETED';
+    } else if (pointed > 0) {
+      status = 'IN_PROGRESS';
+    }
+
+    await prisma.productionOrderOperation.update({
+      where: { id: operationId },
+      data: {
+        status,
+        actualQuantity: pointed,
+      },
+    });
+
+    // Emitir evento se operação foi concluída
+    if (status === 'COMPLETED') {
+      await eventBus.emit(SystemEvents.PRODUCTION_OPERATION_COMPLETED, {
+        operationId: operation.id,
+        productionOrderId: operation.productionOrderId,
+        actualQuantity: pointed,
+      });
+    } else if (status === 'IN_PROGRESS') {
+      await eventBus.emit(SystemEvents.PRODUCTION_OPERATION_STARTED, {
+        operationId: operation.id,
+        productionOrderId: operation.productionOrderId,
+      });
+    }
+  }
+
+  /**
+   * Verifica se a OP foi concluída
+   */
+  private async checkOrderCompletion(productionOrderId: string): Promise<void> {
+    const operations = await prisma.productionOrderOperation.findMany({
+      where: { productionOrderId },
+    });
+
+    const allCompleted = operations.every(op => op.status === 'COMPLETED');
+
+    if (allCompleted) {
+      await prisma.productionOrder.update({
+        where: { id: productionOrderId },
+        data: {
+          status: 'COMPLETED',
+          actualEnd: new Date(),
+        },
+      });
+
+      // Emitir evento de OP concluída
+      await eventBus.emit(SystemEvents.PRODUCTION_ORDER_COMPLETED, {
+        productionOrderId,
+      });
+
+      console.log(`[ProductionPointing] OP ${productionOrderId} concluída!`);
+    }
   }
 }
 

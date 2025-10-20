@@ -234,6 +234,24 @@
                 <p class="text-sm font-medium text-gray-700">Apontamentos</p>
               </div>
             </RouterLink>
+            <RouterLink
+              to="/purchases/quotations"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">💰</div>
+                <p class="text-sm font-medium text-gray-700">Orçamentos</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/purchases/orders"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🛒</div>
+                <p class="text-sm font-medium text-gray-700">Pedidos de Compra</p>
+              </div>
+            </RouterLink>
           </div>
         </Card>
       </div>

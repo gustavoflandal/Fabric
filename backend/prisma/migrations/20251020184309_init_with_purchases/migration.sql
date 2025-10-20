@@ -56,18 +56,27 @@ CREATE TABLE `role_permissions` (
 -- CreateTable
 CREATE TABLE `audit_logs` (
     `id` VARCHAR(191) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
-    `action` VARCHAR(191) NOT NULL,
-    `resource` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NULL,
+    `action` VARCHAR(100) NOT NULL,
+    `resource` VARCHAR(100) NOT NULL,
     `resourceId` VARCHAR(191) NULL,
+    `description` TEXT NULL,
+    `ipAddress` VARCHAR(45) NULL,
+    `userAgent` TEXT NULL,
+    `method` VARCHAR(10) NULL,
+    `endpoint` VARCHAR(500) NULL,
+    `statusCode` INTEGER NULL,
+    `requestBody` JSON NULL,
+    `responseBody` JSON NULL,
     `oldValues` JSON NULL,
     `newValues` JSON NULL,
-    `ipAddress` VARCHAR(191) NULL,
-    `userAgent` VARCHAR(191) NULL,
+    `errorMessage` TEXT NULL,
+    `durationMs` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `audit_logs_userId_idx`(`userId`),
-    INDEX `audit_logs_resource_resourceId_idx`(`resource`, `resourceId`),
+    INDEX `audit_logs_resource_idx`(`resource`),
+    INDEX `audit_logs_action_idx`(`action`),
     INDEX `audit_logs_createdAt_idx`(`createdAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -97,6 +106,9 @@ CREATE TABLE `units_of_measure` (
     `name` VARCHAR(191) NOT NULL,
     `type` VARCHAR(191) NOT NULL,
     `symbol` VARCHAR(191) NULL,
+    `active` BOOLEAN NOT NULL DEFAULT true,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `units_of_measure_code_key`(`code`),
     PRIMARY KEY (`id`)
@@ -333,6 +345,139 @@ CREATE TABLE `production_pointings` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `stock_movements` (
+    `id` VARCHAR(191) NOT NULL,
+    `productId` VARCHAR(191) NOT NULL,
+    `type` VARCHAR(191) NOT NULL,
+    `quantity` DOUBLE NOT NULL,
+    `reason` VARCHAR(191) NOT NULL,
+    `reference` VARCHAR(191) NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `stock_movements_productId_idx`(`productId`),
+    INDEX `stock_movements_createdAt_idx`(`createdAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `purchase_quotations` (
+    `id` VARCHAR(191) NOT NULL,
+    `quotationNumber` VARCHAR(191) NOT NULL,
+    `supplierId` VARCHAR(191) NOT NULL,
+    `requestDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `dueDate` DATETIME(3) NOT NULL,
+    `status` VARCHAR(191) NOT NULL DEFAULT 'PENDING',
+    `notes` TEXT NULL,
+    `totalValue` DOUBLE NOT NULL DEFAULT 0,
+    `createdBy` VARCHAR(191) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    UNIQUE INDEX `purchase_quotations_quotationNumber_key`(`quotationNumber`),
+    INDEX `purchase_quotations_supplierId_idx`(`supplierId`),
+    INDEX `purchase_quotations_status_idx`(`status`),
+    INDEX `purchase_quotations_requestDate_idx`(`requestDate`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `purchase_quotation_items` (
+    `id` VARCHAR(191) NOT NULL,
+    `quotationId` VARCHAR(191) NOT NULL,
+    `productId` VARCHAR(191) NOT NULL,
+    `quantity` DOUBLE NOT NULL,
+    `unitPrice` DOUBLE NOT NULL,
+    `discount` DOUBLE NOT NULL DEFAULT 0,
+    `totalPrice` DOUBLE NOT NULL,
+    `deliveryDays` INTEGER NULL,
+    `notes` VARCHAR(191) NULL,
+
+    INDEX `purchase_quotation_items_quotationId_idx`(`quotationId`),
+    INDEX `purchase_quotation_items_productId_idx`(`productId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `purchase_orders` (
+    `id` VARCHAR(191) NOT NULL,
+    `orderNumber` VARCHAR(191) NOT NULL,
+    `supplierId` VARCHAR(191) NOT NULL,
+    `quotationId` VARCHAR(191) NULL,
+    `orderDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `expectedDate` DATETIME(3) NOT NULL,
+    `receivedDate` DATETIME(3) NULL,
+    `status` VARCHAR(191) NOT NULL DEFAULT 'PENDING',
+    `paymentTerms` VARCHAR(191) NULL,
+    `paymentMethod` VARCHAR(191) NULL,
+    `shippingCost` DOUBLE NOT NULL DEFAULT 0,
+    `discount` DOUBLE NOT NULL DEFAULT 0,
+    `totalValue` DOUBLE NOT NULL,
+    `notes` TEXT NULL,
+    `createdBy` VARCHAR(191) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    UNIQUE INDEX `purchase_orders_orderNumber_key`(`orderNumber`),
+    INDEX `purchase_orders_supplierId_idx`(`supplierId`),
+    INDEX `purchase_orders_quotationId_idx`(`quotationId`),
+    INDEX `purchase_orders_status_idx`(`status`),
+    INDEX `purchase_orders_orderDate_idx`(`orderDate`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `purchase_order_items` (
+    `id` VARCHAR(191) NOT NULL,
+    `orderId` VARCHAR(191) NOT NULL,
+    `productId` VARCHAR(191) NOT NULL,
+    `quantity` DOUBLE NOT NULL,
+    `receivedQty` DOUBLE NOT NULL DEFAULT 0,
+    `unitPrice` DOUBLE NOT NULL,
+    `discount` DOUBLE NOT NULL DEFAULT 0,
+    `totalPrice` DOUBLE NOT NULL,
+    `notes` VARCHAR(191) NULL,
+
+    INDEX `purchase_order_items_orderId_idx`(`orderId`),
+    INDEX `purchase_order_items_productId_idx`(`productId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `purchase_receipts` (
+    `id` VARCHAR(191) NOT NULL,
+    `receiptNumber` VARCHAR(191) NOT NULL,
+    `orderId` VARCHAR(191) NOT NULL,
+    `receiptDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `receivedBy` VARCHAR(191) NOT NULL,
+    `notes` TEXT NULL,
+    `status` VARCHAR(191) NOT NULL DEFAULT 'PENDING',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `purchase_receipts_receiptNumber_key`(`receiptNumber`),
+    INDEX `purchase_receipts_orderId_idx`(`orderId`),
+    INDEX `purchase_receipts_receiptDate_idx`(`receiptDate`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `purchase_receipt_items` (
+    `id` VARCHAR(191) NOT NULL,
+    `receiptId` VARCHAR(191) NOT NULL,
+    `orderItemId` VARCHAR(191) NOT NULL,
+    `productId` VARCHAR(191) NOT NULL,
+    `quantity` DOUBLE NOT NULL,
+    `acceptedQty` DOUBLE NOT NULL,
+    `rejectedQty` DOUBLE NOT NULL DEFAULT 0,
+    `notes` VARCHAR(191) NULL,
+
+    INDEX `purchase_receipt_items_receiptId_idx`(`receiptId`),
+    INDEX `purchase_receipt_items_orderItemId_idx`(`orderItemId`),
+    INDEX `purchase_receipt_items_productId_idx`(`productId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `user_roles` ADD CONSTRAINT `user_roles_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -346,7 +491,7 @@ ALTER TABLE `role_permissions` ADD CONSTRAINT `role_permissions_roleId_fkey` FOR
 ALTER TABLE `role_permissions` ADD CONSTRAINT `role_permissions_permissionId_fkey` FOREIGN KEY (`permissionId`) REFERENCES `permissions`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `audit_logs` ADD CONSTRAINT `audit_logs_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `audit_logs` ADD CONSTRAINT `audit_logs_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `products` ADD CONSTRAINT `products_unitId_fkey` FOREIGN KEY (`unitId`) REFERENCES `units_of_measure`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -395,3 +540,39 @@ ALTER TABLE `production_pointings` ADD CONSTRAINT `production_pointings_operatio
 
 -- AddForeignKey
 ALTER TABLE `production_pointings` ADD CONSTRAINT `production_pointings_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `users`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `stock_movements` ADD CONSTRAINT `stock_movements_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_quotations` ADD CONSTRAINT `purchase_quotations_supplierId_fkey` FOREIGN KEY (`supplierId`) REFERENCES `suppliers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_quotation_items` ADD CONSTRAINT `purchase_quotation_items_quotationId_fkey` FOREIGN KEY (`quotationId`) REFERENCES `purchase_quotations`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_quotation_items` ADD CONSTRAINT `purchase_quotation_items_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_orders` ADD CONSTRAINT `purchase_orders_supplierId_fkey` FOREIGN KEY (`supplierId`) REFERENCES `suppliers`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_orders` ADD CONSTRAINT `purchase_orders_quotationId_fkey` FOREIGN KEY (`quotationId`) REFERENCES `purchase_quotations`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_order_items` ADD CONSTRAINT `purchase_order_items_orderId_fkey` FOREIGN KEY (`orderId`) REFERENCES `purchase_orders`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_order_items` ADD CONSTRAINT `purchase_order_items_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_receipts` ADD CONSTRAINT `purchase_receipts_orderId_fkey` FOREIGN KEY (`orderId`) REFERENCES `purchase_orders`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_receipt_items` ADD CONSTRAINT `purchase_receipt_items_receiptId_fkey` FOREIGN KEY (`receiptId`) REFERENCES `purchase_receipts`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_receipt_items` ADD CONSTRAINT `purchase_receipt_items_orderItemId_fkey` FOREIGN KEY (`orderItemId`) REFERENCES `purchase_order_items`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `purchase_receipt_items` ADD CONSTRAINT `purchase_receipt_items_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

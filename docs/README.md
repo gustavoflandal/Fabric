@@ -125,28 +125,6 @@ Fabric utiliza as melhores práticas de gestão industrial para garantir eficiê
 
 ---
 
-## 🚀 Acesso Rápido
-
-### **🔗 Links Principais**
-- **🌟 [Demo Online](https://vagalume-demo.vercel.app)** - Teste o sistema completo
-- **📖 [Manual do Usuário](https://vagalume-demo.vercel.app/manual)** - Guia completo de utilização
-- **🔗 [Documentação API](https://vagalume-demo.vercel.app/api-docs)** - Para desenvolvedores
-- **🐛 [Reportar Bug](https://github.com/gustavoflandal/VagaLume/issues)** - Ajude a melhorar
-
-### **🎯 Principais Recursos**
-- **💰 Contas Bancárias** - Gerencie múltiplas contas e cartões
-- **📊 Dashboard** - Visão geral das suas finanças
-- **🔄 Transações** - Registre receitas, despesas e transferências
-- **🏷️ Categorias** - Organize seus gastos por tipo
-- **📅 Contas Recorrentes** - Automatize contas mensais e parcelas
-- **💹 Orçamentos** - Controle limites de gastos
-- **📈 Relatórios** - Análise detalhada com gráficos
-- **⚙️ Configurações** - Personalize o sistema
-
-### **📱 Aplicação Responsiva**
-- ✅ **Desktop** - Interface completa otimizada
-- ✅ **Tablet** - Layout adaptado para telas médias
-- ✅ **Mobile** - Experiência otimizada para smartphones
 
 ---
 

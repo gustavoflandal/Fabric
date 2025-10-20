@@ -92,6 +92,14 @@ async function main() {
     // Logs de Auditoria
     { resource: 'audit_logs', action: 'read', description: 'Visualizar logs de auditoria' },
     { resource: 'audit_logs', action: 'delete', description: 'Excluir logs de auditoria' },
+    
+    // Compras
+    { resource: 'purchases', action: 'create', description: 'Criar orçamentos e pedidos de compra' },
+    { resource: 'purchases', action: 'read', description: 'Visualizar orçamentos e pedidos de compra' },
+    { resource: 'purchases', action: 'update', description: 'Editar orçamentos e pedidos de compra' },
+    { resource: 'purchases', action: 'delete', description: 'Excluir orçamentos e pedidos de compra' },
+    { resource: 'purchases', action: 'approve_quotation', description: 'Aprovar orçamentos de compra' },
+    { resource: 'purchases', action: 'approve_order', description: 'Aprovar pedidos de compra' },
   ];
 
   for (const perm of permissions) {

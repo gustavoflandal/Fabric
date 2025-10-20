@@ -18,6 +18,9 @@ import dashboardRoutes from './dashboard.routes';
 import mrpRoutes from './mrp.routes';
 import stockRoutes from './stock.routes';
 import reportsRoutes from './reports.routes';
+import purchaseQuotationRoutes from './purchase-quotation.routes';
+import purchaseOrderRoutes from './purchase-order.routes';
+import purchaseReceiptRoutes from './purchase-receipt.routes';
 
 const router = Router();
 
@@ -55,6 +58,11 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/mrp', mrpRoutes);
 router.use('/stock', stockRoutes);
 router.use('/reports', reportsRoutes);
+
+// Rotas de compras
+router.use('/purchase-quotations', purchaseQuotationRoutes);
+router.use('/purchase-orders', purchaseOrderRoutes);
+router.use('/purchase-receipts', purchaseReceiptRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {

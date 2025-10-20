@@ -197,8 +197,10 @@ const getResourceLabel = (resource: string) => {
     suppliers: 'Fornecedores',
     customers: 'Clientes',
     stock: 'Estoque',
+    mrp: 'MRP (Planejamento de Materiais)',
     reports: 'Relatórios',
     audit_logs: 'Logs de Auditoria',
+    purchases: 'Compras',
   };
   return labels[resource] || resource;
 };
@@ -211,6 +213,15 @@ const getActionLabel = (action: string) => {
     delete: 'Excluir',
     export: 'Exportar',
     execute: 'Executar',
+    entry: 'Registrar Entrada',
+    exit: 'Registrar Saída',
+    adjustment: 'Ajustar',
+    consolidate: 'Consolidar',
+    production: 'Relatório de Produção',
+    efficiency: 'Relatório de Eficiência',
+    quality: 'Relatório de Qualidade',
+    approve_quotation: 'Aprovar Orçamentos',
+    approve_order: 'Aprovar Pedidos',
   };
   return labels[action] || action;
 };

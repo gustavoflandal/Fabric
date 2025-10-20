@@ -2,12 +2,17 @@ import { app } from './app';
 import { config } from './config/env';
 import { logger } from './config/logger';
 import { prisma } from './config/database';
+import { initializeEventListeners } from './events/listeners';
 
 const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
     logger.info('✅ Database connected successfully');
+
+    // Initialize event listeners
+    initializeEventListeners();
+    logger.info('✅ Event listeners initialized');
 
     // Start server
     app.listen(config.port, () => {
