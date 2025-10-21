@@ -53,7 +53,3 @@ temp/
 # Build artifacts
 *.tsbuildinfo
 
-# Backups
-backups/*.json
-backups/*.sql
-!backups/README.md

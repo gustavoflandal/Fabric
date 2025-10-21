@@ -197,6 +197,96 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal de Visualização -->
+    <div v-if="showViewModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-medium">Detalhes do Pedido de Compra</h3>
+          <button @click="showViewModal = false" class="text-gray-400 hover:text-gray-500">
+            <span class="text-2xl">&times;</span>
+          </button>
+        </div>
+        
+        <div v-if="selectedOrder" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Número</label>
+              <p class="mt-1 text-sm text-gray-900">{{ selectedOrder.orderNumber }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Status</label>
+              <span :class="getStatusClass(selectedOrder.status)" class="mt-1 inline-flex px-2 text-xs leading-5 font-semibold rounded-full">
+                {{ getStatusLabel(selectedOrder.status) }}
+              </span>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Fornecedor</label>
+              <p class="mt-1 text-sm text-gray-900">{{ selectedOrder.supplier?.name }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Data do Pedido</label>
+              <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedOrder.orderDate) }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Data Esperada</label>
+              <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedOrder.expectedDate) }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Valor Total</label>
+              <p class="mt-1 text-sm font-bold text-gray-900">{{ formatCurrency(selectedOrder.totalValue) }}</p>
+            </div>
+            <div v-if="selectedOrder.approvedBy">
+              <label class="block text-sm font-medium text-gray-700">Aprovado por</label>
+              <p class="mt-1 text-sm text-gray-900">{{ selectedOrder.approvedBy }}</p>
+            </div>
+          </div>
+
+          <div v-if="selectedOrder.notes">
+            <label class="block text-sm font-medium text-gray-700">Observações</label>
+            <p class="mt-1 text-sm text-gray-900">{{ selectedOrder.notes }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Itens</label>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Recebido</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="item in selectedOrder.items" :key="item.id">
+                    <td class="px-4 py-2 text-sm text-gray-900">{{ item.product?.code }} - {{ item.product?.name }}</td>
+                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.quantity }}</td>
+                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.receivedQty || 0 }}</td>
+                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ formatCurrency(item.unitPrice) }}</td>
+                    <td class="px-4 py-2 text-sm text-right font-semibold text-gray-900">{{ formatCurrency(item.totalPrice) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-end gap-3">
+            <Button type="button" variant="outline" @click="showViewModal = false">
+              Fechar
+            </Button>
+            <Button v-if="selectedOrder.status === 'APPROVED' || selectedOrder.status === 'CONFIRMED'" variant="outline" @click="printOrderPDF(selectedOrder)">
+              📄 Imprimir PDF
+            </Button>
+            <Button v-if="selectedOrder.status === 'PENDING'" variant="primary" @click="confirmOrder(selectedOrder.id)">
+              Confirmar Pedido
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -208,6 +298,7 @@ import { usePurchaseOrderStore } from '@/stores/purchase-order.store';
 import type { PurchaseOrder } from '@/services/purchase-order.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { generatePDF, formatCurrency as formatCurrencyPDF, formatDate as formatDatePDF } from '@/utils/pdf-generator';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -216,6 +307,8 @@ const orderStore = usePurchaseOrderStore();
 const orders = ref<PurchaseOrder[]>([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
+const showViewModal = ref(false);
+const selectedOrder = ref<PurchaseOrder | null>(null);
 const submitting = ref(false);
 const filters = ref({ search: '', status: '' });
 
@@ -325,8 +418,15 @@ const handleSubmit = async () => {
   }
 };
 
-const viewOrder = (order: PurchaseOrder) => {
-  alert(`Visualizar pedido ${order.orderNumber}`);
+const viewOrder = async (order: PurchaseOrder) => {
+  try {
+    // Buscar detalhes completos do pedido
+    const response = await orderStore.getOrderById(order.id);
+    selectedOrder.value = response;
+    showViewModal.value = true;
+  } catch (error: any) {
+    alert(error.message || 'Erro ao carregar detalhes do pedido');
+  }
 };
 
 const confirmOrder = async (id: string) => {
@@ -350,6 +450,50 @@ const cancelOrder = async (id: string) => {
     } catch (error: any) {
       alert(error.message || 'Erro ao cancelar pedido');
     }
+  }
+};
+
+const printOrderPDF = (order: PurchaseOrder) => {
+  try {
+    const pdfData: Record<string, any> = {
+      'Fornecedor': order.supplier?.name || '',
+      'Data do Pedido': formatDatePDF(order.orderDate),
+      'Data Esperada': formatDatePDF(order.expectedDate),
+      'Status': getStatusLabel(order.status),
+      'Condições de Pagamento': order.paymentTerms || 'Não informado',
+      'Valor Total': formatCurrencyPDF(order.totalValue),
+    };
+    
+    if (order.approvedBy) {
+      pdfData['Aprovado por'] = order.approvedBy;
+    }
+    
+    pdfData['Observações'] = order.notes || 'Nenhuma';
+    
+    const pdf = generatePDF({
+      title: 'PEDIDO DE COMPRA',
+      subtitle: order.orderNumber,
+      data: pdfData,
+      items: order.items?.map(item => ({
+        produto: `${item.product?.code} - ${item.product?.name}`,
+        quantidade: item.quantity,
+        recebido: item.receivedQty || 0,
+        unitario: formatCurrencyPDF(item.unitPrice),
+        total: formatCurrencyPDF(item.totalPrice),
+      })) || [],
+      itemsColumns: [
+        { header: 'Produto', key: 'produto', align: 'left' },
+        { header: 'Quantidade', key: 'quantidade', align: 'right' },
+        { header: 'Recebido', key: 'recebido', align: 'right' },
+        { header: 'Preço Unit.', key: 'unitario', align: 'right' },
+        { header: 'Total', key: 'total', align: 'right' },
+      ],
+      supplierSignature: true,
+    });
+    
+    pdf.save(`Pedido_${order.orderNumber}.pdf`);
+  } catch (error: any) {
+    alert('Erro ao gerar PDF: ' + error.message);
   }
 };
 

@@ -75,37 +75,40 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progresso</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Início</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fim</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Número</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Produto</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Qtd.</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Progresso</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Início</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Fim</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Ações</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="order in orders" :key="order.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ order.orderNumber }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ order.product?.code }} - {{ order.product?.name }}
+                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ order.orderNumber }}</td>
+                <td class="px-4 py-4 text-sm text-gray-900">
+                  <div class="font-medium">{{ order.product?.code }}</div>
+                  <div class="text-xs text-gray-500">{{ order.product?.name }}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ order.quantity }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ order.producedQty }} / {{ order.quantity }}
-                  <span class="text-xs text-gray-400">({{ Math.round((order.producedQty / order.quantity) * 100) }}%)</span>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ order.quantity }}</td>
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <div>{{ order.producedQty }} / {{ order.quantity }}</div>
+                  <div class="text-xs text-gray-400">({{ Math.round((order.producedQty / order.quantity) * 100) }}%)</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-4 py-4 whitespace-nowrap">
                   <span :class="getStatusClass(order.status)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
                     {{ getStatusLabel(order.status) }}
                   </span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(order.scheduledStart) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(order.scheduledEnd) }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button @click="openDetailsModal(order)" class="text-primary-600 hover:text-primary-900">Detalhes</button>
-                  <button @click="handleDelete(order)" class="text-red-600 hover:text-red-900">Excluir</button>
+                <td class="px-4 py-4 text-sm text-gray-500">{{ formatDate(order.scheduledStart) }}</td>
+                <td class="px-4 py-4 text-sm text-gray-500">{{ formatDate(order.scheduledEnd) }}</td>
+                <td class="px-4 py-4 text-right text-sm font-medium">
+                  <div class="flex justify-end gap-2">
+                    <button @click="openDetailsModal(order)" class="text-primary-600 hover:text-primary-900 whitespace-nowrap">Detalhes</button>
+                    <button @click="handleDelete(order)" class="text-red-600 hover:text-red-900 whitespace-nowrap">Excluir</button>
+                  </div>
                 </td>
               </tr>
             </tbody>

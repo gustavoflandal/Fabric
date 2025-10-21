@@ -182,6 +182,96 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal de Visualização -->
+    <div v-if="showViewModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-medium">Detalhes do Orçamento</h3>
+          <button @click="showViewModal = false" class="text-gray-400 hover:text-gray-500">
+            <span class="text-2xl">&times;</span>
+          </button>
+        </div>
+        
+        <div v-if="selectedQuotation" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Número</label>
+              <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.quotationNumber }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Status</label>
+              <span :class="getStatusClass(selectedQuotation.status)" class="mt-1 inline-flex px-2 text-xs leading-5 font-semibold rounded-full">
+                {{ getStatusLabel(selectedQuotation.status) }}
+              </span>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Fornecedor</label>
+              <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.supplier?.name }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Data de Solicitação</label>
+              <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedQuotation.requestDate) }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Data de Validade</label>
+              <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedQuotation.dueDate) }}</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Valor Total</label>
+              <p class="mt-1 text-sm font-bold text-gray-900">{{ formatCurrency(selectedQuotation.totalValue) }}</p>
+            </div>
+            <div v-if="selectedQuotation.approvedBy">
+              <label class="block text-sm font-medium text-gray-700">Aprovado por</label>
+              <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.approvedBy }}</p>
+            </div>
+          </div>
+
+          <div v-if="selectedQuotation.notes">
+            <label class="block text-sm font-medium text-gray-700">Observações</label>
+            <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.notes }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Itens</label>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Desconto</th>
+                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                  <tr v-for="item in selectedQuotation.items" :key="item.id">
+                    <td class="px-4 py-2 text-sm text-gray-900">{{ item.product?.code }} - {{ item.product?.name }}</td>
+                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.quantity }}</td>
+                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ formatCurrency(item.unitPrice) }}</td>
+                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.discount || 0 }}%</td>
+                    <td class="px-4 py-2 text-sm text-right font-semibold text-gray-900">{{ formatCurrency(item.totalPrice) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-end gap-3">
+            <Button type="button" variant="outline" @click="showViewModal = false">
+              Fechar
+            </Button>
+            <Button v-if="selectedQuotation.status === 'APPROVED'" variant="outline" @click="printQuotationPDF(selectedQuotation)">
+              📄 Imprimir PDF
+            </Button>
+            <Button v-if="selectedQuotation.status === 'APPROVED'" variant="primary" @click="createOrder(selectedQuotation)">
+              Gerar Pedido
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -194,6 +284,7 @@ import { usePurchaseOrderStore } from '@/stores/purchase-order.store';
 import type { PurchaseQuotation } from '@/services/purchase-quotation.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { generatePDF, formatCurrency as formatCurrencyPDF, formatDate as formatDatePDF } from '@/utils/pdf-generator';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -203,6 +294,8 @@ const orderStore = usePurchaseOrderStore();
 const quotations = ref<PurchaseQuotation[]>([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
+const showViewModal = ref(false);
+const selectedQuotation = ref<PurchaseQuotation | null>(null);
 const submitting = ref(false);
 const filters = ref({ search: '', status: '' });
 
@@ -311,8 +404,15 @@ const handleSubmit = async () => {
   }
 };
 
-const viewQuotation = (quotation: PurchaseQuotation) => {
-  alert(`Visualizar orçamento ${quotation.quotationNumber}`);
+const viewQuotation = async (quotation: PurchaseQuotation) => {
+  try {
+    // Buscar detalhes completos do orçamento
+    const response = await quotationStore.getQuotationById(quotation.id);
+    selectedQuotation.value = response;
+    showViewModal.value = true;
+  } catch (error: any) {
+    alert(error.message || 'Erro ao carregar detalhes do orçamento');
+  }
 };
 
 const createOrder = async (quotation: PurchaseQuotation) => {
@@ -336,6 +436,49 @@ const deleteQuotation = async (id: string) => {
     } catch (error: any) {
       alert(error.message || 'Erro ao excluir orçamento');
     }
+  }
+};
+
+const printQuotationPDF = (quotation: PurchaseQuotation) => {
+  try {
+    const pdfData: Record<string, any> = {
+      'Fornecedor': quotation.supplier?.name || '',
+      'Data de Solicitação': formatDatePDF(quotation.requestDate),
+      'Data de Validade': formatDatePDF(quotation.dueDate),
+      'Status': getStatusLabel(quotation.status),
+      'Valor Total': formatCurrencyPDF(quotation.totalValue),
+    };
+    
+    if (quotation.approvedBy) {
+      pdfData['Aprovado por'] = quotation.approvedBy;
+    }
+    
+    pdfData['Observações'] = quotation.notes || 'Nenhuma';
+    
+    const pdf = generatePDF({
+      title: 'ORÇAMENTO DE COMPRA',
+      subtitle: quotation.quotationNumber,
+      data: pdfData,
+      items: quotation.items?.map(item => ({
+        produto: `${item.product?.code} - ${item.product?.name}`,
+        quantidade: item.quantity,
+        unitario: formatCurrencyPDF(item.unitPrice),
+        desconto: `${item.discount || 0}%`,
+        total: formatCurrencyPDF(item.totalPrice),
+      })) || [],
+      itemsColumns: [
+        { header: 'Produto', key: 'produto', align: 'left' },
+        { header: 'Quantidade', key: 'quantidade', align: 'right' },
+        { header: 'Preço Unit.', key: 'unitario', align: 'right' },
+        { header: 'Desconto', key: 'desconto', align: 'right' },
+        { header: 'Total', key: 'total', align: 'right' },
+      ],
+      supplierSignature: true,
+    });
+    
+    pdf.save(`Orcamento_${quotation.quotationNumber}.pdf`);
+  } catch (error: any) {
+    alert('Erro ao gerar PDF: ' + error.message);
   }
 };
 

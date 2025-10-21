@@ -147,7 +147,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Componente *</label>
-                    <input v-model="item.componentId" type="text" required placeholder="ID do componente" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+                    <select v-model="item.componentId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                      <option value="">Selecione um componente</option>
+                      <option v-for="prod in availableProducts" :key="prod.id" :value="prod.id">
+                        {{ prod.code }} - {{ prod.name }}
+                      </option>
+                    </select>
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Quantidade *</label>
@@ -155,7 +160,12 @@
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Unidade *</label>
-                    <input v-model="item.unitId" type="text" required placeholder="ID da unidade" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+                    <select v-model="item.unitId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                      <option value="">Selecione uma unidade</option>
+                      <option v-for="unit in availableUnits" :key="unit.id" :value="unit.id">
+                        {{ unit.code }} - {{ unit.name }}
+                      </option>
+                    </select>
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Sequência</label>
@@ -239,12 +249,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, onMounted } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import { useBomStore } from '@/stores/bom.store'
+import { useProductStore } from '@/stores/product.store'
 import type { Product } from '@/services/product.service'
 import type { Bom } from '@/services/bom.service'
+import unitOfMeasureService from '@/services/unit-of-measure.service'
 
 type FormMode = 'create' | 'edit'
 
@@ -284,9 +296,24 @@ const emit = defineEmits<{
 }>()
 
 const bomStore = useBomStore()
+const productStore = useProductStore()
 const loading = computed(() => bomStore.loading)
 const error = computed(() => bomStore.error)
 const boms = computed(() => (props.product ? bomStore.getCachedBoms(props.product.id) : []))
+
+const availableProducts = ref<Product[]>([])
+const availableUnits = ref<any[]>([])
+
+onMounted(async () => {
+  try {
+    await productStore.fetchProducts()
+    availableProducts.value = productStore.products
+    const unitsResponse = await unitOfMeasureService.getAll()
+    availableUnits.value = unitsResponse.data.data
+  } catch (err) {
+    console.error('Erro ao carregar produtos/unidades:', err)
+  }
+})
 
 const showForm = ref(false)
 const formMode = ref<FormMode>('create')

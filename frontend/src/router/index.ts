@@ -114,6 +114,60 @@ const routes: RouteRecordRaw[] = [
     name: 'purchase-orders',
     component: () => import('../views/purchases/PurchaseOrdersView.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/notifications',
+    name: 'notifications',
+    component: () => import('../views/NotificationsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/dashboard',
+    name: 'counting-dashboard',
+    component: () => import('../views/counting/CountingDashboard.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/plans',
+    name: 'counting-plans',
+    component: () => import('../views/counting/CountingPlanList.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/plans/new',
+    name: 'counting-plan-new',
+    component: () => import('../views/counting/CountingPlanForm.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/plans/:id',
+    name: 'counting-plan-edit',
+    component: () => import('../views/counting/CountingPlanForm.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/sessions',
+    name: 'counting-sessions',
+    component: () => import('../views/counting/CountingSessionList.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/sessions/:id',
+    name: 'counting-session-detail',
+    component: () => import('../views/counting/CountingSessionExecute.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/sessions/:id/execute',
+    name: 'counting-session-execute',
+    component: () => import('../views/counting/CountingSessionExecute.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/counting/sessions/:id/report',
+    name: 'counting-session-report',
+    component: () => import('../views/counting/CountingSessionReport.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

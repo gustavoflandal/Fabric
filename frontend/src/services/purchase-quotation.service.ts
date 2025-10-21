@@ -10,6 +10,8 @@ export interface PurchaseQuotation {
   notes?: string;
   totalValue: number;
   createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
   createdAt: string;
   updatedAt: string;
   supplier?: {

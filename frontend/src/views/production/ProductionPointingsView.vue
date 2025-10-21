@@ -64,41 +64,42 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ordem</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Operação</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Início</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fim</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd Boa</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Ordem</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase min-w-[200px]">Operação</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Operador</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-36">Início</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-36">Fim</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-24">Qtd Boa</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-24">Refugo</th>
+                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-28">Ações</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="pointing in pointings" :key="pointing.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {{ pointing.productionOrder?.orderNumber }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  Op {{ pointing.operation?.sequence }} - {{ pointing.operation?.description }}
+                <td class="px-4 py-4 text-sm text-gray-900">
+                  <div class="font-medium">Op {{ pointing.operation?.sequence }}</div>
+                  <div class="text-xs text-gray-500">{{ pointing.operation?.description }}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
                   {{ pointing.user?.name }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-4 py-4 text-sm text-gray-500">
                   {{ formatDateTime(pointing.startTime) }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td class="px-4 py-4 text-sm text-gray-500">
                   {{ formatDateTime(pointing.endTime) }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-semibold">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-right text-green-600 font-semibold">
                   {{ pointing.quantityGood }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                <td class="px-4 py-4 whitespace-nowrap text-sm text-right text-red-600">
                   {{ pointing.quantityScrap }}
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button @click="handleDelete(pointing)" class="text-red-600 hover:text-red-900">Excluir</button>
+                <td class="px-4 py-4 text-right text-sm font-medium">
+                  <button @click="handleDelete(pointing)" class="text-red-600 hover:text-red-900 whitespace-nowrap">Excluir</button>
                 </td>
               </tr>
             </tbody>

@@ -10,6 +10,7 @@
           </div>
           
           <div class="flex items-center space-x-4">
+            <NotificationBell />
             <span class="text-sm text-gray-700">
               Olá, <span class="font-semibold">{{ authStore.userName }}</span>
             </span>
@@ -96,24 +97,9 @@
         </Card>
       </div>
 
-      <!-- Quick Actions -->
+      <!-- Notification Center -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card title="Ações Rápidas">
-          <div class="space-y-3">
-            <Button variant="light" full-width @click="goToProductionOrders">
-              📋 Nova Ordem de Produção
-            </Button>
-            <Button variant="light" full-width @click="goToMRP">
-              🔄 Executar MRP
-            </Button>
-            <Button variant="light" full-width @click="goToStock">
-              📦 Consultar Estoque
-            </Button>
-            <Button variant="light" full-width @click="goToReports">
-              📊 Ver Relatórios
-            </Button>
-          </div>
-        </Card>
+        <NotificationCenter />
 
         <Card title="Módulos do Sistema">
           <div class="grid grid-cols-3 gap-3">
@@ -252,6 +238,15 @@
                 <p class="text-sm font-medium text-gray-700">Pedidos de Compra</p>
               </div>
             </RouterLink>
+            <RouterLink
+              to="/counting/dashboard"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">📋</div>
+                <p class="text-sm font-medium text-gray-700">Contagem de Estoque</p>
+              </div>
+            </RouterLink>
           </div>
         </Card>
       </div>
@@ -266,6 +261,8 @@ import { useAuthStore } from '@/stores/auth.store'
 import dashboardService from '@/services/dashboard.service'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
+import NotificationCenter from '@/components/notifications/NotificationCenter.vue'
+import NotificationBell from '@/components/notifications/NotificationBell.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

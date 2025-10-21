@@ -16,6 +16,8 @@ export interface PurchaseOrder {
   totalValue: number;
   notes?: string;
   createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
   createdAt: string;
   updatedAt: string;
   supplier?: {

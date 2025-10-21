@@ -24,12 +24,14 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await authService.login(credentials)
       console.log('AuthStore: Resposta recebida:', response)
 
-      user.value = response.user
+      // Set tokens first so they're available for subsequent requests
       accessToken.value = response.accessToken
       refreshToken.value = response.refreshToken
-
       localStorage.setItem('accessToken', response.accessToken)
       localStorage.setItem('refreshToken', response.refreshToken)
+
+      // Set user data
+      user.value = response.user
 
       console.log('AuthStore: Login bem-sucedido!')
       return true
