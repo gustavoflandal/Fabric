@@ -11,28 +11,28 @@ router.use(authMiddleware);
 // Listar recebimentos
 router.get(
   '/',
-  requirePermission('purchases', 'read'),
+  requirePermission('recebimentos_compra', 'visualizar'),
   purchaseReceiptController.getAll
 );
 
 // Buscar recebimento por ID
 router.get(
   '/:id',
-  requirePermission('purchases', 'read'),
+  requirePermission('recebimentos_compra', 'visualizar'),
   purchaseReceiptController.getById
 );
 
 // Criar recebimento
 router.post(
   '/',
-  requirePermission('purchases', 'create'),
+  requirePermission('recebimentos_compra', 'criar'),
   purchaseReceiptController.create
 );
 
 // Cancelar recebimento
 router.delete(
   '/:id',
-  requirePermission('purchases', 'delete'),
+  requirePermission('recebimentos_compra', 'excluir'),
   purchaseReceiptController.cancel
 );
 

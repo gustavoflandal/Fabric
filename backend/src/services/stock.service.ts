@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { eventBus, SystemEvents } from '../events/event-bus';
+import notificationDetector from './notification-detector.service';
 
 export interface StockMovementDto {
   productId: string;
@@ -89,6 +90,14 @@ export class StockServiceRefactored {
 
     // Verificar níveis de estoque
     await this.checkStockLevels(data.productId);
+
+    // ✅ NOTIFICAÇÃO: Verificar estoque baixo após movimentação
+    const currentBalance = await this.getBalance(data.productId);
+    if (currentBalance.quantity <= product.minStock) {
+      notificationDetector.checkLowStock().catch(err => {
+        console.error('Erro ao verificar estoque baixo:', err);
+      });
+    }
 
     return movement;
   }
@@ -356,6 +365,198 @@ export class StockServiceRefactored {
     }
 
     return consolidation;
+  }
+
+  /**
+   * Obtém resumo do estoque
+   */
+  async getSummary() {
+    const balances = await this.getAllBalances();
+    
+    const total = balances.length;
+    const ok = balances.filter(b => b.status === 'OK').length;
+    const low = balances.filter(b => b.status === 'LOW').length;
+    const critical = balances.filter(b => b.status === 'CRITICAL').length;
+    const excess = balances.filter(b => b.status === 'EXCESS').length;
+    
+    const totalValue = balances.reduce((sum, b) => {
+      const cost = b.product.averageCost || b.product.lastCost || b.product.standardCost || 0;
+      return sum + (b.quantity * cost);
+    }, 0);
+
+    return {
+      total,
+      ok,
+      low,
+      critical,
+      excess,
+      totalValue,
+      lastUpdate: new Date(),
+    };
+  }
+
+  /**
+   * Obtém produtos com estoque baixo
+   */
+  async getLowStockProducts(): Promise<StockBalance[]> {
+    const balances = await this.getAllBalances();
+    return balances.filter(b => b.status === 'LOW' || b.status === 'CRITICAL');
+  }
+
+  /**
+   * Obtém produtos com estoque em excesso
+   */
+  async getExcessStockProducts(): Promise<StockBalance[]> {
+    const balances = await this.getAllBalances();
+    return balances.filter(b => b.status === 'EXCESS');
+  }
+
+  /**
+   * Obtém movimentações de um produto
+   */
+  async getMovements(productId: string, limit = 50) {
+    return this.getMovementHistory(productId, { limit });
+  }
+
+  /**
+   * Registra entrada de estoque
+   */
+  async registerEntry(data: {
+    productId: string;
+    quantity: number;
+    reason: string;
+    reference?: string;
+    userId: string;
+    notes?: string;
+  }) {
+    return this.registerMovement({
+      productId: data.productId,
+      type: 'IN',
+      quantity: data.quantity,
+      reason: data.reason,
+      reference: data.reference,
+      referenceType: 'MANUAL',
+      userId: data.userId,
+      notes: data.notes,
+    });
+  }
+
+  /**
+   * Registra saída de estoque
+   */
+  async registerExit(data: {
+    productId: string;
+    quantity: number;
+    reason: string;
+    reference?: string;
+    userId: string;
+    notes?: string;
+  }) {
+    return this.registerMovement({
+      productId: data.productId,
+      type: 'OUT',
+      quantity: data.quantity,
+      reason: data.reason,
+      reference: data.reference,
+      referenceType: 'MANUAL',
+      userId: data.userId,
+      notes: data.notes,
+    });
+  }
+
+  /**
+   * Registra ajuste de estoque
+   */
+  async registerAdjustment(data: {
+    productId: string;
+    quantity: number;
+    reason: string;
+    userId: string;
+    notes?: string;
+  }) {
+    const currentBalance = await this.getBalance(data.productId);
+    const difference = data.quantity - currentBalance.quantity;
+
+    if (difference === 0) {
+      throw new Error('Nova quantidade é igual à quantidade atual');
+    }
+
+    const type = difference > 0 ? 'IN' : 'OUT';
+    const quantity = Math.abs(difference);
+
+    return this.registerMovement({
+      productId: data.productId,
+      type,
+      quantity,
+      reason: `Ajuste: ${data.reason}`,
+      referenceType: 'ADJUSTMENT',
+      userId: data.userId,
+      notes: `Quantidade anterior: ${currentBalance.quantity}, Nova quantidade: ${data.quantity}. ${data.notes || ''}`,
+    });
+  }
+
+  /**
+   * Reserva estoque para uma ordem de produção
+   */
+  async reserveForOrder(orderId: string, userId: string) {
+    const order = await prisma.productionOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        product: true,
+      },
+    });
+
+    if (!order) {
+      throw new Error('Ordem de produção não encontrada');
+    }
+
+    // Buscar BOM ativa do produto
+    const activeBom = await prisma.bOM.findFirst({
+      where: {
+        productId: order.productId,
+        active: true,
+      },
+      include: {
+        items: {
+          include: {
+            component: true,
+          },
+        },
+      },
+    });
+
+    if (!activeBom) {
+      throw new Error('BOM ativa não encontrada para o produto');
+    }
+
+    const reservations = [];
+
+    for (const bomItem of activeBom.items) {
+      const requiredQty = bomItem.quantity * order.quantity * (1 + bomItem.scrapFactor);
+      const balance = await this.getBalance(bomItem.componentId);
+
+      if (balance.quantity < requiredQty) {
+        throw new Error(`Estoque insuficiente para ${bomItem.component.code}`);
+      }
+
+      // Registrar saída
+      const movement = await this.registerExit({
+        productId: bomItem.componentId,
+        quantity: requiredQty,
+        reason: 'Reserva para produção',
+        reference: order.orderNumber,
+        userId,
+      });
+
+      reservations.push(movement);
+    }
+
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      reservations,
+      totalItems: reservations.length,
+    };
   }
 }
 

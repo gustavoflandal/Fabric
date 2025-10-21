@@ -321,6 +321,27 @@ export class PurchaseOrderService {
     return order;
   }
 
+  async approve(id: string, approvedBy: string) {
+    const order = await prisma.purchaseOrder.update({
+      where: { id },
+      data: { 
+        status: 'APPROVED',
+        approvedBy,
+        approvedAt: new Date(),
+      },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    return order;
+  }
+
   async confirm(id: string) {
     const order = await this.getById(id);
     

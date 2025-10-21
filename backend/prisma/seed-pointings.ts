@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function seedPointings() {
-  console.log('🌱 Iniciando seed de apontamentos de produção...');
+  console.log('⏱️  Iniciando seed de apontamentos de produção...\n');
 
   try {
     // Buscar ordens de produção e usuários
@@ -12,12 +12,14 @@ async function seedPointings() {
         status: { in: ['IN_PROGRESS', 'COMPLETED'] }
       },
       include: {
-        operations: true,
+        operations: {
+          orderBy: { sequence: 'asc' }
+        },
+        product: true,
       },
-      take: 10,
     });
 
-    const users = await prisma.user.findMany({ take: 3 });
+    const users = await prisma.user.findMany();
     
     if (orders.length === 0 || users.length === 0) {
       console.log('⚠️  Ordens ou usuários não encontrados.');
@@ -28,7 +30,7 @@ async function seedPointings() {
 
     // Deletar apontamentos antigos
     await prisma.productionPointing.deleteMany({});
-    console.log('🗑️  Apontamentos antigos deletados');
+    console.log('🗑️  Apontamentos antigos deletados\n');
 
     const pointings: any[] = [];
     const today = new Date();
@@ -42,8 +44,8 @@ async function seedPointings() {
         const operation = order.operations[i];
         const user = users[i % users.length];
 
-        // Apontamentos concluídos (operações anteriores)
-        if (i < order.operations.length - 1 || order.status === 'COMPLETED') {
+        // Criar apontamentos apenas para operações concluídas
+        if (operation.status === 'COMPLETED' || order.status === 'COMPLETED') {
           const daysAgo = Math.floor(Math.random() * 20) + 1;
           const startTime = new Date(today);
           startTime.setDate(startTime.getDate() - daysAgo);
@@ -55,6 +57,7 @@ async function seedPointings() {
 
           const quantityGood = Math.floor(order.quantity * (0.85 + Math.random() * 0.15));
           const quantityScrap = Math.floor(quantityGood * (Math.random() * 0.05)); // 0-5% refugo
+          const runTime = duration * 60; // converter horas em minutos
 
           pointings.push({
             productionOrderId: order.id,
@@ -62,25 +65,10 @@ async function seedPointings() {
             userId: user.id,
             startTime,
             endTime,
+            runTime,
             quantityGood,
             quantityScrap,
             notes: `Apontamento automático - Op ${operation.sequence}`,
-          });
-        } 
-        // Apontamentos em andamento (última operação de ordens IN_PROGRESS)
-        else if (order.status === 'IN_PROGRESS') {
-          const startTime = new Date(today);
-          startTime.setHours(8, 0, 0, 0);
-
-          pointings.push({
-            productionOrderId: order.id,
-            operationId: operation.id,
-            userId: user.id,
-            startTime,
-            endTime: null,
-            quantityGood: 0,
-            quantityScrap: 0,
-            notes: `Em andamento - Op ${operation.sequence}`,
           });
         }
       }
@@ -97,14 +85,16 @@ async function seedPointings() {
     console.log(`✅ ${pointings.length} apontamentos criados com sucesso!`);
 
     // Estatísticas
-    const completed = pointings.filter(p => p.endTime !== null).length;
-    const inProgress = pointings.filter(p => p.endTime === null).length;
+    const totalQuantityGood = pointings.reduce((sum, p) => sum + p.quantityGood, 0);
+    const totalQuantityScrap = pointings.reduce((sum, p) => sum + p.quantityScrap, 0);
+    const scrapRate = totalQuantityGood > 0 ? (totalQuantityScrap / (totalQuantityGood + totalQuantityScrap)) * 100 : 0;
 
     console.log('\n📊 Resumo:');
-    console.log(`   - Concluídos: ${completed}`);
-    console.log(`   - Em Andamento: ${inProgress}`);
-    console.log(`   - Total: ${pointings.length}`);
+    console.log(`   - Apontamentos: ${pointings.length}`);
     console.log(`   - Ordens: ${orders.length}`);
+    console.log(`   - Quantidade Boa: ${totalQuantityGood}`);
+    console.log(`   - Quantidade Refugo: ${totalQuantityScrap}`);
+    console.log(`   - Taxa de Refugo: ${scrapRate.toFixed(2)}%`);
 
   } catch (error) {
     console.error('❌ Erro ao criar apontamentos:', error);

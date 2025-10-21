@@ -48,7 +48,7 @@ export class AuthService {
     });
 
     // Gerar tokens
-    const payload = { userId: user.id, email: user.email };
+    const payload = { userId: user.id, email: user.email, name: user.name };
     const accessToken = JwtUtil.generateAccessToken(payload);
     const refreshToken = JwtUtil.generateRefreshToken(payload);
 
@@ -92,7 +92,7 @@ export class AuthService {
     });
 
     // Gerar tokens
-    const payload = { userId: user.id, email: user.email };
+    const payload = { userId: user.id, email: user.email, name: user.name };
     const accessToken = JwtUtil.generateAccessToken(payload);
     const refreshToken = JwtUtil.generateRefreshToken(payload);
 
@@ -122,7 +122,7 @@ export class AuthService {
       }
 
       // Gerar novo access token
-      const newPayload = { userId: user.id, email: user.email };
+      const newPayload = { userId: user.id, email: user.email, name: user.name };
       const accessToken = JwtUtil.generateAccessToken(newPayload);
 
       return { accessToken };

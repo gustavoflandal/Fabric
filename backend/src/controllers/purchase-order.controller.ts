@@ -103,7 +103,7 @@ export class PurchaseOrderController {
 
   async approve(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const order = await purchaseOrderService.updateStatus(req.params.id, 'APPROVED');
+      const order = await purchaseOrderService.approve(req.params.id, req.userName || 'Sistema');
       return res.status(200).json({
         status: 'success',
         message: 'Pedido aprovado com sucesso',

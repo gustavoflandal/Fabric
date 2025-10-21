@@ -3,13 +3,13 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function seedStockMovements() {
-  console.log('🌱 Iniciando seed de movimentações de estoque...');
+  console.log('📦 Iniciando seed de movimentações de estoque...\n');
 
   try {
     // Buscar produtos e usuário
     const products = await prisma.product.findMany({
       where: { active: true },
-      take: 10,
+      orderBy: { code: 'asc' },
     });
 
     const users = await prisma.user.findMany({ take: 1 });
@@ -24,10 +24,21 @@ async function seedStockMovements() {
 
     // Deletar movimentações antigas
     await prisma.stockMovement.deleteMany({});
-    console.log('🗑️  Movimentações antigas deletadas');
+    console.log('🗑️  Movimentações antigas deletadas\n');
 
     const movements: any[] = [];
     const today = new Date();
+    
+    // Quantidades iniciais baseadas no tipo de produto
+    const getInitialQuantity = (type: string) => {
+      switch (type) {
+        case 'finished': return 50 + Math.floor(Math.random() * 50); // 50-100
+        case 'semi_finished': return 100 + Math.floor(Math.random() * 100); // 100-200
+        case 'raw_material': return 500 + Math.floor(Math.random() * 500); // 500-1000
+        case 'packaging': return 1000 + Math.floor(Math.random() * 1000); // 1000-2000
+        default: return 100;
+      }
+    };
 
     // Para cada produto, criar várias movimentações
     for (const product of products) {

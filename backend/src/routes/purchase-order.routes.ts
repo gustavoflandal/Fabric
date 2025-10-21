@@ -11,84 +11,84 @@ router.use(authMiddleware);
 // Listar pedidos
 router.get(
   '/',
-  requirePermission('purchases', 'read'),
+  requirePermission('pedidos_compra', 'visualizar'),
   purchaseOrderController.getAll
 );
 
 // Buscar pedidos pendentes
 router.get(
   '/pending',
-  requirePermission('purchases', 'read'),
+  requirePermission('pedidos_compra', 'visualizar'),
   purchaseOrderController.getPendingOrders
 );
 
 // Buscar por fornecedor
 router.get(
   '/supplier/:supplierId',
-  requirePermission('purchases', 'read'),
+  requirePermission('pedidos_compra', 'visualizar'),
   purchaseOrderController.getBySupplier
 );
 
 // Buscar por ID
 router.get(
   '/:id',
-  requirePermission('purchases', 'read'),
+  requirePermission('pedidos_compra', 'visualizar'),
   purchaseOrderController.getById
 );
 
 // Criar pedido
 router.post(
   '/',
-  requirePermission('purchases', 'create'),
+  requirePermission('pedidos_compra', 'criar'),
   purchaseOrderController.create
 );
 
 // Criar pedido a partir de orçamento
 router.post(
   '/from-quotation',
-  requirePermission('purchases', 'create'),
+  requirePermission('pedidos_compra', 'criar'),
   purchaseOrderController.createFromQuotation
 );
 
 // Atualizar pedido
 router.put(
   '/:id',
-  requirePermission('purchases', 'update'),
+  requirePermission('pedidos_compra', 'editar'),
   purchaseOrderController.update
 );
 
 // Atualizar status
 router.patch(
   '/:id/status',
-  requirePermission('purchases', 'update'),
+  requirePermission('pedidos_compra', 'editar'),
   purchaseOrderController.updateStatus
 );
 
 // Aprovar pedido
 router.patch(
   '/:id/approve',
-  requirePermission('purchases', 'approve_order'),
+  requirePermission('pedidos_compra', 'aprovar'),
   purchaseOrderController.approve
 );
 
 // Confirmar pedido
 router.patch(
   '/:id/confirm',
-  requirePermission('purchases', 'update'),
+  requirePermission('pedidos_compra', 'editar'),
   purchaseOrderController.confirm
 );
 
 // Cancelar pedido
 router.patch(
   '/:id/cancel',
-  requirePermission('purchases', 'update'),
+  requirePermission('pedidos_compra', 'editar'),
   purchaseOrderController.cancel
 );
 
 // Excluir pedido
 router.delete(
   '/:id',
-  requirePermission('purchases', 'delete'),
+  requirePermission('pedidos_compra', 'excluir'),
   purchaseOrderController.delete
 );
 

@@ -84,7 +84,7 @@ export class PurchaseQuotationController {
 
   async approve(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const quotation = await purchaseQuotationService.updateStatus(req.params.id, 'APPROVED');
+      const quotation = await purchaseQuotationService.approve(req.params.id, req.userName || 'Sistema');
       return res.status(200).json({
         status: 'success',
         message: 'Orçamento aprovado com sucesso',

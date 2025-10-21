@@ -93,13 +93,53 @@ async function main() {
     { resource: 'audit_logs', action: 'read', description: 'Visualizar logs de auditoria' },
     { resource: 'audit_logs', action: 'delete', description: 'Excluir logs de auditoria' },
     
-    // Compras
-    { resource: 'purchases', action: 'create', description: 'Criar orçamentos e pedidos de compra' },
-    { resource: 'purchases', action: 'read', description: 'Visualizar orçamentos e pedidos de compra' },
-    { resource: 'purchases', action: 'update', description: 'Editar orçamentos e pedidos de compra' },
-    { resource: 'purchases', action: 'delete', description: 'Excluir orçamentos e pedidos de compra' },
-    { resource: 'purchases', action: 'approve_quotation', description: 'Aprovar orçamentos de compra' },
-    { resource: 'purchases', action: 'approve_order', description: 'Aprovar pedidos de compra' },
+    // Orçamentos de Compra
+    { resource: 'orcamentos_compra', action: 'criar', description: 'Criar orçamentos de compra' },
+    { resource: 'orcamentos_compra', action: 'visualizar', description: 'Visualizar orçamentos de compra' },
+    { resource: 'orcamentos_compra', action: 'editar', description: 'Editar orçamentos de compra' },
+    { resource: 'orcamentos_compra', action: 'excluir', description: 'Excluir orçamentos de compra' },
+    { resource: 'orcamentos_compra', action: 'aprovar', description: 'Aprovar orçamentos de compra' },
+    { resource: 'orcamentos_compra', action: 'rejeitar', description: 'Rejeitar orçamentos de compra' },
+    
+    // Pedidos de Compra
+    { resource: 'pedidos_compra', action: 'criar', description: 'Criar pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'visualizar', description: 'Visualizar pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'editar', description: 'Editar pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'excluir', description: 'Excluir pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'aprovar', description: 'Aprovar pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'confirmar', description: 'Confirmar pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'cancelar', description: 'Cancelar pedidos de compra' },
+    { resource: 'pedidos_compra', action: 'receber', description: 'Receber pedidos de compra' },
+    
+    // Recebimentos de Compra
+    { resource: 'recebimentos_compra', action: 'criar', description: 'Criar recebimentos de compra' },
+    { resource: 'recebimentos_compra', action: 'visualizar', description: 'Visualizar recebimentos de compra' },
+    { resource: 'recebimentos_compra', action: 'editar', description: 'Editar recebimentos de compra' },
+    { resource: 'recebimentos_compra', action: 'excluir', description: 'Excluir recebimentos de compra' },
+    
+    // Planos de Contagem
+    { resource: 'planos_contagem', action: 'criar', description: 'Criar planos de contagem' },
+    { resource: 'planos_contagem', action: 'visualizar', description: 'Visualizar planos de contagem' },
+    { resource: 'planos_contagem', action: 'editar', description: 'Editar planos de contagem' },
+    { resource: 'planos_contagem', action: 'excluir', description: 'Excluir planos de contagem' },
+    { resource: 'planos_contagem', action: 'ativar', description: 'Ativar planos de contagem' },
+    { resource: 'planos_contagem', action: 'pausar', description: 'Pausar planos de contagem' },
+    
+    // Sessões de Contagem
+    { resource: 'sessoes_contagem', action: 'visualizar', description: 'Visualizar sessões de contagem' },
+    { resource: 'sessoes_contagem', action: 'criar', description: 'Criar sessões de contagem' },
+    { resource: 'sessoes_contagem', action: 'iniciar', description: 'Iniciar sessões de contagem' },
+    { resource: 'sessoes_contagem', action: 'completar', description: 'Completar sessões de contagem' },
+    { resource: 'sessoes_contagem', action: 'cancelar', description: 'Cancelar sessões de contagem' },
+    
+    // Contagem de Estoque
+    { resource: 'contagem', action: 'executar', description: 'Executar contagem de estoque' },
+    { resource: 'contagem', action: 'recontar', description: 'Recontar itens' },
+    { resource: 'contagem', action: 'aprovar_divergencia', description: 'Aprovar divergências de contagem' },
+    
+    // Relatórios de Contagem
+    { resource: 'relatorios_contagem', action: 'visualizar', description: 'Visualizar relatórios de contagem' },
+    { resource: 'relatorios_contagem', action: 'exportar', description: 'Exportar relatórios de contagem' },
   ];
 
   for (const perm of permissions) {

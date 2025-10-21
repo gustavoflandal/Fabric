@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import materialConsumptionService from './material-consumption.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
+import notificationDetector from './notification-detector.service';
 
 export interface CreateProductionPointingDto {
   productionOrderId: string;
@@ -125,6 +126,20 @@ export class ProductionPointingService {
         type: 'MATERIAL_CONSUMPTION_FAILED',
         pointingId: pointing.id,
         error: error.message,
+      });
+    }
+
+    // ✅ NOTIFICAÇÃO: Monitorar taxa de refugo
+    if (data.scrapQuantity && data.scrapQuantity > 0) {
+      notificationDetector.monitorScrapRate(pointing.id).catch(err => {
+        console.error('Erro ao monitorar refugo:', err);
+      });
+    }
+
+    // ✅ NOTIFICAÇÃO: Operação concluída
+    if (data.endTime) {
+      notificationDetector.notifyOperationCompleted(pointing.id).catch(err => {
+        console.error('Erro ao notificar conclusão:', err);
       });
     }
 

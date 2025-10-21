@@ -253,6 +253,27 @@ export class PurchaseQuotationService {
     return quotation;
   }
 
+  async approve(id: string, approvedBy: string) {
+    const quotation = await prisma.purchaseQuotation.update({
+      where: { id },
+      data: { 
+        status: 'APPROVED',
+        approvedBy,
+        approvedAt: new Date(),
+      },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    return quotation;
+  }
+
   async delete(id: string) {
     // Verificar se há pedidos vinculados
     const quotation = await this.getById(id);

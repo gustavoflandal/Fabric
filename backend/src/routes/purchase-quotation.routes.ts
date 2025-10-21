@@ -11,63 +11,63 @@ router.use(authMiddleware);
 // Listar orçamentos
 router.get(
   '/',
-  requirePermission('purchases', 'read'),
+  requirePermission('orcamentos_compra', 'visualizar'),
   purchaseQuotationController.getAll
 );
 
 // Buscar por fornecedor
 router.get(
   '/supplier/:supplierId',
-  requirePermission('purchases', 'read'),
+  requirePermission('orcamentos_compra', 'visualizar'),
   purchaseQuotationController.getBySupplier
 );
 
 // Buscar por ID
 router.get(
   '/:id',
-  requirePermission('purchases', 'read'),
+  requirePermission('orcamentos_compra', 'visualizar'),
   purchaseQuotationController.getById
 );
 
 // Criar orçamento
 router.post(
   '/',
-  requirePermission('purchases', 'create'),
+  requirePermission('orcamentos_compra', 'criar'),
   purchaseQuotationController.create
 );
 
 // Atualizar orçamento
 router.put(
   '/:id',
-  requirePermission('purchases', 'update'),
+  requirePermission('orcamentos_compra', 'editar'),
   purchaseQuotationController.update
 );
 
 // Atualizar status
 router.patch(
   '/:id/status',
-  requirePermission('purchases', 'update'),
+  requirePermission('orcamentos_compra', 'editar'),
   purchaseQuotationController.updateStatus
 );
 
 // Aprovar orçamento
 router.patch(
   '/:id/approve',
-  requirePermission('purchases', 'approve_quotation'),
+  requirePermission('orcamentos_compra', 'aprovar'),
   purchaseQuotationController.approve
 );
 
 // Rejeitar orçamento
 router.patch(
   '/:id/reject',
-  requirePermission('purchases', 'approve_quotation'),
+  requirePermission('orcamentos_compra', 'rejeitar'),
   purchaseQuotationController.reject
 );
 
 // Excluir orçamento
 router.delete(
   '/:id',
-  requirePermission('purchases', 'delete'),
+  requirePermission('orcamentos_compra', 'excluir'),
   purchaseQuotationController.delete
 );
 

@@ -6,6 +6,7 @@ import { AppError } from './error.middleware';
 export interface AuthRequest extends Request {
   userId?: string;
   userEmail?: string;
+  userName?: string;
 }
 
 export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -21,10 +22,12 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
     const decoded = jwt.verify(token, config.jwt.secret) as {
       userId: string;
       email: string;
+      name?: string;
     };
 
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
+    req.userName = decoded.name;
 
     next();
   } catch (error) {

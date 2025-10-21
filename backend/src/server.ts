@@ -3,6 +3,7 @@ import { config } from './config/env';
 import { logger } from './config/logger';
 import { prisma } from './config/database';
 import { initializeEventListeners } from './events/listeners';
+import notificationScheduler from './services/notification-scheduler.service';
 
 const startServer = async () => {
   try {
@@ -13,6 +14,10 @@ const startServer = async () => {
     // Initialize event listeners
     initializeEventListeners();
     logger.info('✅ Event listeners initialized');
+
+    // Initialize notification scheduler
+    notificationScheduler.start();
+    logger.info('✅ Notification scheduler initialized');
 
     // Start server
     app.listen(config.port, () => {
@@ -29,12 +34,14 @@ const startServer = async () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
+  notificationScheduler.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
+  notificationScheduler.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

@@ -21,6 +21,8 @@ import reportsRoutes from './reports.routes';
 import purchaseQuotationRoutes from './purchase-quotation.routes';
 import purchaseOrderRoutes from './purchase-order.routes';
 import purchaseReceiptRoutes from './purchase-receipt.routes';
+import notificationRoutes from './notification.routes';
+import countingRoutes from './counting.routes';
 
 const router = Router();
 
@@ -63,6 +65,21 @@ router.use('/reports', reportsRoutes);
 router.use('/purchase-quotations', purchaseQuotationRoutes);
 router.use('/purchase-orders', purchaseOrderRoutes);
 router.use('/purchase-receipts', purchaseReceiptRoutes);
+
+// Rotas de notificações
+router.use('/notifications', notificationRoutes);
+
+// Rotas de contagem de estoque - TESTE
+router.get('/counting/test-direct', (_req, res) => {
+  res.json({ message: 'Direct route works!' });
+});
+
+try {
+  router.use('/counting', countingRoutes);
+  console.log('✅ Counting routes loaded successfully');
+} catch (error) {
+  console.error('❌ Error loading counting routes:', error);
+}
 
 // Health check
 router.get('/health', (_req, res) => {

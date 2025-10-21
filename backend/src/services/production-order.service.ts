@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import notificationDetector from './notification-detector.service';
 
 export interface CreateProductionOrderDto {
   orderNumber: string;
@@ -192,13 +193,23 @@ export class ProductionOrderService {
       updateData.notes = order.notes ? `${order.notes}\n${notes}` : notes;
     }
 
-    return prisma.productionOrder.update({
+    const updatedOrder = await prisma.productionOrder.update({
       where: { id },
       data: updateData,
       include: {
         product: { select: { id: true, code: true, name: true, type: true } },
       },
     });
+
+    // Verificar disponibilidade de material ao liberar ordem
+    if (status === 'RELEASED') {
+      // Executar verificação em background (não bloqueia a resposta)
+      notificationDetector.checkMaterialAvailability(id).catch(err => {
+        console.error('Erro ao verificar material:', err);
+      });
+    }
+
+    return updatedOrder;
   }
 
   async updateProgress(id: string, producedQuantity: number, scrapQuantity: number = 0) {

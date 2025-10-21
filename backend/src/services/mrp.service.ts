@@ -88,11 +88,13 @@ export class MRPService {
       // Determinar ação sugerida
       let suggestedAction: 'BUY' | 'PRODUCE' | 'NONE' = 'NONE';
       if (netRequirement > 0) {
-        suggestedAction = component.type === 'RAW_MATERIAL' ? 'BUY' : 'PRODUCE';
+        // Matérias-primas e embalagens são compradas, semiacabados são produzidos
+        const isBuyable = ['raw_material', 'packaging'].includes(component.type.toLowerCase());
+        suggestedAction = isBuyable ? 'BUY' : 'PRODUCE';
       }
       
-      // Lead time (dias)
-      const leadTime = component.type === 'RAW_MATERIAL' ? 7 : 3;
+      // Lead time (dias) - usar o leadTime do produto ou padrão
+      const leadTime = component.leadTime || (component.type.toLowerCase() === 'raw_material' ? 7 : 3);
       
       // Data sugerida (subtrair lead time da data de início da ordem)
       const suggestedDate = new Date(order.scheduledStart);
@@ -243,34 +245,54 @@ export class MRPService {
   }
 
   /**
-   * Simula estoque disponível (será substituído pelo módulo de estoque real)
+   * Obtém estoque disponível real do produto
    */
   private async getAvailableStock(productId: string): Promise<number> {
-    // TODO: Integrar com módulo de estoque real
-    // Por enquanto, retorna valores simulados
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
+    // Buscar todas as movimentações do produto
+    const movements = await prisma.stockMovement.findMany({
+      where: { productId },
     });
-    
-    if (!product) return 0;
-    
-    // Simular estoque baseado no tipo
-    if (product.type === 'RAW_MATERIAL') {
-      return Math.floor(Math.random() * 100); // 0-100 unidades
-    } else if (product.type === 'SEMI_FINISHED') {
-      return Math.floor(Math.random() * 50); // 0-50 unidades
+
+    // Calcular saldo (entradas - saídas)
+    let balance = 0;
+    for (const movement of movements) {
+      if (movement.type === 'IN') {
+        balance += movement.quantity;
+      } else if (movement.type === 'OUT') {
+        balance -= movement.quantity;
+      }
     }
-    
-    return 0;
+
+    return Math.max(0, balance);
   }
 
   /**
-   * Simula quantidade em pedidos (será substituído por dados reais)
+   * Obtém quantidade em pedidos de compra pendentes
    */
   private async getOnOrderQuantity(productId: string): Promise<number> {
-    // TODO: Integrar com módulo de compras/ordens
-    // Por enquanto, retorna 0
-    return 0;
+    // Buscar itens de pedidos de compra confirmados mas não recebidos
+    const orderItems = await prisma.purchaseOrderItem.findMany({
+      where: {
+        productId,
+        order: {
+          status: {
+            in: ['APPROVED', 'CONFIRMED'],
+          },
+        },
+      },
+      select: {
+        quantity: true,
+        receivedQty: true,
+      },
+    });
+
+    // Somar quantidade pendente (quantidade - recebida)
+    let onOrderQty = 0;
+    for (const item of orderItems) {
+      onOrderQty += (item.quantity - item.receivedQty);
+    }
+
+    return onOrderQty;
   }
 
   /**

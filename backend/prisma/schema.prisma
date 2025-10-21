@@ -28,6 +28,15 @@ model User {
   auditLogs     AuditLog[]
   productionPointings ProductionPointing[]
   stockMovements StockMovement[]
+  notifications Notification[]
+  notificationPreferences NotificationPreference[]
+  
+  // Contagem de Estoque
+  countingPlansCreated CountingPlan[] @relation("CountingPlanCreator")
+  sessionsAssigned CountingSession[] @relation("SessionAssignedTo")
+  sessionsCompleted CountingSession[] @relation("SessionCompletedBy")
+  itemsCounted CountingItem[] @relation("ItemCountedBy")
+  itemsRecounted CountingItem[] @relation("ItemRecountedBy")
   
   @@map("users")
 }
@@ -41,6 +50,7 @@ model Role {
   
   users         UserRole[]
   permissions   RolePermission[]
+  notificationRules NotificationRule[]
   
   @@map("roles")
 }
@@ -241,6 +251,7 @@ model Product {
   quotationItems PurchaseQuotationItem[]
   purchaseOrderItems PurchaseOrderItem[]
   receiptItems  PurchaseReceiptItem[]
+  countingItems CountingItem[]
   
   @@index([type])
   @@index([active])
@@ -452,6 +463,7 @@ model StockMovement {
   
   product       Product   @relation(fields: [productId], references: [id])
   user          User      @relation(fields: [userId], references: [id])
+  countingSession CountingSession? @relation("CountingAdjustments", fields: [reference], references: [id])
   
   @@index([productId])
   @@index([type])
@@ -474,6 +486,8 @@ model PurchaseQuotation {
   notes         String?   @db.Text
   totalValue    Float     @default(0)
   createdBy     String
+  approvedBy    String?
+  approvedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -522,6 +536,8 @@ model PurchaseOrder {
   totalValue    Float
   notes         String?   @db.Text
   createdBy     String
+  approvedBy    String?
+  approvedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -593,4 +609,301 @@ model PurchaseReceiptItem {
   @@index([orderItemId])
   @@index([productId])
   @@map("purchase_receipt_items")
+}
+
+// ============================================
+// NOTIFICAÇÕES
+// ============================================
+
+model Notification {
+  id            String    @id @default(uuid())
+  userId        String
+  type          String    // INFO, WARNING, ERROR, SUCCESS
+  category      String    // PRODUCTION, STOCK, PURCHASE, QUALITY, CAPACITY
+  eventType     String    // PRODUCTION_DELAYED, STOCK_BELOW_SAFETY, etc
+  title         String
+  message       String    @db.Text
+  data          Json?     // Dados contextuais adicionais
+  
+  // Navegação
+  link          String?   // URL para ir direto ao recurso
+  resourceType  String?   // ProductionOrder, Product, PurchaseOrder, etc
+  resourceId    String?
+  
+  // Estado
+  read          Boolean   @default(false)
+  readAt        DateTime?
+  archived      Boolean   @default(false)
+  archivedAt    DateTime?
+  
+  // Prioridade
+  priority      Int       @default(1) // 1=baixa, 2=média, 3=alta, 4=crítica
+  expiresAt     DateTime?
+  
+  createdAt     DateTime  @default(now())
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, read])
+  @@index([userId, archived])
+  @@index([category])
+  @@index([eventType])
+  @@index([priority])
+  @@index([createdAt])
+  @@index([resourceType, resourceId])
+  @@map("notifications")
+}
+
+model NotificationRule {
+  id            String    @id @default(uuid())
+  roleId        String
+  eventType     String    // Tipo de evento que dispara a notificação
+  
+  // Configurações
+  enabled       Boolean   @default(true)
+  minPriority   Int       @default(1)
+  
+  // Canais de entrega
+  inApp         Boolean   @default(true)
+  email         Boolean   @default(false)
+  
+  // Condições adicionais (JSON)
+  conditions    Json?     // Ex: { "workCenterId": "xxx", "assignedOnly": true }
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  role          Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([roleId, eventType])
+  @@map("notification_rules")
+}
+
+model NotificationPreference {
+  id            String    @id @default(uuid())
+  userId        String
+  category      String    // PRODUCTION, STOCK, PURCHASE, QUALITY, CAPACITY
+  
+  // Canais habilitados por categoria
+  inApp         Boolean   @default(true)
+  email         Boolean   @default(false)
+  
+  // Filtros
+  minPriority   Int       @default(1)
+  enabled       Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, category])
+  @@map("notification_preferences")
+}
+
+// ============================================
+// MÓDULO DE CONTAGEM DE ESTOQUE
+// ============================================
+
+// Localização Física
+model Location {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  type          LocationType
+  parentId      String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  parent        Location?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children      Location[] @relation("LocationHierarchy")
+  countingItems CountingItem[]
+  
+  @@index([parentId])
+  @@index([type, active])
+  @@map("locations")
+}
+
+// Plano de Contagem
+model CountingPlan {
+  id                String              @id @default(uuid())
+  code              String              @unique
+  name              String
+  description       String?             @db.Text
+  type              CountingType
+  frequency         CountingFrequency?
+  status            CountingPlanStatus  @default(DRAFT)
+  
+  // Critérios de seleção (JSON)
+  criteria          Json?
+  
+  // Configurações
+  allowBlindCount   Boolean             @default(true)
+  requireRecount    Boolean             @default(true)
+  tolerancePercent  Decimal?            @db.Decimal(5, 2)
+  toleranceQty      Int?
+  
+  // Datas
+  startDate         DateTime
+  endDate           DateTime?
+  nextExecution     DateTime?
+  
+  // Responsável
+  createdBy         String
+  
+  // Auditoria
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  // Relações
+  creator           User                @relation("CountingPlanCreator", fields: [createdBy], references: [id])
+  sessions          CountingSession[]
+  
+  @@index([status, nextExecution])
+  @@index([type, frequency])
+  @@index([createdBy])
+  @@map("counting_plans")
+}
+
+// Sessão de Contagem (Execução do plano)
+model CountingSession {
+  id                String              @id @default(uuid())
+  code              String              @unique
+  planId            String
+  status            SessionStatus       @default(SCHEDULED)
+  
+  // Datas
+  scheduledDate     DateTime
+  startedAt         DateTime?
+  completedAt       DateTime?
+  
+  // Responsáveis
+  assignedTo        String?
+  completedBy       String?
+  
+  // Estatísticas
+  totalItems        Int                 @default(0)
+  countedItems      Int                 @default(0)
+  itemsWithDiff     Int                 @default(0)
+  accuracyPercent   Decimal?            @db.Decimal(5, 2)
+  
+  // Auditoria
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  // Relações
+  plan              CountingPlan        @relation(fields: [planId], references: [id])
+  assignedUser      User?               @relation("SessionAssignedTo", fields: [assignedTo], references: [id])
+  completedUser     User?               @relation("SessionCompletedBy", fields: [completedBy], references: [id])
+  items             CountingItem[]
+  adjustments       StockMovement[]     @relation("CountingAdjustments")
+  
+  @@index([planId])
+  @@index([status, scheduledDate])
+  @@index([assignedTo])
+  @@map("counting_sessions")
+}
+
+// Item de Contagem
+model CountingItem {
+  id                String              @id @default(uuid())
+  sessionId         String
+  productId         String
+  locationId        String?
+  
+  // Quantidades
+  systemQty         Decimal             @db.Decimal(10, 2)
+  countedQty        Decimal?            @db.Decimal(10, 2)
+  recountQty        Decimal?            @db.Decimal(10, 2)
+  finalQty          Decimal?            @db.Decimal(10, 2)
+  
+  // Divergência
+  difference        Decimal?            @db.Decimal(10, 2)
+  differencePercent Decimal?            @db.Decimal(5, 2)
+  hasDifference     Boolean             @default(false)
+  
+  // Status
+  status            CountingItemStatus  @default(PENDING)
+  
+  // Observações
+  notes             String?             @db.Text
+  reason            String?             @db.Text
+  
+  // Contadores
+  countedBy         String?
+  countedAt         DateTime?
+  recountedBy       String?
+  recountedAt       DateTime?
+  
+  // Auditoria
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  
+  // Relações
+  session           CountingSession     @relation(fields: [sessionId], references: [id])
+  product           Product             @relation(fields: [productId], references: [id])
+  location          Location?           @relation(fields: [locationId], references: [id])
+  counter           User?               @relation("ItemCountedBy", fields: [countedBy], references: [id])
+  recounter         User?               @relation("ItemRecountedBy", fields: [recountedBy], references: [id])
+  
+  @@index([sessionId, status])
+  @@index([productId])
+  @@index([hasDifference])
+  @@index([countedBy])
+  @@map("counting_items")
+}
+
+// ============================================
+// ENUMS - CONTAGEM DE ESTOQUE
+// ============================================
+
+enum LocationType {
+  WAREHOUSE
+  AREA
+  CORRIDOR
+  SHELF
+  BIN
+  FLOOR
+}
+
+enum CountingType {
+  CYCLIC
+  SPOT
+  FULL_INVENTORY
+  BLIND
+}
+
+enum CountingFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+  ON_DEMAND
+}
+
+enum CountingPlanStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum CountingItemStatus {
+  PENDING
+  COUNTED
+  RECOUNTED
+  ADJUSTED
+  CANCELLED
 }

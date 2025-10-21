@@ -30,11 +30,6 @@ Thumbs.db
 # Prisma
 prisma/migrations/**/migration.sql.bak
 
-# Backups
-backup/*.json
-backup/*.sql
-!backup/README.md
-
 # Logs
 logs/
 *.log
