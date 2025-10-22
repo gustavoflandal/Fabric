@@ -8,7 +8,7 @@
             <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
           </div>
           <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">Dashboard</RouterLink>
+            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">Início</RouterLink>
             <span class="text-sm text-gray-700">Olá, <span class="font-semibold">{{ authStore.userName }}</span></span>
             <Button variant="outline" size="sm" @click="handleLogout">Sair</Button>
           </div>

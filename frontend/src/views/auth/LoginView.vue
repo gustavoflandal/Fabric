@@ -95,9 +95,11 @@
       </Card>
 
       <!-- Footer -->
-      <p class="mt-8 text-center text-xs text-gray-500">
-        &copy; 2024 Fabric. Todos os direitos reservados.
-      </p>
+      <div class="mt-8 text-center text-xs text-gray-500">
+        <p>&copy; 2024 Fabric. Todos os direitos reservados ao desenvolvedor</p>
+        <p>Gustavo Frederico Landal</p>
+        <p>gustavoflandal@gmail.com</p>
+      </div>
     </div>
   </div>
 </template>

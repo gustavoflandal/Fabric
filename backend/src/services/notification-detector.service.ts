@@ -11,11 +11,11 @@ export class NotificationDetectorService {
    */
   async detectProductionDelays() {
     const now = new Date();
-    
+
     const delayedOrders = await prisma.productionOrder.findMany({
       where: {
         status: { in: ['RELEASED', 'IN_PROGRESS'] },
-        expectedEndDate: { lt: now },
+        scheduledEnd: { lt: now },
       },
       include: {
         product: {
@@ -29,7 +29,7 @@ export class NotificationDetectorService {
 
     for (const order of delayedOrders) {
       const delayDays = Math.ceil(
-        (now.getTime() - new Date(order.expectedEndDate).getTime()) / (1000 * 60 * 60 * 24)
+        (now.getTime() - new Date(order.scheduledEnd).getTime()) / (1000 * 60 * 60 * 24)
       );
 
       // Verificar se já foi notificado nas últimas 24h
@@ -55,7 +55,7 @@ export class NotificationDetectorService {
               orderNumber: order.orderNumber,
               productName: order.product.name,
               delayDays,
-              expectedEndDate: order.expectedEndDate,
+              scheduledEnd: order.scheduledEnd,
             },
             link: `/production/orders/${order.id}`,
             resourceType: 'ProductionOrder',
@@ -83,7 +83,7 @@ export class NotificationDetectorService {
             status: { in: ['PENDING', 'IN_PROGRESS'] },
           },
           include: {
-            order: {
+            productionOrder: {
               select: {
                 orderNumber: true,
               },
@@ -119,7 +119,7 @@ export class NotificationDetectorService {
                 workCenterName: wc.name,
                 queueSize,
                 threshold,
-                operations: wc.productionOperations.map(op => op.order.orderNumber),
+                operations: wc.productionOperations.map(op => op.productionOrder.orderNumber),
               },
               link: `/work-centers/${wc.id}`,
               resourceType: 'WorkCenter',
@@ -223,7 +223,7 @@ export class NotificationDetectorService {
       include: {
         operation: {
           include: {
-            order: {
+            productionOrder: {
               select: {
                 orderNumber: true,
               },
@@ -259,9 +259,9 @@ export class NotificationDetectorService {
           category: 'QUALITY',
           eventType: 'QUALITY_SCRAP_HIGH',
           title: 'Taxa de Refugo Crítica',
-          message: `Apontamento da OP ${pointing.operation.order.orderNumber} registrou ${scrapRate.toFixed(1)}% de refugo (limite: ${maxScrapRate}%)`,
+          message: `Apontamento da OP ${pointing.operation.productionOrder.orderNumber} registrou ${scrapRate.toFixed(1)}% de refugo (limite: ${maxScrapRate}%)`,
           data: {
-            orderNumber: pointing.operation.order.orderNumber,
+            orderNumber: pointing.operation.productionOrder.orderNumber,
             operationName: pointing.operation.name,
             scrapRate: scrapRate.toFixed(2),
             maxScrapRate,
@@ -360,7 +360,7 @@ export class NotificationDetectorService {
       include: {
         operation: {
           include: {
-            order: {
+            productionOrder: {
               select: {
                 orderNumber: true,
               },
@@ -390,9 +390,9 @@ export class NotificationDetectorService {
         category: 'PRODUCTION',
         eventType: 'OPERATION_COMPLETED',
         title: 'Operação Concluída',
-        message: `${pointing.user.name} concluiu operação da OP ${pointing.operation.order.orderNumber}`,
+        message: `${pointing.user.name} concluiu operação da OP ${pointing.operation.productionOrder.orderNumber}`,
         data: {
-          orderNumber: pointing.operation.order.orderNumber,
+          orderNumber: pointing.operation.productionOrder.orderNumber,
           operationName: pointing.operation.name,
           operatorName: pointing.user.name,
           goodQty: pointing.goodQty,

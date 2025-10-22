@@ -144,21 +144,21 @@
               </div>
 
               <div v-for="(item, index) in form.items" :key="index" class="border border-gray-200 rounded-lg p-4 space-y-3">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div>
+                <div class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <div class="md:col-span-2">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Componente *</label>
                     <select v-model="item.componentId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                       <option value="">Selecione um componente</option>
-                      <option v-for="prod in availableProducts" :key="prod.id" :value="prod.id">
+                      <option v-for="prod in sortedProducts" :key="prod.id" :value="prod.id">
                         {{ prod.code }} - {{ prod.name }}
                       </option>
                     </select>
                   </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Quantidade *</label>
+                  <div class="md:col-span-1">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Qtd *</label>
                     <input v-model.number="item.quantity" type="number" min="0.0001" step="0.0001" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
                   </div>
-                  <div>
+                  <div class="md:col-span-2">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Unidade *</label>
                     <select v-model="item.unitId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                       <option value="">Selecione uma unidade</option>
@@ -167,8 +167,8 @@
                       </option>
                     </select>
                   </div>
-                  <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Sequência</label>
+                  <div class="md:col-span-1">
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Seq.</label>
                     <input v-model.number="item.sequence" type="number" min="1" step="1" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
                   </div>
                 </div>
@@ -303,6 +303,15 @@ const boms = computed(() => (props.product ? bomStore.getCachedBoms(props.produc
 
 const availableProducts = ref<Product[]>([])
 const availableUnits = ref<any[]>([])
+
+// Produtos ordenados alfabeticamente por código
+const sortedProducts = computed(() => {
+  return [...availableProducts.value].sort((a, b) => {
+    const codeA = a.code?.toLowerCase() || ''
+    const codeB = b.code?.toLowerCase() || ''
+    return codeA.localeCompare(codeB)
+  })
+})
 
 onMounted(async () => {
   try {

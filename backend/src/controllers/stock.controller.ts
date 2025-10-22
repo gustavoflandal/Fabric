@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import stockService from '../services/stock.service';
+import { parsePositiveInt } from '../utils/validation.util';
 
 export class StockController {
   async getBalance(req: AuthRequest, res: Response, next: NextFunction) {
@@ -84,7 +85,7 @@ export class StockController {
   async getMovements(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { productId } = req.params;
-      const limit = parseInt(req.query.limit as string) || 50;
+      const limit = parsePositiveInt(req.query.limit, 50, 500);
       const movements = await stockService.getMovements(productId, limit);
       return res.status(200).json({ status: 'success', data: movements });
     } catch (error) {

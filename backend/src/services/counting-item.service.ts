@@ -170,34 +170,52 @@ class CountingItemService {
       finalQty = data.countedQty;
     }
 
-    // Atualizar item
-    const updatedItem = await prisma.countingItem.update({
-      where: { id },
-      data: {
-        countedQty: data.countedQty,
-        difference,
-        differencePercent,
-        hasDifference,
-        status,
-        finalQty: status === 'ADJUSTED' ? finalQty : null,
-        notes: data.notes,
-        countedBy: data.countedBy,
-        countedAt: new Date(),
-      },
-      include: {
-        product: true,
-        session: {
-          include: {
-            plan: true,
+    // ✅ CORREÇÃO RACE CONDITION: Atualizar item e contadores em transação
+    return await prisma.$transaction(async (tx) => {
+      const updatedItem = await tx.countingItem.update({
+        where: { id },
+        data: {
+          countedQty: data.countedQty,
+          difference,
+          differencePercent,
+          hasDifference,
+          status,
+          finalQty: status === 'ADJUSTED' ? finalQty : null,
+          notes: data.notes,
+          countedBy: data.countedBy,
+          countedAt: new Date(),
+        },
+        include: {
+          product: true,
+          session: {
+            include: {
+              plan: true,
+            },
           },
         },
-      },
+      });
+
+      // Atualizar contadores da sessão dentro da transação
+      const items = await tx.countingItem.findMany({
+        where: { sessionId: item.sessionId },
+      });
+
+      const countedItems = items.filter(
+        (item) => item.status !== 'PENDING' && item.status !== 'CANCELLED'
+      ).length;
+
+      const itemsWithDiff = items.filter((item) => item.hasDifference).length;
+
+      await tx.countingSession.update({
+        where: { id: item.sessionId },
+        data: {
+          countedItems,
+          itemsWithDiff,
+        },
+      });
+
+      return updatedItem;
     });
-
-    // Atualizar contadores da sessão
-    await this.updateSessionCounters(item.sessionId);
-
-    return updatedItem;
   }
 
   /**
@@ -219,33 +237,51 @@ class CountingItemService {
       ? (difference / Number(item.systemQty)) * 100 
       : 0;
 
-    // Atualizar item
-    const updatedItem = await prisma.countingItem.update({
-      where: { id },
-      data: {
-        recountQty: data.recountQty,
-        difference,
-        differencePercent,
-        finalQty: data.recountQty,
-        status: 'RECOUNTED',
-        notes: data.notes,
-        recountedBy: data.recountedBy,
-        recountedAt: new Date(),
-      },
-      include: {
-        product: true,
-        session: {
-          include: {
-            plan: true,
+    // ✅ CORREÇÃO RACE CONDITION: Atualizar item e contadores em transação
+    return await prisma.$transaction(async (tx) => {
+      const updatedItem = await tx.countingItem.update({
+        where: { id },
+        data: {
+          recountQty: data.recountQty,
+          difference,
+          differencePercent,
+          finalQty: data.recountQty,
+          status: 'RECOUNTED',
+          notes: data.notes,
+          recountedBy: data.recountedBy,
+          recountedAt: new Date(),
+        },
+        include: {
+          product: true,
+          session: {
+            include: {
+              plan: true,
+            },
           },
         },
-      },
+      });
+
+      // Atualizar contadores da sessão dentro da transação
+      const items = await tx.countingItem.findMany({
+        where: { sessionId: item.sessionId },
+      });
+
+      const countedItems = items.filter(
+        (item) => item.status !== 'PENDING' && item.status !== 'CANCELLED'
+      ).length;
+
+      const itemsWithDiff = items.filter((item) => item.hasDifference).length;
+
+      await tx.countingSession.update({
+        where: { id: item.sessionId },
+        data: {
+          countedItems,
+          itemsWithDiff,
+        },
+      });
+
+      return updatedItem;
     });
-
-    // Atualizar contadores da sessão
-    await this.updateSessionCounters(item.sessionId);
-
-    return updatedItem;
   }
 
   /**

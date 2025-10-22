@@ -3,6 +3,10 @@ import countingPlanController from '../controllers/counting-plan.controller';
 import countingSessionController from '../controllers/counting-session.controller';
 import countingItemController from '../controllers/counting-item.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { requirePermission } from '../middleware/permission.middleware';
+// Importar novos controllers
+import countingPlanProductRouter from './counting-plan-product.routes';
+import countingAssignmentRouter from './counting-assignment.routes';
 
 const router = Router();
 
@@ -19,92 +23,96 @@ router.use(authMiddleware);
 // ============================================
 
 // Listar planos
-router.get('/plans', countingPlanController.index);
+router.get('/plans', requirePermission('planos_contagem', 'visualizar'), countingPlanController.index);
 
 // Buscar plano por ID
-router.get('/plans/:id', countingPlanController.show);
+router.get('/plans/:id', requirePermission('planos_contagem', 'visualizar'), countingPlanController.show);
 
 // Criar plano
-router.post('/plans', countingPlanController.create);
+router.post('/plans', requirePermission('planos_contagem', 'criar'), countingPlanController.create);
 
 // Atualizar plano
-router.put('/plans/:id', countingPlanController.update);
+router.put('/plans/:id', requirePermission('planos_contagem', 'editar'), countingPlanController.update);
 
 // Deletar plano
-router.delete('/plans/:id', countingPlanController.delete);
+router.delete('/plans/:id', requirePermission('planos_contagem', 'excluir'), countingPlanController.delete);
 
 // Ativar plano
-router.patch('/plans/:id/activate', countingPlanController.activate);
+router.patch('/plans/:id/activate', requirePermission('planos_contagem', 'ativar'), countingPlanController.activate);
 
 // Pausar plano
-router.patch('/plans/:id/pause', countingPlanController.pause);
+router.patch('/plans/:id/pause', requirePermission('planos_contagem', 'pausar'), countingPlanController.pause);
 
 // Cancelar plano
-router.patch('/plans/:id/cancel', countingPlanController.cancel);
+router.patch('/plans/:id/cancel', requirePermission('planos_contagem', 'excluir'), countingPlanController.cancel);
 
 // Visualizar produtos do plano
-router.get('/plans/:id/products', countingPlanController.getProducts);
+router.get('/plans/:id/products', requirePermission('planos_contagem', 'visualizar'), countingPlanController.getProducts);
 
 // ============================================
 // ROTAS DE SESSÕES DE CONTAGEM
 // ============================================
 
 // Dashboard
-router.get('/dashboard', countingSessionController.getDashboard);
+router.get('/dashboard', requirePermission('sessoes_contagem', 'visualizar'), countingSessionController.getDashboard);
 
 // Listar sessões
-router.get('/sessions', countingSessionController.index);
+router.get('/sessions', requirePermission('sessoes_contagem', 'visualizar'), countingSessionController.index);
 
 // Buscar sessão por ID
-router.get('/sessions/:id', countingSessionController.show);
+router.get('/sessions/:id', requirePermission('sessoes_contagem', 'visualizar'), countingSessionController.show);
 
 // Criar sessão
-router.post('/sessions', countingSessionController.create);
+router.post('/sessions', requirePermission('sessoes_contagem', 'criar'), countingSessionController.create);
 
 // Iniciar sessão
-router.post('/sessions/:id/start', countingSessionController.start);
+router.post('/sessions/:id/start', requirePermission('sessoes_contagem', 'iniciar'), countingSessionController.start);
 
 // Completar sessão
-router.post('/sessions/:id/complete', countingSessionController.complete);
+router.post('/sessions/:id/complete', requirePermission('sessoes_contagem', 'completar'), countingSessionController.complete);
 
 // Cancelar sessão
-router.post('/sessions/:id/cancel', countingSessionController.cancel);
+router.post('/sessions/:id/cancel', requirePermission('sessoes_contagem', 'cancelar'), countingSessionController.cancel);
 
 // Gerar relatório
-router.get('/sessions/:id/report', countingSessionController.getReport);
+router.get('/sessions/:id/report', requirePermission('sessoes_contagem', 'visualizar'), countingSessionController.getReport);
 
 // Ajustar estoque
-router.post('/sessions/:id/adjust-stock', countingSessionController.adjustStock);
+router.post('/sessions/:id/adjust-stock', requirePermission('stock', 'adjustment'), countingSessionController.adjustStock);
 
 // Buscar divergências da sessão
-router.get('/sessions/:sessionId/divergences', countingItemController.getDivergences);
+router.get('/sessions/:sessionId/divergences', requirePermission('sessoes_contagem', 'visualizar'), countingItemController.getDivergences);
 
 // ============================================
 // ROTAS DE ITENS DE CONTAGEM
 // ============================================
 
 // Listar itens
-router.get('/items', countingItemController.index);
+router.get('/items', requirePermission('contagem', 'executar'), countingItemController.index);
 
 // Buscar item por ID
-router.get('/items/:id', countingItemController.show);
+router.get('/items/:id', requirePermission('contagem', 'executar'), countingItemController.show);
 
 // Contar item
-router.post('/items/:id/count', countingItemController.count);
+router.post('/items/:id/count', requirePermission('contagem', 'executar'), countingItemController.count);
 
 // Recontar item
-router.post('/items/:id/recount', countingItemController.recount);
+router.post('/items/:id/recount', requirePermission('contagem', 'recontar'), countingItemController.recount);
 
 // Aceitar contagem
-router.post('/items/:id/accept', countingItemController.accept);
+router.post('/items/:id/accept', requirePermission('contagem', 'aprovar_divergencia'), countingItemController.accept);
 
 // Cancelar item
-router.post('/items/:id/cancel', countingItemController.cancel);
+router.post('/items/:id/cancel', requirePermission('contagem', 'executar'), countingItemController.cancel);
 
 // Itens pendentes do usuário
-router.get('/items/pending/me', countingItemController.getPendingByUser);
+router.get('/items/pending/me', requirePermission('contagem', 'executar'), countingItemController.getPendingByUser);
 
 // Estatísticas de produto
-router.get('/products/:productId/stats', countingItemController.getProductStats);
+router.get('/products/:productId/stats', requirePermission('contagem', 'executar'), countingItemController.getProductStats);
+
+// Adicionar novas rotas
+router.use('/products', countingPlanProductRouter);
+router.use('/assignments', countingAssignmentRouter);
 
 export default router;

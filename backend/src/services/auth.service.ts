@@ -140,6 +140,29 @@ export class AuthService {
         name: true,
         active: true,
         createdAt: true,
+        roles: {
+          select: {
+            role: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+                permissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        id: true,
+                        resource: true,
+                        action: true,
+                        description: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -147,7 +170,16 @@ export class AuthService {
       throw new AppError(404, 'Usuário não encontrado');
     }
 
-    return user;
+    // Flatten the roles structure
+    const formattedUser = {
+      ...user,
+      roles: user.roles.map((ur) => ({
+        ...ur.role,
+        permissions: ur.role.permissions.map((rp) => rp.permission),
+      })),
+    };
+
+    return formattedUser;
   }
 }
 

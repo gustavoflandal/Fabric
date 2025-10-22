@@ -112,6 +112,23 @@ export class PermissionService {
       // Relatórios
       { resource: 'reports', action: 'read', description: 'Visualizar relatórios' },
       { resource: 'reports', action: 'export', description: 'Exportar relatórios' },
+      
+      // Abas do Sistema - Módulos
+      { resource: 'modules', action: 'view_general', description: 'Visualizar módulos Gerais' },
+      { resource: 'modules', action: 'view_pcp', description: 'Visualizar módulos PCP' },
+      { resource: 'modules', action: 'view_wms', description: 'Visualizar módulos WMS' },
+      { resource: 'modules', action: 'view_yms', description: 'Visualizar módulos YMS' },
+      
+      // PCP - Dashboard
+      { resource: 'pcp.dashboard', action: 'view', description: 'Visualizar Dashboard do PCP' },
+      
+      // WMS - Contagem de Estoque
+      { resource: 'counting', action: 'create', description: 'Criar planos de contagem' },
+      { resource: 'counting', action: 'read', description: 'Visualizar contagens' },
+      { resource: 'counting', action: 'update', description: 'Editar contagens' },
+      { resource: 'counting', action: 'delete', description: 'Excluir contagens' },
+      { resource: 'counting', action: 'execute', description: 'Executar contagem' },
+      { resource: 'counting.plans', action: 'print', description: 'Imprimir formulário de plano de contagem em PDF' },
     ];
 
     const created = [];

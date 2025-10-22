@@ -27,9 +27,12 @@ async function restore(backupFile) {
     // Confirmar restauração
     console.log('⚠️  ATENÇÃO: Esta operação irá DELETAR todos os dados atuais!\n');
     console.log('📊 Dados que serão restaurados:');
-    Object.keys(backupData.tables).forEach(table => {
-      console.log(`   - ${table}: ${backupData.tables[table].length} registros`);
-    });
+    if (backupData.data) {
+      Object.keys(backupData.data).forEach(table => {
+        const count = Array.isArray(backupData.data[table]) ? backupData.data[table].length : 0;
+        console.log(`   - ${table}: ${count} registros`);
+      });
+    }
     console.log('\n');
 
     // Aguardar 3 segundos para o usuário ler
@@ -99,147 +102,153 @@ async function restore(backupFile) {
     console.log('\n📥 Restaurando dados...\n');
 
     // Usuários
-    if (backupData.tables.users?.length > 0) {
-      for (const user of backupData.tables.users) {
-        await prisma.user.create({ data: user });
+    if (backupData.data.users?.length > 0) {
+      for (const user of backupData.data.users) {
+        const { roles, ...userData } = user;
+        await prisma.user.create({ data: userData });
       }
-      console.log(`   ✓ Usuários: ${backupData.tables.users.length}`);
+      console.log(`   ✓ Usuários: ${backupData.data.users.length}`);
     }
 
     // Perfis
-    if (backupData.tables.roles?.length > 0) {
-      for (const role of backupData.tables.roles) {
-        await prisma.role.create({ data: role });
+    if (backupData.data.roles?.length > 0) {
+      for (const role of backupData.data.roles) {
+        const { users, permissions, ...roleData } = role;
+        await prisma.role.create({ data: roleData });
       }
-      console.log(`   ✓ Perfis: ${backupData.tables.roles.length}`);
+      console.log(`   ✓ Perfis: ${backupData.data.roles.length}`);
     }
 
     // Permissões
-    if (backupData.tables.permissions?.length > 0) {
-      for (const permission of backupData.tables.permissions) {
+    if (backupData.data.permissions?.length > 0) {
+      for (const permission of backupData.data.permissions) {
         await prisma.permission.create({ data: permission });
       }
-      console.log(`   ✓ Permissões: ${backupData.tables.permissions.length}`);
+      console.log(`   ✓ Permissões: ${backupData.data.permissions.length}`);
     }
 
     // Unidades de Medida
-    if (backupData.tables.unitOfMeasures?.length > 0) {
-      for (const unit of backupData.tables.unitOfMeasures) {
+    if (backupData.data.unitsOfMeasure?.length > 0) {
+      for (const unit of backupData.data.unitsOfMeasure) {
         await prisma.unitOfMeasure.create({ data: unit });
       }
-      console.log(`   ✓ Unidades de Medida: ${backupData.tables.unitOfMeasures.length}`);
+      console.log(`   ✓ Unidades de Medida: ${backupData.data.unitsOfMeasure.length}`);
     }
 
     // Categorias de Produto
-    if (backupData.tables.productCategories?.length > 0) {
-      for (const category of backupData.tables.productCategories) {
+    if (backupData.data.productCategories?.length > 0) {
+      for (const category of backupData.data.productCategories) {
         await prisma.productCategory.create({ data: category });
       }
-      console.log(`   ✓ Categorias: ${backupData.tables.productCategories.length}`);
+      console.log(`   ✓ Categorias: ${backupData.data.productCategories.length}`);
     }
 
     // Produtos
-    if (backupData.tables.products?.length > 0) {
-      for (const product of backupData.tables.products) {
-        await prisma.product.create({ data: product });
+    if (backupData.data.products?.length > 0) {
+      for (const product of backupData.data.products) {
+        const { boms, routings, bomItems, routingOperations, productionOrders, stockMovements, ...productData } = product;
+        await prisma.product.create({ data: productData });
       }
-      console.log(`   ✓ Produtos: ${backupData.tables.products.length}`);
+      console.log(`   ✓ Produtos: ${backupData.data.products.length}`);
     }
 
     // BOMs
-    if (backupData.tables.boms?.length > 0) {
-      for (const bom of backupData.tables.boms) {
-        await prisma.bOM.create({ data: bom });
+    if (backupData.data.boms?.length > 0) {
+      for (const bom of backupData.data.boms) {
+        const { items, ...bomData } = bom;
+        await prisma.bOM.create({ data: bomData });
       }
-      console.log(`   ✓ BOMs: ${backupData.tables.boms.length}`);
+      console.log(`   ✓ BOMs: ${backupData.data.boms.length}`);
     }
 
     // Itens de BOM
-    if (backupData.tables.bomItems?.length > 0) {
-      for (const item of backupData.tables.bomItems) {
+    if (backupData.data.bomItems?.length > 0) {
+      for (const item of backupData.data.bomItems) {
         await prisma.bOMItem.create({ data: item });
       }
-      console.log(`   ✓ Itens de BOM: ${backupData.tables.bomItems.length}`);
+      console.log(`   ✓ Itens de BOM: ${backupData.data.bomItems.length}`);
     }
 
     // Roteiros
-    if (backupData.tables.routings?.length > 0) {
-      for (const routing of backupData.tables.routings) {
-        await prisma.routing.create({ data: routing });
+    if (backupData.data.routings?.length > 0) {
+      for (const routing of backupData.data.routings) {
+        const { operations, ...routingData } = routing;
+        await prisma.routing.create({ data: routingData });
       }
-      console.log(`   ✓ Roteiros: ${backupData.tables.routings.length}`);
+      console.log(`   ✓ Roteiros: ${backupData.data.routings.length}`);
     }
 
     // Operações de Roteiro
-    if (backupData.tables.routingOperations?.length > 0) {
-      for (const operation of backupData.tables.routingOperations) {
+    if (backupData.data.routingOperations?.length > 0) {
+      for (const operation of backupData.data.routingOperations) {
         await prisma.routingOperation.create({ data: operation });
       }
-      console.log(`   ✓ Operações de Roteiro: ${backupData.tables.routingOperations.length}`);
+      console.log(`   ✓ Operações de Roteiro: ${backupData.data.routingOperations.length}`);
     }
 
     // Centros de Trabalho
-    if (backupData.tables.workCenters?.length > 0) {
-      for (const workCenter of backupData.tables.workCenters) {
+    if (backupData.data.workCenters?.length > 0) {
+      for (const workCenter of backupData.data.workCenters) {
         await prisma.workCenter.create({ data: workCenter });
       }
-      console.log(`   ✓ Centros de Trabalho: ${backupData.tables.workCenters.length}`);
+      console.log(`   ✓ Centros de Trabalho: ${backupData.data.workCenters.length}`);
     }
 
     // Fornecedores
-    if (backupData.tables.suppliers?.length > 0) {
-      for (const supplier of backupData.tables.suppliers) {
+    if (backupData.data.suppliers?.length > 0) {
+      for (const supplier of backupData.data.suppliers) {
         await prisma.supplier.create({ data: supplier });
       }
-      console.log(`   ✓ Fornecedores: ${backupData.tables.suppliers.length}`);
+      console.log(`   ✓ Fornecedores: ${backupData.data.suppliers.length}`);
     }
 
     // Clientes
-    if (backupData.tables.customers?.length > 0) {
-      for (const customer of backupData.tables.customers) {
+    if (backupData.data.customers?.length > 0) {
+      for (const customer of backupData.data.customers) {
         await prisma.customer.create({ data: customer });
       }
-      console.log(`   ✓ Clientes: ${backupData.tables.customers.length}`);
+      console.log(`   ✓ Clientes: ${backupData.data.customers.length}`);
     }
 
     // Ordens de Produção
-    if (backupData.tables.productionOrders?.length > 0) {
-      for (const order of backupData.tables.productionOrders) {
-        await prisma.productionOrder.create({ data: order });
+    if (backupData.data.productionOrders?.length > 0) {
+      for (const order of backupData.data.productionOrders) {
+        const { operations, pointings, ...orderData } = order;
+        await prisma.productionOrder.create({ data: orderData });
       }
-      console.log(`   ✓ Ordens de Produção: ${backupData.tables.productionOrders.length}`);
+      console.log(`   ✓ Ordens de Produção: ${backupData.data.productionOrders.length}`);
     }
 
     // Operações de Ordem
-    if (backupData.tables.productionOrderOperations?.length > 0) {
-      for (const operation of backupData.tables.productionOrderOperations) {
+    if (backupData.data.productionOrderOperations?.length > 0) {
+      for (const operation of backupData.data.productionOrderOperations) {
         await prisma.productionOrderOperation.create({ data: operation });
       }
-      console.log(`   ✓ Operações de Ordem: ${backupData.tables.productionOrderOperations.length}`);
+      console.log(`   ✓ Operações de Ordem: ${backupData.data.productionOrderOperations.length}`);
     }
 
     // Apontamentos
-    if (backupData.tables.productionPointings?.length > 0) {
-      for (const pointing of backupData.tables.productionPointings) {
+    if (backupData.data.productionPointings?.length > 0) {
+      for (const pointing of backupData.data.productionPointings) {
         await prisma.productionPointing.create({ data: pointing });
       }
-      console.log(`   ✓ Apontamentos: ${backupData.tables.productionPointings.length}`);
+      console.log(`   ✓ Apontamentos: ${backupData.data.productionPointings.length}`);
     }
 
     // Movimentações de Estoque
-    if (backupData.tables.stockMovements?.length > 0) {
-      for (const movement of backupData.tables.stockMovements) {
+    if (backupData.data.stockMovements?.length > 0) {
+      for (const movement of backupData.data.stockMovements) {
         await prisma.stockMovement.create({ data: movement });
       }
-      console.log(`   ✓ Movimentações de Estoque: ${backupData.tables.stockMovements.length}`);
+      console.log(`   ✓ Movimentações de Estoque: ${backupData.data.stockMovements.length}`);
     }
 
     // Logs de Auditoria
-    if (backupData.tables.auditLogs?.length > 0) {
-      for (const log of backupData.tables.auditLogs) {
+    if (backupData.data.auditLogs?.length > 0) {
+      for (const log of backupData.data.auditLogs) {
         await prisma.auditLog.create({ data: log });
       }
-      console.log(`   ✓ Logs de Auditoria: ${backupData.tables.auditLogs.length}`);
+      console.log(`   ✓ Logs de Auditoria: ${backupData.data.auditLogs.length}`);
     }
 
     console.log('\n✅ Restauração concluída com sucesso!\n');

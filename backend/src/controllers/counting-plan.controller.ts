@@ -71,9 +71,11 @@ class CountingPlanController {
   async update(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      console.log('Corpo da requisição:', req.body);
       const plan = await countingPlanService.update(id, req.body);
       res.json(plan);
     } catch (error: any) {
+      console.error('Erro ao atualizar plano:', error);
       res.status(400).json({ error: error.message });
     }
   }

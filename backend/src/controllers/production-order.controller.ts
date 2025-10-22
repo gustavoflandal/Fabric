@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import productionOrderService from '../services/production-order.service';
+import { parsePositiveInt } from '../utils/validation.util';
 
 export class ProductionOrderController {
   async create(req: AuthRequest, res: Response, next: NextFunction) {
@@ -23,8 +24,8 @@ export class ProductionOrderController {
 
   async getAll(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 100;
+      const page = parsePositiveInt(req.query.page, 1);
+      const limit = parsePositiveInt(req.query.limit, 100, 500);
       const filters = {
         status: req.query.status as string,
         productId: req.query.productId as string,

@@ -7,6 +7,7 @@ export interface CreateCountingPlanDTO {
   description?: string;
   type: CountingType;
   frequency?: CountingFrequency;
+  priority?: number;
   criteria?: any;
   allowBlindCount?: boolean;
   requireRecount?: boolean;
@@ -22,6 +23,7 @@ export interface UpdateCountingPlanDTO {
   description?: string;
   type?: CountingType;
   frequency?: CountingFrequency;
+  priority?: number;
   criteria?: any;
   allowBlindCount?: boolean;
   requireRecount?: boolean;
@@ -129,6 +131,7 @@ class CountingPlanService {
         description: data.description,
         type: data.type,
         frequency: data.frequency,
+        priority: data.priority ?? 5,
         criteria: data.criteria || {},
         allowBlindCount: data.allowBlindCount ?? true,
         requireRecount: data.requireRecount ?? true,
@@ -161,16 +164,28 @@ class CountingPlanService {
       throw new Error('Plano de contagem não encontrado');
     }
 
+    // Remover campos que não devem ser atualizados
+    const { code, ...updateData } = data as any;
+
+    // Converter datas de string para Date
+    if (updateData.startDate && typeof updateData.startDate === 'string') {
+      updateData.startDate = new Date(updateData.startDate);
+    }
+    if (updateData.endDate && typeof updateData.endDate === 'string') {
+      updateData.endDate = new Date(updateData.endDate);
+    }
+
     // Recalcular próxima execução se frequência mudou
     let nextExecution = plan.nextExecution;
-    if (data.frequency && data.frequency !== plan.frequency) {
-      nextExecution = this.calculateNextExecution(data.startDate || plan.startDate, data.frequency);
+    if (updateData.frequency && updateData.frequency !== plan.frequency) {
+      const startDate = updateData.startDate || plan.startDate || new Date();
+      nextExecution = this.calculateNextExecution(startDate, updateData.frequency);
     }
 
     return await prisma.countingPlan.update({
       where: { id },
       data: {
-        ...data,
+        ...updateData,
         nextExecution,
       },
       include: {

@@ -31,13 +31,64 @@
           <p class="text-gray-500">Carregando permissões...</p>
         </div>
 
-        <!-- Permissions by Resource -->
-        <div v-else class="space-y-6">
-          <div v-for="(perms, resource) in groupedPermissions" :key="resource">
-            <h4 class="text-lg font-semibold text-gray-900 mb-3">
-              {{ getResourceLabel(resource) }}
-            </h4>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg">
+        <!-- Tabs -->
+        <div v-else>
+          <div class="mb-6 border-b border-gray-200">
+            <nav class="-mb-px flex space-x-8">
+              <button
+                @click="activeTab = 'geral'"
+                :class="[
+                  'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === 'geral'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ]"
+              >
+                Geral
+              </button>
+              <button
+                @click="activeTab = 'pcp'"
+                :class="[
+                  'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === 'pcp'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ]"
+              >
+                PCP
+              </button>
+              <button
+                @click="activeTab = 'wms'"
+                :class="[
+                  'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === 'wms'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ]"
+              >
+                WMS
+              </button>
+              <button
+                @click="activeTab = 'yms'"
+                :class="[
+                  'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === 'yms'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                ]"
+              >
+                YMS
+              </button>
+            </nav>
+          </div>
+
+          <!-- Tab Content -->
+          <div class="space-y-6">
+            <div v-for="(perms, resource) in filteredPermissionsByTab" :key="resource">
+              <h4 class="text-lg font-semibold text-gray-900 mb-3">
+                {{ getResourceLabel(resource) }}
+              </h4>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg">
               <div
                 v-for="permission in perms"
                 :key="permission.id"
@@ -60,6 +111,7 @@
                   </p>
                 </label>
               </div>
+            </div>
             </div>
           </div>
 
@@ -140,9 +192,19 @@ const emit = defineEmits<Emits>();
 
 const allPermissions = ref<Permission[]>([]);
 const selectedPermissions = ref<string[]>([]);
+const activeTab = ref('geral');
 const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
+
+// Definir quais recursos pertencem a cada aba
+const tabResourceMapping = {
+  geral: ['users', 'roles', 'audit_logs', 'modules'],
+  pcp: ['products', 'boms', 'routings', 'production_orders', 'production_pointings', 
+        'work_centers', 'suppliers', 'customers', 'stock', 'mrp', 'reports', 'purchases', 'pcp.dashboard'],
+  wms: ['counting', 'counting.plans', 'warehouse_receipts', 'warehouse_locations', 'warehouse_transfers'],
+  yms: ['yard_scheduling', 'yard_docks', 'yard_checkin']
+};
 
 const groupedPermissions = computed(() => {
   const grouped: Record<string, Permission[]> = {};
@@ -155,6 +217,20 @@ const groupedPermissions = computed(() => {
   });
   
   return grouped;
+});
+
+// Filtrar permissões por aba ativa
+const filteredPermissionsByTab = computed(() => {
+  const filtered: Record<string, Permission[]> = {};
+  const resourcesForTab = tabResourceMapping[activeTab.value as keyof typeof tabResourceMapping] || [];
+  
+  Object.entries(groupedPermissions.value).forEach(([resource, perms]) => {
+    if (resourcesForTab.includes(resource)) {
+      filtered[resource] = perms;
+    }
+  });
+  
+  return filtered;
 });
 
 const loadPermissions = async () => {
@@ -186,10 +262,15 @@ watch(() => props.isOpen, (newValue, oldValue) => {
 
 const getResourceLabel = (resource: string) => {
   const labels: Record<string, string> = {
+    // Geral
     users: 'Usuários',
-    roles: 'Perfis',
+    roles: 'Perfis de Acesso',
+    audit_logs: 'Logs de Auditoria',
+    modules: 'Módulos do Sistema',
+    
+    // PCP
     products: 'Produtos',
-    boms: 'BOMs (Estruturas de Produto)',
+    boms: 'Listas de Materiais (BOM)',
     routings: 'Roteiros de Produção',
     production_orders: 'Ordens de Produção',
     production_pointings: 'Apontamentos de Produção',
@@ -197,31 +278,67 @@ const getResourceLabel = (resource: string) => {
     suppliers: 'Fornecedores',
     customers: 'Clientes',
     stock: 'Estoque',
-    mrp: 'MRP (Planejamento de Materiais)',
+    mrp: 'Planejamento de Materiais (MRP)',
     reports: 'Relatórios',
-    audit_logs: 'Logs de Auditoria',
     purchases: 'Compras',
+    
+    // WMS
+    counting: 'Contagem de Estoque',
+    'counting.plans': 'Planos de Contagem',
+    warehouse_receipts: 'Recebimento de Mercadorias',
+    warehouse_locations: 'Localizações do Armazém',
+    warehouse_transfers: 'Transferências Internas',
+    
+    // YMS
+    yard_scheduling: 'Agendamento de Pátio',
+    yard_docks: 'Docas',
+    yard_checkin: 'Check-in/Check-out',
   };
   return labels[resource] || resource;
 };
 
 const getActionLabel = (action: string) => {
   const labels: Record<string, string> = {
+    // Ações básicas
     create: 'Criar',
     read: 'Visualizar',
     update: 'Editar',
     delete: 'Excluir',
     export: 'Exportar',
     execute: 'Executar',
+    print: 'Imprimir',
+    
+    // Estoque
     entry: 'Registrar Entrada',
     exit: 'Registrar Saída',
-    adjustment: 'Ajustar',
+    adjustment: 'Realizar Ajustes',
+    transfer: 'Transferir',
+    
+    // MRP e Produção
     consolidate: 'Consolidar',
+    
+    // Relatórios
     production: 'Relatório de Produção',
     efficiency: 'Relatório de Eficiência',
     quality: 'Relatório de Qualidade',
+    
+    // Compras
     approve_quotation: 'Aprovar Orçamentos',
-    approve_order: 'Aprovar Pedidos',
+    approve_order: 'Aprovar Pedidos de Compra',
+    
+    // Módulos do Sistema
+    view_general: 'Visualizar Módulos Gerais',
+    view_pcp: 'Visualizar Módulos PCP',
+    view_wms: 'Visualizar Módulos WMS',
+    view_yms: 'Visualizar Módulos YMS',
+    
+    // PCP - Dashboard
+    view: 'Visualizar Dashboard',
+    
+    // Contagem de Estoque
+    create_plan: 'Criar Planos de Contagem',
+    execute_counting: 'Executar Contagem',
+    approve_adjustments: 'Aprovar Ajustes',
   };
   return labels[action] || action;
 };

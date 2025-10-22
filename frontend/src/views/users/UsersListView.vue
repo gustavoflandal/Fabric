@@ -11,7 +11,7 @@
           
           <div class="flex items-center space-x-4">
             <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Dashboard
+              Início
             </RouterLink>
             <RouterLink to="/roles" class="text-sm text-gray-700 hover:text-primary-600">
               Perfis

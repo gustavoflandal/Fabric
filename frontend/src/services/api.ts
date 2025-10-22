@@ -24,17 +24,22 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Don't logout on 400 errors (bad request)
+    if (error.response?.status === 400) {
+      return Promise.reject(error);
+    }
+    
+    // Only logout on 401 (unauthorized)
     if (error.response?.status === 401) {
-      // Token expirado ou inválido - limpar storage e redirecionar
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       
-      // Redirecionar para login apenas se não estiver já na página de login
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
       }
     }
+    
     return Promise.reject(error);
   }
 );

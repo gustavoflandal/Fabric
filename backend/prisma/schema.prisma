@@ -30,6 +30,7 @@ model User {
   stockMovements StockMovement[]
   notifications Notification[]
   notificationPreferences NotificationPreference[]
+  countingAssignments CountingAssignment[]
   
   // Contagem de Estoque
   countingPlansCreated CountingPlan[] @relation("CountingPlanCreator")
@@ -252,6 +253,7 @@ model Product {
   purchaseOrderItems PurchaseOrderItem[]
   receiptItems  PurchaseReceiptItem[]
   countingItems CountingItem[]
+  countingPlanProducts CountingPlanProduct[]
   
   @@index([type])
   @@index([active])
@@ -743,6 +745,7 @@ model CountingPlan {
   requireRecount    Boolean             @default(true)
   tolerancePercent  Decimal?            @db.Decimal(5, 2)
   toleranceQty      Int?
+  priority          Int                 @default(5)
   
   // Datas
   startDate         DateTime
@@ -759,6 +762,7 @@ model CountingPlan {
   // Relações
   creator           User                @relation("CountingPlanCreator", fields: [createdBy], references: [id])
   sessions          CountingSession[]
+  products          CountingPlanProduct[]
   
   @@index([status, nextExecution])
   @@index([type, frequency])
@@ -798,6 +802,7 @@ model CountingSession {
   completedUser     User?               @relation("SessionCompletedBy", fields: [completedBy], references: [id])
   items             CountingItem[]
   adjustments       StockMovement[]     @relation("CountingAdjustments")
+  assignments       CountingAssignment[]
   
   @@index([planId])
   @@index([status, scheduledDate])
@@ -836,6 +841,9 @@ model CountingItem {
   recountedBy       String?
   recountedAt       DateTime?
   
+  // Sequência para ordenação
+  sequence          Int?               @default(0)
+  
   // Auditoria
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
@@ -852,6 +860,46 @@ model CountingItem {
   @@index([hasDifference])
   @@index([countedBy])
   @@map("counting_items")
+}
+
+// Relação de produtos em planos de contagem
+model CountingPlanProduct {
+  id                String        @id @default(uuid())
+  planId            String
+  productId         String
+  priority          Int           @default(0)
+  
+  plan              CountingPlan  @relation(fields: [planId], references: [id])
+  product           Product       @relation(fields: [productId], references: [id])
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  @@unique([planId, productId])
+  @@map("counting_plan_products")
+}
+
+// Atribuição de contadores a sessões
+model CountingAssignment {
+  id                String            @id @default(uuid())
+  sessionId         String
+  userId            String
+  role              CounterRole
+  assignedAt        DateTime          @default(now())
+  
+  session           CountingSession   @relation(fields: [sessionId], references: [id])
+  user              User              @relation(fields: [userId], references: [id])
+  
+  @@unique([sessionId, userId])
+  @@map("counting_assignments")
+}
+
+// Papéis de contador
+enum CounterRole {
+  PRIMARY     // Contador principal
+  SECONDARY   // Recontador
+  VALIDATOR   // Validador final
+  SUPERVISOR  // Supervisor
 }
 
 // ============================================

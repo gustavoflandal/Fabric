@@ -33,9 +33,6 @@ build/
 Thumbs.db
 desktop.ini
 
-# Prisma
-prisma/migrations/**/migration.sql
-
 # Logs
 logs/
 *.log

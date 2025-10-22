@@ -1,5 +1,7 @@
 import { prisma } from '../config/database';
 import notificationDetector from './notification-detector.service';
+import { AppError } from '../middleware/error.middleware';
+import { validateDate, validateDateRange } from '../utils/validation.util';
 
 export interface CreateProductionOrderDto {
   orderNumber: string;
@@ -28,7 +30,50 @@ export class ProductionOrderService {
     });
 
     if (!product) {
-      throw new Error('Produto não encontrado');
+      throw new AppError(404, 'Produto não encontrado');
+    }
+
+    // ✅ VALIDAÇÃO CRÍTICA: Validar datas
+    const scheduledStart = new Date(data.scheduledStart);
+    const scheduledEnd = new Date(data.scheduledEnd);
+
+    // Verificar se as datas são válidas
+    if (isNaN(scheduledStart.getTime())) {
+      throw new AppError(400, 'Data de início inválida');
+    }
+    
+    if (isNaN(scheduledEnd.getTime())) {
+      throw new AppError(400, 'Data de término inválida');
+    }
+
+    // Verificar se data de término é posterior à data de início
+    if (scheduledEnd <= scheduledStart) {
+      throw new AppError(400, 'Data de término deve ser posterior à data de início');
+    }
+
+    // Verificar se data de início não é muito no passado (permitir até 1 dia atrás)
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    
+    if (scheduledStart < oneDayAgo) {
+      throw new AppError(400, 'Data de início não pode ser anterior a ontem');
+    }
+
+    // Verificar se data de término não é muito no futuro (máximo 2 anos)
+    const twoYearsFromNow = new Date();
+    twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
+    
+    if (scheduledEnd > twoYearsFromNow) {
+      throw new AppError(400, 'Data de término não pode exceder 2 anos no futuro');
+    }
+
+    // Verificar número da ordem único
+    const existingOrder = await prisma.productionOrder.findUnique({
+      where: { orderNumber: data.orderNumber }
+    });
+    
+    if (existingOrder) {
+      throw new AppError(409, `Número de ordem ${data.orderNumber} já existe`);
     }
 
     // Criar a ordem
@@ -41,8 +86,8 @@ export class ProductionOrderService {
         scrapQty: 0,
         status: 'PLANNED',
         priority: data.priority || 5,
-        scheduledStart: new Date(data.scheduledStart),
-        scheduledEnd: new Date(data.scheduledEnd),
+        scheduledStart,
+        scheduledEnd,
         notes: data.notes,
         createdBy: userId,
       },

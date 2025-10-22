@@ -15,6 +15,7 @@ import routingRoutes from './routing.routes';
 import productionOrderRoutes from './production-order.routes';
 import productionPointingRoutes from './production-pointing.routes';
 import dashboardRoutes from './dashboard.routes';
+import pcpDashboardRoutes from './pcp-dashboard.routes';
 import mrpRoutes from './mrp.routes';
 import stockRoutes from './stock.routes';
 import reportsRoutes from './reports.routes';
@@ -55,6 +56,7 @@ router.use('/production-pointings', productionPointingRoutes);
 
 // Rotas de dashboard
 router.use('/dashboard', dashboardRoutes);
+router.use('/pcp/dashboard', pcpDashboardRoutes);
 
 // Rotas de MRP, Estoque e Relatórios
 router.use('/mrp', mrpRoutes);

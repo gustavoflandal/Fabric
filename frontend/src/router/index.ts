@@ -26,6 +26,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/pcp/dashboard',
+    name: 'pcp-dashboard',
+    component: () => import('../views/pcp/PCPDashboardView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/users',
     name: 'users',
     component: () => import('../views/users/UsersListView.vue'),

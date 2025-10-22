@@ -4,6 +4,7 @@ import { logger } from './config/logger';
 import { prisma } from './config/database';
 import { initializeEventListeners } from './events/listeners';
 import notificationScheduler from './services/notification-scheduler.service';
+import logCleanupJob from './jobs/log-cleanup.job';
 
 const startServer = async () => {
   try {
@@ -18,6 +19,10 @@ const startServer = async () => {
     // Initialize notification scheduler
     notificationScheduler.start();
     logger.info('✅ Notification scheduler initialized');
+
+    // Initialize log cleanup job
+    logCleanupJob.start();
+    logger.info('✅ Log cleanup job initialized');
 
     // Start server
     app.listen(config.port, () => {
@@ -35,6 +40,7 @@ const startServer = async () => {
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   notificationScheduler.stop();
+  logCleanupJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
@@ -42,6 +48,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
   notificationScheduler.stop();
+  logCleanupJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

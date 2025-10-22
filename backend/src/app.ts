@@ -5,16 +5,22 @@ import { config } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { logger } from './config/logger';
 import { auditMiddleware } from './middleware/audit.middleware';
+import { generalLimiter } from './middleware/rate-limit.middleware';
 import routes from './routes';
 
 const app = express();
 
-// Middlewares
+// Security middlewares
 app.use(helmet());
 app.use(cors({ 
   origin: ['http://localhost:5173', 'http://localhost:5175', 'http://localhost:5174'],
   credentials: true 
 }));
+
+// Rate limiting (aplicar antes de parsear body)
+app.use(generalLimiter);
+
+// Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

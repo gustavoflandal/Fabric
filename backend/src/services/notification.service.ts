@@ -330,18 +330,37 @@ export class NotificationService {
       _count: true,
     });
 
-    // Tendência diária
-    const dailyTrend = await prisma.$queryRaw<Array<{ date: string; count: number; critical: number }>>`
-      SELECT 
-        DATE(createdAt) as date,
-        COUNT(*) as count,
-        SUM(CASE WHEN priority >= 3 THEN 1 ELSE 0 END) as critical
-      FROM notifications
-      WHERE userId = ${userId}
-        AND createdAt >= ${since}
-      GROUP BY DATE(createdAt)
-      ORDER BY date ASC
-    `;
+    // Tendência diária - CORRIGIDO: usar agregação do Prisma ao invés de raw SQL
+    const notifications = await prisma.notification.findMany({
+      where: {
+        userId,
+        createdAt: { gte: since },
+      },
+      select: {
+        createdAt: true,
+        priority: true,
+      },
+    });
+
+    // Processar para agrupar por dia
+    const dailyTrendMap = new Map<string, { count: number; critical: number }>();
+    
+    for (const notification of notifications) {
+      const date = notification.createdAt.toISOString().split('T')[0]; // YYYY-MM-DD
+      const existing = dailyTrendMap.get(date) || { count: 0, critical: 0 };
+      existing.count += 1;
+      // Contar como crítico se prioridade >= 3
+      if (notification.priority >= 3) {
+        existing.critical += 1;
+      }
+      dailyTrendMap.set(date, existing);
+    }
+    
+    const dailyTrend = Array.from(dailyTrendMap.entries()).map(([date, data]) => ({
+      date,
+      count: data.count,
+      critical: data.critical
+    })).sort((a, b) => a.date.localeCompare(b.date));
 
     // Top eventos
     const topEvents = await prisma.notification.groupBy({

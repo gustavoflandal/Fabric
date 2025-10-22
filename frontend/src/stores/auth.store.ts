@@ -5,6 +5,7 @@ import authService, { type LoginRequest, type RegisterRequest } from '@/services
 export const useAuthStore = defineStore('auth', () => {
   // State
   const user = ref<{ id: string; email: string; name: string } | null>(null)
+  const permissions = ref<string[]>([])
   const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
   const refreshToken = ref<string | null>(localStorage.getItem('refreshToken'))
   const loading = ref(false)
@@ -13,6 +14,23 @@ export const useAuthStore = defineStore('auth', () => {
   // Getters
   const isAuthenticated = computed(() => !!accessToken.value && !!user.value)
   const userName = computed(() => user.value?.name || '')
+  
+  // Verificar se tem permissão específica
+  const hasPermission = computed(() => (resource: string, action: string) => {
+    return permissions.value.includes(`${resource}.${action}`)
+  })
+  
+  // Verificar permissões de módulos
+  const canViewGeneral = computed(() => permissions.value.includes('modules.view_general'))
+  const canViewPCP = computed(() => permissions.value.includes('modules.view_pcp'))
+  const canViewWMS = computed(() => permissions.value.includes('modules.view_wms'))
+  const canViewYMS = computed(() => permissions.value.includes('modules.view_yms'))
+  
+  // Verificar permissões específicas do PCP
+  const canViewPCPDashboard = computed(() => permissions.value.includes('pcp.dashboard.view'))
+  
+  // Verificar permissões de contagem
+  const canPrintCountingPlan = computed(() => permissions.value.includes('counting.plans.print'))
 
   // Actions
   async function login(credentials: LoginRequest) {
@@ -20,9 +38,11 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = true
       error.value = null
 
-      console.log('AuthStore: Chamando authService.login...')
+      if (import.meta.env.DEV) {
+        console.log('AuthStore: Iniciando login...')
+      }
+      
       const response = await authService.login(credentials)
-      console.log('AuthStore: Resposta recebida:', response)
 
       // Set tokens first so they're available for subsequent requests
       accessToken.value = response.accessToken
@@ -33,12 +53,25 @@ export const useAuthStore = defineStore('auth', () => {
       // Set user data
       user.value = response.user
 
-      console.log('AuthStore: Login bem-sucedido!')
+      if (import.meta.env.DEV) {
+        console.log('AuthStore: Login bem-sucedido!')
+      }
       return true
     } catch (err: any) {
-      console.error('AuthStore: Erro no login:', err)
-      console.error('AuthStore: Resposta do erro:', err.response)
-      error.value = err.response?.data?.message || 'Erro ao fazer login'
+      if (import.meta.env.DEV) {
+        console.error('AuthStore: Erro no login:', err.message)
+      }
+      
+      // Mensagens de erro mais específicas e acionáveis
+      if (err.response?.status === 401) {
+        error.value = 'Email ou senha incorretos. Por favor, verifique suas credenciais.'
+      } else if (err.response?.status === 403) {
+        error.value = 'Sua conta está inativa. Entre em contato com o administrador.'
+      } else if (err.response?.status === 429) {
+        error.value = 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
+      } else {
+        error.value = err.response?.data?.message || 'Erro ao fazer login. Verifique sua conexão e tente novamente.'
+      }
       return false
     } finally {
       loading.value = false
@@ -61,7 +94,14 @@ export const useAuthStore = defineStore('auth', () => {
 
       return true
     } catch (err: any) {
-      error.value = err.response?.data?.message || 'Erro ao registrar'
+      // Mensagens de erro mais específicas
+      if (err.response?.status === 409) {
+        error.value = 'Este email já está cadastrado. Tente fazer login ou use outro email.'
+      } else if (err.response?.status === 400) {
+        error.value = err.response?.data?.message || 'Dados inválidos. Verifique os campos e tente novamente.'
+      } else {
+        error.value = err.response?.data?.message || 'Erro ao criar conta. Tente novamente mais tarde.'
+      }
       return false
     } finally {
       loading.value = false
@@ -72,7 +112,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await authService.logout()
     } catch (err) {
-      console.error('Erro ao fazer logout:', err)
+      if (import.meta.env.DEV) {
+        console.error('Erro ao fazer logout:', err)
+      }
+      // Continua com logout local mesmo se falhar no servidor
     } finally {
       user.value = null
       accessToken.value = null
@@ -97,8 +140,32 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const userData = await authService.getMe()
       user.value = userData
+      
+      // Buscar permissões do usuário
+      if (userData.roles && Array.isArray(userData.roles)) {
+        const allPermissions: string[] = []
+        for (const role of userData.roles) {
+          if (role.permissions && Array.isArray(role.permissions)) {
+            for (const perm of role.permissions) {
+              const permKey = `${perm.resource}.${perm.action}`
+              if (!allPermissions.includes(permKey)) {
+                allPermissions.push(permKey)
+              }
+            }
+          }
+        }
+        permissions.value = allPermissions
+        
+        if (import.meta.env.DEV) {
+          console.log('✅ Permissões carregadas:', permissions.value.length)
+          console.log('📋 Módulos:', allPermissions.filter(p => p.startsWith('modules.')))
+        }
+      }
     } catch (err) {
-      console.error('Erro ao buscar usuário:', err)
+      if (import.meta.env.DEV) {
+        console.error('Erro ao buscar usuário:', err)
+      }
+      // Logout se não conseguir buscar dados do usuário (token inválido)
       logout()
     }
   }
@@ -112,6 +179,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     // State
     user,
+    permissions,
     accessToken,
     refreshToken,
     loading,
@@ -119,6 +187,13 @@ export const useAuthStore = defineStore('auth', () => {
     // Getters
     isAuthenticated,
     userName,
+    hasPermission,
+    canViewGeneral,
+    canViewPCP,
+    canViewWMS,
+    canViewYMS,
+    canViewPCPDashboard,
+    canPrintCountingPlan,
     // Actions
     login,
     register,

@@ -161,6 +161,7 @@ export class PurchaseReceiptService {
 
   /**
    * Atualiza custos dos produtos baseado no recebimento
+   * ✅ CORREÇÃO CRÍTICA: Calcula estoque real para custo médio correto
    */
   private async updateProductCosts(items: any[]) {
     for (const item of items) {
@@ -170,10 +171,17 @@ export class PurchaseReceiptService {
 
       if (!product) continue;
 
-      // Calcular novo custo médio
-      const currentStock = 0; // TODO: Buscar estoque real
+      // ✅ Buscar estoque real do produto
+      const movements = await prisma.stockMovement.findMany({
+        where: { productId: item.productId },
+      });
+
+      const currentStock = movements.reduce((sum, mov) => {
+        return mov.type === 'IN' ? sum + mov.quantity : sum - mov.quantity;
+      }, 0);
+
+      // Calcular novo custo médio ponderado
       const currentValue = (product.averageCost || 0) * currentStock;
-      
       const newStock = currentStock + item.quantityReceived;
       const newValue = currentValue + (item.orderItem.unitPrice * item.quantityReceived);
       
@@ -190,6 +198,7 @@ export class PurchaseReceiptService {
 
       console.log(
         `[PurchaseReceipt] Custo atualizado para ${item.product.code}: ` +
+        `Estoque: ${currentStock} → ${newStock}, ` +
         `Último: R$ ${item.orderItem.unitPrice.toFixed(2)}, ` +
         `Médio: R$ ${newAverageCost.toFixed(2)}`
       );

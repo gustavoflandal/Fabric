@@ -11,7 +11,7 @@ router.get('/order/:orderId', mrpController.executeForOrder);
 router.post('/execute-multiple', mrpController.executeForMultipleOrders);
 router.post('/execute-all', mrpController.executeForAllPending);
 router.post('/consolidate', mrpController.consolidateRequirements);
-router.get('/purchase-suggestions', mrpController.getPurchaseSuggestions);
-router.get('/production-suggestions', mrpController.getProductionSuggestions);
+router.get('/purchase-suggestions', mrpController.generatePurchaseSuggestions);
+router.get('/production-suggestions', mrpController.generateProductionSuggestions);
 
 export default router;

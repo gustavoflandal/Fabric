@@ -11,7 +11,7 @@
           
           <div class="flex items-center space-x-4">
             <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-gray-900">
-              Dashboard
+              Início
             </RouterLink>
             <span class="text-sm text-gray-700">
               Olá, <span class="font-semibold">{{ authStore.userName }}</span>

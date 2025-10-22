@@ -497,66 +497,90 @@ export class StockServiceRefactored {
 
   /**
    * Reserva estoque para uma ordem de produção
+   * ✅ CORREÇÃO RACE CONDITION: Usa transação para garantir atomicidade
    */
   async reserveForOrder(orderId: string, userId: string) {
-    const order = await prisma.productionOrder.findUnique({
-      where: { id: orderId },
-      include: {
-        product: true,
-      },
-    });
-
-    if (!order) {
-      throw new Error('Ordem de produção não encontrada');
-    }
-
-    // Buscar BOM ativa do produto
-    const activeBom = await prisma.bOM.findFirst({
-      where: {
-        productId: order.productId,
-        active: true,
-      },
-      include: {
-        items: {
-          include: {
-            component: true,
-          },
+    return await prisma.$transaction(async (tx) => {
+      const order = await tx.productionOrder.findUnique({
+        where: { id: orderId },
+        include: {
+          product: true,
         },
-      },
-    });
-
-    if (!activeBom) {
-      throw new Error('BOM ativa não encontrada para o produto');
-    }
-
-    const reservations = [];
-
-    for (const bomItem of activeBom.items) {
-      const requiredQty = bomItem.quantity * order.quantity * (1 + bomItem.scrapFactor);
-      const balance = await this.getBalance(bomItem.componentId);
-
-      if (balance.quantity < requiredQty) {
-        throw new Error(`Estoque insuficiente para ${bomItem.component.code}`);
-      }
-
-      // Registrar saída
-      const movement = await this.registerExit({
-        productId: bomItem.componentId,
-        quantity: requiredQty,
-        reason: 'Reserva para produção',
-        reference: order.orderNumber,
-        userId,
       });
 
-      reservations.push(movement);
-    }
+      if (!order) {
+        throw new Error('Ordem de produção não encontrada');
+      }
 
-    return {
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      reservations,
-      totalItems: reservations.length,
-    };
+      // Buscar BOM ativa do produto
+      const activeBom = await tx.bOM.findFirst({
+        where: {
+          productId: order.productId,
+          active: true,
+        },
+        include: {
+          items: {
+            include: {
+              component: true,
+            },
+          },
+        },
+      });
+
+      if (!activeBom) {
+        throw new Error('BOM ativa não encontrada para o produto');
+      }
+
+      // ✅ FASE 1: Validar TODOS os estoques antes de reservar qualquer um (fail-fast)
+      const requiredItems = activeBom.items.map(bomItem => ({
+        componentId: bomItem.componentId,
+        componentCode: bomItem.component.code,
+        requiredQty: bomItem.quantity * order.quantity * (1 + bomItem.scrapFactor),
+      }));
+
+      for (const item of requiredItems) {
+        const movements = await tx.stockMovement.findMany({
+          where: { productId: item.componentId },
+        });
+
+        const balance = movements.reduce((sum, mov) => {
+          return mov.type === 'IN' ? sum + mov.quantity : sum - mov.quantity;
+        }, 0);
+
+        if (balance < item.requiredQty) {
+          throw new Error(`Estoque insuficiente para ${item.componentCode}: disponível ${balance}, necessário ${item.requiredQty}`);
+        }
+      }
+
+      // ✅ FASE 2: Todos os estoques validados, agora registrar TODAS as saídas
+      const reservations = [];
+
+      for (const item of requiredItems) {
+        const movement = await tx.stockMovement.create({
+          data: {
+            productId: item.componentId,
+            type: 'OUT',
+            quantity: item.requiredQty,
+            reason: 'Reserva para produção',
+            reference: order.orderNumber,
+            referenceType: 'MANUAL',
+            userId,
+          },
+          include: {
+            product: true,
+          },
+        });
+
+        reservations.push(movement);
+      }
+
+      return {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        reservations,
+        totalItems: reservations.length,
+      };
+    });
   }
 }
 

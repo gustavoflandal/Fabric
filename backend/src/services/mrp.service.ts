@@ -69,6 +69,11 @@ export class MRPService {
       };
     }
 
+    // ✅ OTIMIZAÇÃO: Buscar estoque de todos os componentes de uma vez
+    const componentIds = activeBom.items.map(item => item.component.id);
+    const stockBalances = await this.getAvailableStockBatch(componentIds);
+    const onOrderQuantities = await this.getOnOrderQuantityBatch(componentIds);
+
     // Para cada material necessário
     for (const bomItem of activeBom.items) {
       const component = bomItem.component;
@@ -76,11 +81,9 @@ export class MRPService {
       // Calcular quantidade necessária
       const requiredQty = bomItem.quantity * order.quantity * (1 + bomItem.scrapFactor);
       
-      // Calcular estoque disponível (simulado - será real quando implementar estoque)
-      const availableQty = await this.getAvailableStock(component.id);
-      
-      // Calcular quantidade em pedidos (simulado)
-      const onOrderQty = await this.getOnOrderQuantity(component.id);
+      // ✅ Usar valores do batch
+      const availableQty = stockBalances.get(component.id) || 0;
+      const onOrderQty = onOrderQuantities.get(component.id) || 0;
       
       // Calcular necessidade líquida
       const netRequirement = Math.max(0, requiredQty - availableQty - onOrderQty);
@@ -245,35 +248,51 @@ export class MRPService {
   }
 
   /**
-   * Obtém estoque disponível real do produto
+   * Obtém estoque disponível real de múltiplos produtos (otimizado)
    */
-  private async getAvailableStock(productId: string): Promise<number> {
-    // Buscar todas as movimentações do produto
+  private async getAvailableStockBatch(productIds: string[]): Promise<Map<string, number>> {
+    // Buscar todas as movimentações de uma vez
     const movements = await prisma.stockMovement.findMany({
-      where: { productId },
+      where: { productId: { in: productIds } },
+      select: { productId: true, type: true, quantity: true }
     });
-
-    // Calcular saldo (entradas - saídas)
-    let balance = 0;
+    
+    const balances = new Map<string, number>();
+    
+    // Inicializar todos os produtos com 0
+    for (const productId of productIds) {
+      balances.set(productId, 0);
+    }
+    
+    // Calcular saldos
     for (const movement of movements) {
-      if (movement.type === 'IN') {
-        balance += movement.quantity;
+      const current = balances.get(movement.productId) || 0;
+      if (movement.type === 'IN' || movement.type === 'ADJUSTMENT') {
+        balances.set(movement.productId, current + movement.quantity);
       } else if (movement.type === 'OUT') {
-        balance -= movement.quantity;
+        balances.set(movement.productId, current - movement.quantity);
       }
     }
-
-    return Math.max(0, balance);
+    
+    return balances;
   }
 
   /**
-   * Obtém quantidade em pedidos de compra pendentes
+   * Obtém estoque disponível real do produto (mantido para compatibilidade)
    */
-  private async getOnOrderQuantity(productId: string): Promise<number> {
+  private async getAvailableStock(productId: string): Promise<number> {
+    const batch = await this.getAvailableStockBatch([productId]);
+    return Math.max(0, batch.get(productId) || 0);
+  }
+
+  /**
+   * Obtém quantidade em pedidos de compra pendentes de múltiplos produtos (otimizado)
+   */
+  private async getOnOrderQuantityBatch(productIds: string[]): Promise<Map<string, number>> {
     // Buscar itens de pedidos de compra confirmados mas não recebidos
     const orderItems = await prisma.purchaseOrderItem.findMany({
       where: {
-        productId,
+        productId: { in: productIds },
         order: {
           status: {
             in: ['APPROVED', 'CONFIRMED'],
@@ -281,18 +300,35 @@ export class MRPService {
         },
       },
       select: {
+        productId: true,
         quantity: true,
         receivedQty: true,
       },
     });
 
-    // Somar quantidade pendente (quantidade - recebida)
-    let onOrderQty = 0;
-    for (const item of orderItems) {
-      onOrderQty += (item.quantity - item.receivedQty);
+    const onOrderQuantities = new Map<string, number>();
+    
+    // Inicializar todos os produtos com 0
+    for (const productId of productIds) {
+      onOrderQuantities.set(productId, 0);
     }
 
-    return onOrderQty;
+    // Somar quantidade pendente por produto
+    for (const item of orderItems) {
+      const current = onOrderQuantities.get(item.productId) || 0;
+      const pending = item.quantity - item.receivedQty;
+      onOrderQuantities.set(item.productId, current + pending);
+    }
+
+    return onOrderQuantities;
+  }
+
+  /**
+   * Obtém quantidade em pedidos de compra pendentes (mantido para compatibilidade)
+   */
+  private async getOnOrderQuantity(productId: string): Promise<number> {
+    const batch = await this.getOnOrderQuantityBatch([productId]);
+    return batch.get(productId) || 0;
   }
 
   /**
