@@ -24,6 +24,9 @@ import purchaseOrderRoutes from './purchase-order.routes';
 import purchaseReceiptRoutes from './purchase-receipt.routes';
 import notificationRoutes from './notification.routes';
 import countingRoutes from './counting.routes';
+import warehouseRoutes from './warehouse.routes';
+import warehouseStructureRoutes from './warehouse-structure.routes';
+import storagePositionRoutes from './storage-position.routes';
 
 const router = Router();
 
@@ -43,6 +46,9 @@ router.use('/units-of-measure', unitOfMeasureRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/customers', customerRoutes);
 router.use('/work-centers', workCenterRoutes);
+router.use('/warehouses', warehouseRoutes);
+router.use('/warehouse-structures', warehouseStructureRoutes);
+router.use('/storage-positions', storagePositionRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);

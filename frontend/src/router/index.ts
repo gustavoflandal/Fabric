@@ -174,7 +174,19 @@ const routes: RouteRecordRaw[] = [
     name: 'counting-session-report',
     component: () => import('../views/counting/CountingSessionReport.vue'),
     meta: { requiresAuth: true }
-  }
+  },
+  {
+    path: '/warehouses',
+    name: 'warehouses',
+    component: () => import('../views/warehouses/WarehousesView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/warehouse-structures',
+    name: 'warehouse-structures',
+    component: () => import('../views/warehouse-structures/WarehouseStructuresView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
