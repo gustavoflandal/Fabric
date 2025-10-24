@@ -188,7 +188,7 @@ interface Emits {
 }
 
 const props = defineProps<Props>();
-const emit = defineEmits<Emits>();
+const emit = defineEmits<Emits>()
 
 const allPermissions = ref<Permission[]>([]);
 const selectedPermissions = ref<string[]>([]);
@@ -202,7 +202,7 @@ const tabResourceMapping = {
   geral: ['users', 'roles', 'audit_logs', 'modules'],
   pcp: ['products', 'boms', 'routings', 'production_orders', 'production_pointings', 
         'work_centers', 'suppliers', 'customers', 'stock', 'mrp', 'reports', 'purchases', 'pcp.dashboard'],
-  wms: ['counting', 'counting.plans', 'warehouse_receipts', 'warehouse_locations', 'warehouse_transfers'],
+  wms: ['counting', 'counting.plans', 'warehouse_receipts', 'warehouse_locations', 'warehouse_transfers', 'warehouses', 'warehouse_structures'],
   yms: ['yard_scheduling', 'yard_docks', 'yard_checkin']
 };
 
@@ -288,6 +288,8 @@ const getResourceLabel = (resource: string) => {
     warehouse_receipts: 'Recebimento de Mercadorias',
     warehouse_locations: 'Localizações do Armazém',
     warehouse_transfers: 'Transferências Internas',
+    warehouses: 'Armazéns',
+    warehouse_structures: 'Estruturas de Armazém',
     
     // YMS
     yard_scheduling: 'Agendamento de Pátio',
@@ -339,6 +341,10 @@ const getActionLabel = (action: string) => {
     create_plan: 'Criar Planos de Contagem',
     execute_counting: 'Executar Contagem',
     approve_adjustments: 'Aprovar Ajustes',
+    
+    // Estruturas de Armazém
+    gerar_posicoes: 'Gerar Posições de Armazenagem',
+    excluir_posicoes: 'Excluir Posições de Armazenagem',
   };
   return labels[action] || action;
 };

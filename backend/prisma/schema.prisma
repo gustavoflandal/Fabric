@@ -955,3 +955,93 @@ enum CountingItemStatus {
   ADJUSTED
   CANCELLED
 }
+
+model Warehouse {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  legalName     String?
+  document      String?
+  email         String?
+  phone         String?
+  address       String?
+  city          String?
+  state         String?
+  zipCode       String?
+  country       String    @default("BR")
+  managerName   String?
+  capacity      Float?
+  description   String?   @db.Text
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  structures      WarehouseStructure[]
+
+  @@map("warehouses")
+}
+
+model WarehouseStructure {
+  id              String   @id @default(uuid())
+  warehouseId     String
+  streetCode      String
+  floors          Int
+  positions       Int
+  weightCapacity  Float
+  height          Float
+  width           Float
+  depth           Float
+  maxHeight       Float
+  blocked         Boolean  @default(false)
+  positionType    PositionType
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+  storagePositions StoragePosition[]
+
+  @@map("warehouse_structures")
+}
+
+model StoragePosition {
+  id              String   @id @default(uuid())
+  structureId     String
+  warehouseCode   String
+  streetCode      String
+  floor           Int
+  position        Int
+  positionType    PositionType
+  weightCapacity  Float
+  height          Float
+  width           Float
+  depth           Float
+  maxHeight       Float
+  blocked         Boolean  @default(false)
+  occupied        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  structure       WarehouseStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([structureId, floor, position])
+  @@index([warehouseCode, streetCode])
+  @@index([blocked])
+  @@index([occupied])
+  @@map("storage_positions")
+}
+
+enum PositionType {
+  PORTA_PALETES
+  MINI_PORTA_PALETES
+  DRIVE_IN
+  DRIVE_THROUGH
+  PUSH_BACK
+  FLOW_RACK
+  CANTILEVER
+  MEZANINO
+  AUTOPORTANTE
+  RACKS
+  CARROSSEL
+  MINI_LOAD
+  ESTANTES_INDUSTRIAIS
+}

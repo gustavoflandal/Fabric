@@ -260,6 +260,24 @@
                   <p class="text-sm font-medium text-gray-700">Contagem de Estoque</p>
                 </div>
               </RouterLink>
+              <RouterLink
+                to="/warehouses"
+                class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              >
+                <div class="text-center">
+                  <div class="text-3xl mb-2">🏭</div>
+                  <p class="text-sm font-medium text-gray-700">Armazéns</p>
+                </div>
+              </RouterLink>
+              <RouterLink
+                to="/warehouse-structures"
+                class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              >
+                <div class="text-center">
+                  <div class="text-3xl mb-2">📦</div>
+                  <p class="text-sm font-medium text-gray-700">Estruturas de Armazém</p>
+                </div>
+              </RouterLink>
               <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
                 <div class="text-center">
                   <div class="text-3xl mb-2">📦</div>
