@@ -387,6 +387,7 @@ class CountingSessionService {
           reason: `Ajuste por contagem - Sessão ${session.code}`,
           reference: session.id,
           referenceType: 'COUNTING',
+          countingSessionId: session.id,
           userId,
           notes: item.reason || undefined,
         },
