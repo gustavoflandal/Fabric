@@ -1,268 +1,58 @@
-# 📚 Índice da Documentação - Sistema MES Fabric
+# Índice da Documentação — Fabric
 
-**Versão**: 1.0.0  
-**Data**: 20 de Outubro de 2025  
-**Status**: ✅ Completo
+**Atualizado em:** 01/09/2026 — após faxina que removeu ~55 documentos obsoletos (relatórios de sessão, diários de bug-fix pontuais, snapshots de dados de seed e uma transcrição de chat colada por engano). O que resta abaixo é o que se pretende manter como referência viva.
 
----
-
-## 📄 Documentos Disponíveis
-
-### **1. Relatório Final** 📊
-**Arquivo**: `RELATORIO_FINAL.md`
-
-**Conteúdo:**
-- Sumário executivo do projeto
-- Módulos implementados (8/8 - 100%)
-- Arquitetura do sistema
-- Dados cadastrados
-- Segurança e permissões
-- KPIs do dashboard
-- Instruções de instalação
-- Resultados alcançados
-
-**Para quem**: Gestores, stakeholders, visão geral do projeto
+**Aviso de defasagem:** os documentos numerados `01`-`07` e `DOCUMENTACAO_TECNICA.md`/`GUIA_USUARIO.md`/`README.md` ainda não passaram por essa revisão de conteúdo (só a faxina de remoção de arquivos obsoletos foi feita) — foram escritos no início do projeto e é esperado que tenham divergido do código atual em vários pontos, da mesma forma que `docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md` estava antes de ser reescrito. Trate-os como ponto de partida, não como verdade absoluta; confira contra `backend/prisma/schema.prisma` e o código antes de confiar em algo específico. Revisão de conteúdo desse núcleo é a próxima etapa planejada.
 
 ---
 
-### **2. Documentação Técnica** 🔧
-**Arquivo**: `DOCUMENTACAO_TECNICA.md`
+## Núcleo de referência (escrito no início do projeto — conteúdo não revisado ainda)
 
-**Conteúdo:**
-- Arquitetura detalhada
-- Estrutura de pastas completa
-- API Endpoints (50+)
-- Modelos de dados (Prisma)
-- Fluxos de trabalho
-- Configuração de ambiente
-- Autenticação e autorização
-- Performance e otimizações
-- Testes
-- Deploy
+| Documento | Conteúdo |
+|---|---|
+| [`01_VISAO_GERAL.md`](./01_VISAO_GERAL.md) | Objetivo do sistema, contexto |
+| [`02_MODELO_DADOS.md`](./02_MODELO_DADOS.md) | Modelo de dados — segurança, cadastros |
+| [`03_MODELO_DADOS_PARTE2.md`](./03_MODELO_DADOS_PARTE2.md) | Modelo de dados — estoque e almoxarifado |
+| [`04_MODELO_DADOS_PARTE3.md`](./04_MODELO_DADOS_PARTE3.md) | Modelo de dados — manutenção de ativos |
+| [`05_APIS_ENDPOINTS.md`](./05_APIS_ENDPOINTS.md) | Endpoints da API REST |
+| [`06_ROADMAP_IMPLEMENTACAO.md`](./06_ROADMAP_IMPLEMENTACAO.md) | Roadmap original por fases |
+| [`07_ESTRUTURA_PROJETO.md`](./07_ESTRUTURA_PROJETO.md) | Estrutura de pastas do repositório |
+| [`DOCUMENTACAO_TECNICA.md`](./DOCUMENTACAO_TECNICA.md) | Arquitetura, API, modelos, fluxos — visão consolidada |
+| [`GUIA_USUARIO.md`](./GUIA_USUARIO.md) | Manual do usuário final |
+| [`README.md`](./README.md) | Apresentação do projeto |
 
-**Para quem**: Desenvolvedores, equipe técnica
+## Referência com conteúdo revisado nesta faxina
 
----
+| Documento | Conteúdo |
+|---|---|
+| [`08_SISTEMA_AUDIT_LOGS.md`](./08_SISTEMA_AUDIT_LOGS.md) | Sistema de audit log: captura configurável por modo, limpeza manual e automática |
+| [`09_MODULO_GESTAO_USUARIOS_COMPLETO.md`](./09_MODULO_GESTAO_USUARIOS_COMPLETO.md) | Módulo de usuários, perfis e permissões |
+| [`PERMISSOES_SISTEMA.md`](./PERMISSOES_SISTEMA.md) | Lista real de permissões RBAC, reconciliada contra o código |
+| [`SISTEMA_NOTIFICACOES.md`](./SISTEMA_NOTIFICACOES.md) | Sistema de notificações |
 
-### **3. Guia do Usuário** 👤
-**Arquivo**: `GUIA_USUARIO.md`
+## Guias operacionais
 
-**Conteúdo:**
-- Como fazer login
-- Como usar o dashboard
-- Como gerenciar produtos e BOMs
-- Como criar roteiros
-- Como criar e executar ordens de produção
-- Como fazer apontamentos
-- Administração do sistema
-- Perguntas frequentes
-- Dicas e boas práticas
+| Documento | Conteúdo |
+|---|---|
+| [`SETUP.md`](./SETUP.md) | Setup inicial do ambiente de desenvolvimento |
+| [`BACKUP_GUIDE.md`](./BACKUP_GUIDE.md) | Backup e restauração do banco (`npm run backup`/`restore`) |
+| [`INSTALACAO_PDF.md`](./INSTALACAO_PDF.md) | Dependência de geração de PDF (`jspdf`) |
+| [`10_TROUBLESHOOTING.md`](./10_TROUBLESHOOTING.md) | Problemas comuns e soluções |
 
-**Para quem**: Usuários finais, operadores, gerentes
+## Análises e planejamento em andamento
 
----
-
-### **4. Dados do Sistema** 📦
-**Arquivo**: `DADOS_SISTEMA.md` (na raiz do projeto)
-
-**Conteúdo:**
-- Usuários de teste
-- Produtos cadastrados
-- BOMs criadas
-- Roteiros configurados
-- Ordens de produção
-- Centros de trabalho
-- Fornecedores e clientes
-
-**Para quem**: Todos, referência rápida
+| Documento | Conteúdo |
+|---|---|
+| [`fase-2026-09-modernizacao/`](./fase-2026-09-modernizacao/README.md) | Cronograma de modernização em execução (decisões técnicas, débito corrigido fase a fase) |
+| [`fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md`](./fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md) | Análise e plano faseado para completar o WMS |
 
 ---
 
-### **5. Permissões do Sistema** 🔐
-**Arquivo**: `PERMISSOES_SISTEMA.md` (na raiz do projeto)
+## Padrão para novos documentos
 
-**Conteúdo:**
-- 47 permissões detalhadas
-- Permissões por módulo
-- Perfis padrão (ADMIN, MANAGER, OPERATOR)
-- Como criar perfis personalizados
-- Exemplos de uso
+A partir desta faxina, documentação nova segue o padrão estabelecido em `fase-2026-09-modernizacao/`:
 
-**Para quem**: Administradores, gestores de acesso
-
----
-
-### **6. Exemplos de Roteiros** 🔧
-**Arquivo**: `ROTEIROS_EXEMPLO.md` (na raiz do projeto)
-
-**Conteúdo:**
-- 4 roteiros completos
-- Operações detalhadas
-- Tempos de setup e execução
-- Cálculos de tempo total
-
-**Para quem**: Engenheiros, planejadores
-
----
-
-### **7. Exemplos de Ordens** 📋
-**Arquivo**: `ORDENS_PRODUCAO_EXEMPLO.md` (na raiz do projeto)
-
-**Conteúdo:**
-- 5 ordens em diferentes status
-- Materiais calculados
-- Operações planejadas
-- Progresso de execução
-
-**Para quem**: Gerentes de produção, operadores
-
----
-
-### **8. Plano de Trabalho** 📝
-**Arquivo**: `PLANO_TRABALHO.md` (na raiz do projeto)
-
-**Conteúdo:**
-- Roadmap do projeto
-- Módulos planejados vs implementados
-- Cronograma
-- Status atual
-
-**Para quem**: Gestores de projeto, stakeholders
-
----
-
-## 🎯 Guia Rápido por Perfil
-
-### **👨‍💼 Gestor / Stakeholder**
-Leia primeiro:
-1. ✅ `RELATORIO_FINAL.md` - Visão geral completa
-2. ✅ `DADOS_SISTEMA.md` - O que está disponível
-3. ✅ `PLANO_TRABALHO.md` - Roadmap
-
-### **👨‍💻 Desenvolvedor**
-Leia primeiro:
-1. ✅ `DOCUMENTACAO_TECNICA.md` - Arquitetura e APIs
-2. ✅ `RELATORIO_FINAL.md` - Contexto do projeto
-3. ✅ Código fonte - `/backend` e `/frontend`
-
-### **👤 Usuário Final**
-Leia primeiro:
-1. ✅ `GUIA_USUARIO.md` - Como usar o sistema
-2. ✅ `DADOS_SISTEMA.md` - Dados de teste disponíveis
-3. ✅ `PERMISSOES_SISTEMA.md` - O que você pode fazer
-
-### **🔧 Administrador**
-Leia primeiro:
-1. ✅ `GUIA_USUARIO.md` - Seção de Administração
-2. ✅ `PERMISSOES_SISTEMA.md` - Gestão de acessos
-3. ✅ `DOCUMENTACAO_TECNICA.md` - Configuração
-
----
-
-## 📊 Estatísticas da Documentação
-
-| Documento | Páginas | Palavras | Público |
-|-----------|---------|----------|---------|
-| Relatório Final | ~15 | ~3.500 | Geral |
-| Doc. Técnica | ~25 | ~6.000 | Técnico |
-| Guia do Usuário | ~20 | ~5.000 | Usuários |
-| **Total** | **~60** | **~14.500** | **Todos** |
-
----
-
-## 🔍 Como Encontrar Informações
-
-### **Procurando por...**
-
-**"Como instalar o sistema?"**
-→ `RELATORIO_FINAL.md` ou `DOCUMENTACAO_TECNICA.md`
-
-**"Quais são os endpoints da API?"**
-→ `DOCUMENTACAO_TECNICA.md` - Seção API Endpoints
-
-**"Como criar uma ordem de produção?"**
-→ `GUIA_USUARIO.md` - Seção Ordens de Produção
-
-**"Quais dados de teste existem?"**
-→ `DADOS_SISTEMA.md`
-
-**"Como funciona o sistema de permissões?"**
-→ `PERMISSOES_SISTEMA.md`
-
-**"Qual a arquitetura do sistema?"**
-→ `DOCUMENTACAO_TECNICA.md` - Seção Arquitetura
-
-**"Como fazer login?"**
-→ `GUIA_USUARIO.md` - Seção Acesso ao Sistema
-
-**"Quais são os próximos passos?"**
-→ `PLANO_TRABALHO.md`
-
----
-
-## 📞 Suporte
-
-### **Dúvidas sobre Documentação**
-- Verifique o índice acima
-- Use Ctrl+F para buscar palavras-chave
-- Consulte múltiplos documentos se necessário
-
-### **Informações Não Encontradas**
-- Entre em contato com a equipe de desenvolvimento
-- Abra uma issue no repositório
-- Consulte o código fonte diretamente
-
----
-
-## ✅ Checklist de Leitura
-
-### **Para Começar a Usar**
-- [ ] Li o Relatório Final
-- [ ] Li o Guia do Usuário
-- [ ] Conheço os dados de teste
-- [ ] Sei fazer login
-- [ ] Sei navegar no sistema
-
-### **Para Desenvolver**
-- [ ] Li a Documentação Técnica
-- [ ] Entendo a arquitetura
-- [ ] Conheço os endpoints
-- [ ] Sei configurar o ambiente
-- [ ] Sei executar o projeto
-
-### **Para Administrar**
-- [ ] Li o Guia do Usuário (Administração)
-- [ ] Entendo o sistema de permissões
-- [ ] Sei criar usuários
-- [ ] Sei gerenciar perfis
-- [ ] Sei consultar logs
-
----
-
-## 🎓 Glossário Rápido
-
-- **MES**: Manufacturing Execution System
-- **BOM**: Bill of Materials (Estrutura de Produto)
-- **Routing**: Roteiro de Produção
-- **OP**: Ordem de Produção
-- **KPI**: Key Performance Indicator
-- **JWT**: JSON Web Token
-- **CRUD**: Create, Read, Update, Delete
-- **API**: Application Programming Interface
-- **ORM**: Object-Relational Mapping
-
----
-
-## 📅 Histórico de Atualizações
-
-| Data | Versão | Mudanças |
-|------|--------|----------|
-| 20/10/2025 | 1.0.0 | Documentação inicial completa |
-
----
-
-**Documentação Completa e Atualizada** ✅
-
-*Sistema MES Fabric - 100% Funcional*
-
-*Última atualização: 20 de Outubro de 2025*
+- **Documento de sessão/correção pontual não vira arquivo em `docs/`** — isso é o que a mensagem do commit é para. Um `.md` só se justifica se for referência que alguém vai consultar depois, não um relato do que foi feito numa tarde.
+- **Toda afirmação sobre o código verifica contra o código antes de ser escrita** — não descrever de memória o que um model/endpoint faz; ler o arquivo.
+- **Divergências e inconsistências reais são registradas, não escondidas** — um documento que esconde um problema para parecer arrumado engana quem lê depois.
+- **Sem duplicação de tópico** — um assunto, um documento. Se surgir uma segunda versão, ela substitui a primeira (com nota do que mudou), não convive ao lado.
