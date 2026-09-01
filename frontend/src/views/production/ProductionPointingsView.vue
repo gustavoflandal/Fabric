@@ -42,7 +42,7 @@
             type="text"
             placeholder="Buscar..."
             class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            @input="loadPointings"
+            @input="debouncedLoadPointings"
           />
           <select v-model="filters.status" @change="loadPointings" class="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
             <option value="">Todos os Status</option>
@@ -231,10 +231,14 @@ import { useProductionPointingStore } from '@/stores/production-pointing.store';
 import type { ProductionPointing } from '@/services/production-pointing.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const pointingStore = useProductionPointingStore();
+const toast = useToast();
 
 const pointings = ref<ProductionPointing[]>([]);
 const loading = ref(false);
@@ -271,16 +275,17 @@ const loadPointings = async () => {
     loading.value = false;
   }
 };
+const debouncedLoadPointings = useDebounce(loadPointings, 350);
 
 const handleDelete = async (pointing: ProductionPointing) => {
-  if (!confirm('Deseja realmente excluir este apontamento?')) return;
+  if (!(await confirmDialog('Deseja realmente excluir este apontamento?'))) return;
 
   try {
     await pointingStore.deletePointing(pointing.id);
-    alert('Apontamento excluído com sucesso!');
+    toast.success('Apontamento excluído com sucesso!');
     await loadPointings();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao excluir apontamento');
+    toast.error(error.response?.data?.message || 'Erro ao excluir apontamento');
   }
 };
 
@@ -342,11 +347,11 @@ const handleCreate = async () => {
       notes: form.value.notes || undefined,
     });
     
-    alert('Apontamento criado com sucesso!');
+    toast.success('Apontamento criado com sucesso!');
     closeModal();
     await loadPointings();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao criar apontamento');
+    toast.error(error.response?.data?.message || 'Erro ao criar apontamento');
   } finally {
     submitting.value = false;
   }

@@ -1,6 +1,8 @@
 <template>
   <div id="app">
     <RouterView />
+    <ToastContainer />
+    <ConfirmDialogContainer />
   </div>
 </template>
 
@@ -8,6 +10,8 @@
 import { RouterView } from 'vue-router'
 import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
+import ToastContainer from '@/components/common/ToastContainer.vue'
+import ConfirmDialogContainer from '@/components/common/ConfirmDialogContainer.vue'
 
 const authStore = useAuthStore()
 const isInitializing = ref(true)

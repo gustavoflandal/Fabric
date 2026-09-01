@@ -433,9 +433,12 @@ import { useAuthStore } from '@/stores/auth.store';
 import auditLogService, { type AuditLog, type AuditLogStatistics } from '@/services/audit-log.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const logs = ref<AuditLog[]>([]);
 const statistics = ref<AuditLogStatistics | null>(null);
@@ -638,18 +641,18 @@ const getMostChangedModuleCount = () => {
 
 const handleDeleteLogsFromFilters = async () => {
   if (!filters.value.startDate || !filters.value.endDate) {
-    alert('Por favor, selecione as datas de início e fim nos filtros acima.');
+    toast.warning('Por favor, selecione as datas de início e fim nos filtros acima.');
     return;
   }
 
   const confirmMessage = `⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL!\n\nVocê está prestes a excluir TODOS os logs entre:\n\n📅 ${formatDate(filters.value.startDate)} e ${formatDate(filters.value.endDate)}\n\nDeseja realmente continuar?`;
-  
-  if (!confirm(confirmMessage)) {
+
+  if (!(await confirmDialog(confirmMessage, { title: 'Excluir logs de auditoria' }))) {
     return;
   }
 
   // Confirmação adicional
-  if (!confirm('Confirme novamente: Deseja REALMENTE excluir os logs deste período?')) {
+  if (!(await confirmDialog('Confirme novamente: Deseja REALMENTE excluir os logs deste período?', { title: 'Confirmação final' }))) {
     return;
   }
 
@@ -662,7 +665,7 @@ const handleDeleteLogsFromFilters = async () => {
     );
 
     const count = response.data.data.count;
-    alert(`✅ Sucesso!\n\n${count} logs foram excluídos permanentemente.`);
+    toast.success(`${count} logs foram excluídos permanentemente.`);
     
     // Limpar filtros e recarregar
     filters.value = {
@@ -677,7 +680,7 @@ const handleDeleteLogsFromFilters = async () => {
     await loadStatistics();
   } catch (error: any) {
     const errorMessage = error.response?.data?.message || 'Erro ao excluir logs';
-    alert(`❌ Erro!\n\n${errorMessage}`);
+    toast.error(errorMessage);
   } finally {
     deleting.value = false;
   }
@@ -694,10 +697,10 @@ const formatValue = (value: any): string => {
 const copyToClipboard = async (text: string) => {
   try {
     await navigator.clipboard.writeText(text);
-    alert('Copiado para a área de transferência!');
+    toast.success('Copiado para a área de transferência!');
   } catch (err) {
     console.error('Erro ao copiar:', err);
-    alert('Erro ao copiar para a área de transferência');
+    toast.error('Erro ao copiar para a área de transferência');
   }
 };
 

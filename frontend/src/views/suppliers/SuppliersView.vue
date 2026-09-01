@@ -44,7 +44,7 @@
               type="text"
               placeholder="Código, nome, documento ou email..."
               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @input="handleFilterChange"
+              @input="debouncedFilterChange"
             />
           </div>
           <div>
@@ -209,10 +209,14 @@ import { useSupplierStore } from '@/stores/supplier.store';
 import type { Supplier } from '@/services/supplier.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const supplierStore = useSupplierStore();
+const toast = useToast();
 
 const suppliers = ref<Supplier[]>([]);
 const loading = ref(false);
@@ -246,6 +250,7 @@ const handleFilterChange = () => {
   pagination.value.page = 1;
   loadSuppliers();
 };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 
 const openCreateModal = () => {
   editingSupplier.value = null;
@@ -268,37 +273,37 @@ const handleSubmit = async () => {
   try {
     if (editingSupplier.value) {
       await supplierStore.updateSupplier(editingSupplier.value.id, formData.value);
-      alert('Fornecedor atualizado com sucesso!');
+      toast.success('Fornecedor atualizado com sucesso!');
     } else {
       await supplierStore.createSupplier(formData.value);
-      alert('Fornecedor criado com sucesso!');
+      toast.success('Fornecedor criado com sucesso!');
     }
     closeModal();
     await loadSuppliers();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar fornecedor');
+    toast.error(error.response?.data?.message || 'Erro ao salvar fornecedor');
   }
 };
 
 const handleToggleActive = async (supplier: Supplier) => {
-  if (confirm(`Deseja ${supplier.active ? 'desativar' : 'ativar'} o fornecedor "${supplier.name}"?`)) {
+  if (await confirmDialog(`Deseja ${supplier.active ? 'desativar' : 'ativar'} o fornecedor "${supplier.name}"?`)) {
     try {
       await supplierStore.toggleActive(supplier.id);
       await loadSuppliers();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error(error.response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
 const handleDelete = async (supplier: Supplier) => {
-  if (confirm(`Deseja realmente excluir o fornecedor "${supplier.name}"?`)) {
+  if (await confirmDialog(`Deseja realmente excluir o fornecedor "${supplier.name}"?`)) {
     try {
       await supplierStore.deleteSupplier(supplier.id);
-      alert('Fornecedor excluído com sucesso!');
+      toast.success('Fornecedor excluído com sucesso!');
       await loadSuppliers();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao excluir fornecedor');
+      toast.error(error.response?.data?.message || 'Erro ao excluir fornecedor');
     }
   }
 };

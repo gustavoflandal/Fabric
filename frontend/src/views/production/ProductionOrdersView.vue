@@ -46,7 +46,7 @@
               type="text"
               placeholder="Número ou produto..."
               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @input="handleSearch"
+              @input="debouncedSearch"
             />
           </div>
           <div>
@@ -195,11 +195,15 @@ import type { ProductionOrder } from '@/services/production-order.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import ProductionOrderDetailsModal from '@/components/production/ProductionOrderDetailsModal.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const orderStore = useProductionOrderStore();
 const productStore = useProductStore();
+const toast = useToast();
 
 const orders = ref<ProductionOrder[]>([]);
 const products = ref<any[]>([]);
@@ -247,6 +251,7 @@ const loadProducts = async () => {
 const handleSearch = () => {
   loadOrders();
 };
+const debouncedSearch = useDebounce(handleSearch, 350);
 
 const openCreateModal = () => {
   formData.value = {
@@ -268,11 +273,11 @@ const closeModal = () => {
 const handleSubmit = async () => {
   try {
     await orderStore.createOrder(formData.value);
-    alert('Ordem de produção criada com sucesso!');
+    toast.success('Ordem de produção criada com sucesso!');
     closeModal();
     await loadOrders();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao criar ordem de produção');
+    toast.error(error.response?.data?.message || 'Erro ao criar ordem de produção');
   }
 };
 
@@ -287,14 +292,14 @@ const handleLogout = async () => {
 };
 
 const handleDelete = async (order: ProductionOrder) => {
-  if (!confirm(`Deseja realmente excluir a ordem ${order.orderNumber}?`)) return;
+  if (!(await confirmDialog(`Deseja realmente excluir a ordem ${order.orderNumber}?`))) return;
 
   try {
     await orderStore.deleteOrder(order.id);
-    alert('Ordem excluída com sucesso!');
+    toast.success('Ordem excluída com sucesso!');
     await loadOrders();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao excluir ordem');
+    toast.error(error.response?.data?.message || 'Erro ao excluir ordem');
   }
 };
 

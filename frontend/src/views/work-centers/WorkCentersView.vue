@@ -29,7 +29,7 @@
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input v-model="filters.search" type="text" placeholder="Código ou nome..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="handleFilterChange" />
+            <input v-model="filters.search" type="text" placeholder="Código ou nome..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="debouncedFilterChange" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
@@ -144,10 +144,14 @@ import { useWorkCenterStore } from '@/stores/work-center.store';
 import type { WorkCenter } from '@/services/work-center.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const workCenterStore = useWorkCenterStore();
+const toast = useToast();
 
 const workCenters = ref<WorkCenter[]>([]);
 const loading = ref(false);
@@ -169,6 +173,7 @@ const loadWorkCenters = async () => {
 };
 
 const handleFilterChange = () => { pagination.value.page = 1; loadWorkCenters(); };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 const openCreateModal = () => { editingWorkCenter.value = null; formData.value = { code: '', name: '', description: '', type: '', capacity: undefined, efficiency: 1, costPerHour: undefined, active: true }; showModal.value = true; };
 const openEditModal = (wc: WorkCenter) => { editingWorkCenter.value = wc; formData.value = { ...wc, efficiency: wc.efficiency || 1 }; showModal.value = true; };
 const closeModal = () => { showModal.value = false; editingWorkCenter.value = null; };
@@ -178,37 +183,37 @@ const handleSubmit = async () => {
     const data = { ...formData.value, efficiency: (formData.value.efficiency || 100) / 100 };
     if (editingWorkCenter.value) {
       await workCenterStore.updateWorkCenter(editingWorkCenter.value.id, data);
-      alert('Centro de trabalho atualizado com sucesso!');
+      toast.success('Centro de trabalho atualizado com sucesso!');
     } else {
       await workCenterStore.createWorkCenter(data);
-      alert('Centro de trabalho criado com sucesso!');
+      toast.success('Centro de trabalho criado com sucesso!');
     }
     closeModal();
     await loadWorkCenters();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar centro de trabalho');
+    toast.error(error.response?.data?.message || 'Erro ao salvar centro de trabalho');
   }
 };
 
 const handleToggleActive = async (wc: WorkCenter) => {
-  if (confirm(`Deseja ${wc.active ? 'desativar' : 'ativar'} o centro de trabalho "${wc.name}"?`)) {
+  if (await confirmDialog(`Deseja ${wc.active ? 'desativar' : 'ativar'} o centro de trabalho "${wc.name}"?`)) {
     try {
       await workCenterStore.toggleActive(wc.id);
       await loadWorkCenters();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error(error.response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
 const handleDelete = async (wc: WorkCenter) => {
-  if (confirm(`Deseja realmente excluir o centro de trabalho "${wc.name}"?`)) {
+  if (await confirmDialog(`Deseja realmente excluir o centro de trabalho "${wc.name}"?`)) {
     try {
       await workCenterStore.deleteWorkCenter(wc.id);
-      alert('Centro de trabalho excluído com sucesso!');
+      toast.success('Centro de trabalho excluído com sucesso!');
       await loadWorkCenters();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao excluir centro de trabalho');
+      toast.error(error.response?.data?.message || 'Erro ao excluir centro de trabalho');
     }
   }
 };

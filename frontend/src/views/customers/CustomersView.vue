@@ -30,7 +30,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input v-model="filters.search" type="text" placeholder="Código, nome, documento ou email..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="handleFilterChange" />
+            <input v-model="filters.search" type="text" placeholder="Código, nome, documento ou email..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="debouncedFilterChange" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -134,10 +134,14 @@ import { useCustomerStore } from '@/stores/customer.store';
 import type { Customer } from '@/services/customer.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const customerStore = useCustomerStore();
+const toast = useToast();
 
 const customers = ref<Customer[]>([]);
 const loading = ref(false);
@@ -159,6 +163,7 @@ const loadCustomers = async () => {
 };
 
 const handleFilterChange = () => { pagination.value.page = 1; loadCustomers(); };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 const openCreateModal = () => { editingCustomer.value = null; formData.value = { code: '', name: '', legalName: '', document: '', email: '', phone: '', address: '', city: '', state: '', zipCode: '', country: 'BR', paymentTerms: '', creditLimit: undefined, active: true }; showModal.value = true; };
 const openEditModal = (customer: Customer) => { editingCustomer.value = customer; formData.value = { ...customer }; showModal.value = true; };
 const closeModal = () => { showModal.value = false; editingCustomer.value = null; };
@@ -167,37 +172,37 @@ const handleSubmit = async () => {
   try {
     if (editingCustomer.value) {
       await customerStore.updateCustomer(editingCustomer.value.id, formData.value);
-      alert('Cliente atualizado com sucesso!');
+      toast.success('Cliente atualizado com sucesso!');
     } else {
       await customerStore.createCustomer(formData.value);
-      alert('Cliente criado com sucesso!');
+      toast.success('Cliente criado com sucesso!');
     }
     closeModal();
     await loadCustomers();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar cliente');
+    toast.error(error.response?.data?.message || 'Erro ao salvar cliente');
   }
 };
 
 const handleToggleActive = async (customer: Customer) => {
-  if (confirm(`Deseja ${customer.active ? 'desativar' : 'ativar'} o cliente "${customer.name}"?`)) {
+  if (await confirmDialog(`Deseja ${customer.active ? 'desativar' : 'ativar'} o cliente "${customer.name}"?`)) {
     try {
       await customerStore.toggleActive(customer.id);
       await loadCustomers();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error(error.response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
 const handleDelete = async (customer: Customer) => {
-  if (confirm(`Deseja realmente excluir o cliente "${customer.name}"?`)) {
+  if (await confirmDialog(`Deseja realmente excluir o cliente "${customer.name}"?`)) {
     try {
       await customerStore.deleteCustomer(customer.id);
-      alert('Cliente excluído com sucesso!');
+      toast.success('Cliente excluído com sucesso!');
       await loadCustomers();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao excluir cliente');
+      toast.error(error.response?.data?.message || 'Erro ao excluir cliente');
     }
   }
 };

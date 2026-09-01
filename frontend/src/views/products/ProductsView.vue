@@ -29,7 +29,7 @@
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input v-model="filters.search" type="text" placeholder="Código ou nome" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="handleFilterChange" />
+            <input v-model="filters.search" type="text" placeholder="Código ou nome" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="debouncedFilterChange" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
@@ -51,7 +51,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-            <input v-model="filters.categoryId" type="text" placeholder="ID da categoria" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="handleFilterChange" />
+            <input v-model="filters.categoryId" type="text" placeholder="ID da categoria" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="debouncedFilterChange" />
           </div>
         </div>
       </Card>
@@ -186,12 +186,16 @@ import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import BomManagerModal from '@/components/products/BomManagerModal.vue';
 import RoutingManagerModal from '@/components/products/RoutingManagerModal.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const productStore = useProductStore();
 const unitStore = useUnitOfMeasureStore();
 const categoryStore = useProductCategoryStore();
+const toast = useToast();
 
 const products = ref<Product[]>([]);
 const loading = ref(false);
@@ -245,6 +249,7 @@ const handleFilterChange = () => {
   pagination.value.page = 1;
   loadProducts();
 };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 
 const changePage = (page: number) => {
   pagination.value.page = page;
@@ -335,41 +340,41 @@ const handleSubmit = async () => {
 
     if (editingProduct.value) {
       await productStore.updateProduct(editingProduct.value.id, payload);
-      alert('Produto atualizado com sucesso!');
+      toast.success('Produto atualizado com sucesso!');
     } else {
       await productStore.createProduct(payload);
-      alert('Produto criado com sucesso!');
+      toast.success('Produto criado com sucesso!');
     }
 
     closeModal();
     await loadProducts();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar produto');
+    toast.error(error.response?.data?.message || 'Erro ao salvar produto');
   }
 };
 
 const handleToggleActive = async (product: Product) => {
-  if (!confirm(`Deseja ${product.active ? 'desativar' : 'ativar'} o produto "${product.name}"?`)) {
+  if (!(await confirmDialog(`Deseja ${product.active ? 'desativar' : 'ativar'} o produto "${product.name}"?`))) {
     return;
   }
   try {
     await productStore.toggleActive(product.id);
     await loadProducts();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao alterar status');
+    toast.error(error.response?.data?.message || 'Erro ao alterar status');
   }
 };
 
 const handleDelete = async (product: Product) => {
-  if (!confirm(`Deseja realmente excluir o produto "${product.name}"?`)) {
+  if (!(await confirmDialog(`Deseja realmente excluir o produto "${product.name}"?`))) {
     return;
   }
   try {
     await productStore.deleteProduct(product.id);
-    alert('Produto excluído com sucesso!');
+    toast.success('Produto excluído com sucesso!');
     await loadProducts();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao excluir produto');
+    toast.error(error.response?.data?.message || 'Erro ao excluir produto');
   }
 };
 
