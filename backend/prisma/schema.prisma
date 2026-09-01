@@ -254,10 +254,29 @@ model Product {
   receiptItems  PurchaseReceiptItem[]
   countingItems CountingItem[]
   countingPlanProducts CountingPlanProduct[]
-  
+  stockBalance  StockBalance?
+
   @@index([type])
   @@index([active])
   @@map("products")
+}
+
+// Saldo de estoque persistido por produto. Antes, o saldo era somado em memoria
+// a partir de todo o historico de stock_movements a cada consulta - alem de
+// caro, nao existia uma linha para travar (SELECT ... FOR UPDATE) e evitar que
+// duas movimentacoes concorrentes do mesmo produto lessem o mesmo saldo "fantasma"
+// e ambas decidissem que havia estoque suficiente. Ver Fase 1 do cronograma
+// (docs/fase-2026-09-modernizacao/02_CRONOGRAMA_IMPLEMENTACOES.md, itens 1.1/1.2).
+model StockBalance {
+  id        String   @id @default(uuid())
+  productId String   @unique
+  quantity  Float    @default(0)
+  version   Int      @default(0) // lock otimista para leituras fora de transacao
+  updatedAt DateTime @updatedAt
+
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@map("stock_balances")
 }
 
 model ProductCategory {

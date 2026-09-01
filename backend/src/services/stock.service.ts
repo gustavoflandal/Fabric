@@ -1,6 +1,9 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
+
+type TransactionClient = Prisma.TransactionClient;
 
 export interface StockMovementDto {
   productId: string;
@@ -8,7 +11,8 @@ export interface StockMovementDto {
   quantity: number;
   reason: string;
   reference?: string;
-  referenceType?: 'PRODUCTION' | 'PURCHASE' | 'ADJUSTMENT' | 'MANUAL';
+  referenceType?: 'PRODUCTION' | 'PURCHASE' | 'ADJUSTMENT' | 'MANUAL' | 'COUNTING';
+  countingSessionId?: string;
   userId: string;
   notes?: string;
 }
@@ -25,6 +29,69 @@ export interface StockBalance {
 }
 
 export class StockServiceRefactored {
+  /**
+   * Lê o saldo travando a linha (SELECT ... FOR UPDATE dentro da transação),
+   * cria a movimentação e atualiza o saldo - tudo atômico e serializado por
+   * produto. Compartilhado por registerMovement (própria transação) e por
+   * reserveForOrder (transação do chamador), por isso recebe o `tx`.
+   *
+   * ✅ CORREÇÃO RACE CONDITION (Fase 1, itens 1.1/1.2 do cronograma):
+   * antes, o saldo era somado em memória a partir de stock_movements a cada
+   * chamada - não existia linha para travar, então duas movimentações
+   * concorrentes do mesmo produto podiam ler o mesmo saldo "fantasma" e
+   * ambas decidirem que havia estoque suficiente.
+   */
+  private async applyMovement(tx: TransactionClient, data: StockMovementDto) {
+    await tx.stockBalance.upsert({
+      where: { productId: data.productId },
+      create: { productId: data.productId, quantity: 0 },
+      update: {},
+    });
+
+    const locked = await tx.$queryRaw<{ quantity: number }[]>`
+      SELECT quantity FROM stock_balances WHERE productId = ${data.productId} FOR UPDATE
+    `;
+    const currentQty = Number(locked[0]?.quantity ?? 0);
+    const delta = data.type === 'OUT' ? -data.quantity : data.quantity;
+
+    if (data.type === 'OUT' && currentQty < data.quantity) {
+      throw new Error(
+        `Estoque insuficiente. Disponível: ${currentQty}, Solicitado: ${data.quantity}`
+      );
+    }
+
+    const movement = await tx.stockMovement.create({
+      data: {
+        productId: data.productId,
+        type: data.type,
+        quantity: data.quantity,
+        reason: data.reason,
+        reference: data.reference,
+        referenceType: data.referenceType,
+        countingSessionId: data.countingSessionId,
+        userId: data.userId,
+        notes: data.notes,
+      },
+      include: {
+        product: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    await tx.stockBalance.update({
+      where: { productId: data.productId },
+      data: { quantity: currentQty + delta, version: { increment: 1 } },
+    });
+
+    return movement;
+  }
+
   /**
    * Registra uma movimentação de estoque
    */
@@ -43,41 +110,7 @@ export class StockServiceRefactored {
       throw new Error('Quantidade deve ser maior que zero');
     }
 
-    // Se for saída, verificar se há estoque disponível
-    if (data.type === 'OUT') {
-      const currentBalance = await this.getBalance(data.productId);
-      
-      if (currentBalance.quantity < data.quantity) {
-        throw new Error(
-          `Estoque insuficiente. Disponível: ${currentBalance.quantity}, ` +
-          `Solicitado: ${data.quantity}`
-        );
-      }
-    }
-
-    // Criar movimentação
-    const movement = await prisma.stockMovement.create({
-      data: {
-        productId: data.productId,
-        type: data.type,
-        quantity: data.quantity,
-        reason: data.reason,
-        reference: data.reference,
-        referenceType: data.referenceType,
-        userId: data.userId,
-        notes: data.notes,
-      },
-      include: {
-        product: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    const movement = await prisma.$transaction((tx) => this.applyMovement(tx, data));
 
     // Emitir evento
     await eventBus.emit(SystemEvents.STOCK_MOVEMENT_CREATED, {
@@ -103,7 +136,8 @@ export class StockServiceRefactored {
   }
 
   /**
-   * Obtém saldo REAL de estoque de um produto
+   * Obtém saldo REAL de estoque de um produto (lido da tabela de saldo
+   * persistida, não mais recalculado somando o histórico inteiro)
    */
   async getBalance(productId: string): Promise<StockBalance> {
     const product = await prisma.product.findUnique({
@@ -118,26 +152,23 @@ export class StockServiceRefactored {
       throw new Error('Produto não encontrado');
     }
 
-    // Calcular saldo baseado em movimentações REAIS
-    const movements = await prisma.stockMovement.findMany({
+    let balanceRow = await prisma.stockBalance.findUnique({ where: { productId } });
+    if (!balanceRow) {
+      balanceRow = await prisma.stockBalance.upsert({
+        where: { productId },
+        create: { productId, quantity: 0 },
+        update: {},
+      });
+    }
+
+    const lastMovementRow = await prisma.stockMovement.findFirst({
       where: { productId },
       orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
     });
 
-    let quantity = 0;
-    let lastMovement: Date | undefined;
-
-    for (const movement of movements) {
-      if (movement.type === 'IN' || movement.type === 'ADJUSTMENT') {
-        quantity += movement.quantity;
-      } else if (movement.type === 'OUT') {
-        quantity -= movement.quantity;
-      }
-
-      if (!lastMovement || movement.createdAt > lastMovement) {
-        lastMovement = movement.createdAt;
-      }
-    }
+    const quantity = balanceRow.quantity;
+    const lastMovement = lastMovementRow?.createdAt;
 
     const minStock = product.minStock || 0;
     const maxStock = product.maxStock || 1000;
@@ -531,7 +562,10 @@ export class StockServiceRefactored {
         throw new Error('BOM ativa não encontrada para o produto');
       }
 
-      // ✅ FASE 1: Validar TODOS os estoques antes de reservar qualquer um (fail-fast)
+      // ✅ FASE 1: Validar TODOS os estoques antes de reservar qualquer um (fail-fast).
+      // Trava cada linha de saldo aqui mesmo (a mesma transação/conexão reutiliza o
+      // lock em FASE 2) para que nenhuma outra reserva concorrente consiga ler um
+      // saldo desatualizado entre a validação e a escrita.
       const requiredItems = activeBom.items.map(bomItem => ({
         componentId: bomItem.componentId,
         componentCode: bomItem.component.code,
@@ -539,36 +573,34 @@ export class StockServiceRefactored {
       }));
 
       for (const item of requiredItems) {
-        const movements = await tx.stockMovement.findMany({
+        await tx.stockBalance.upsert({
           where: { productId: item.componentId },
+          create: { productId: item.componentId, quantity: 0 },
+          update: {},
         });
 
-        const balance = movements.reduce((sum, mov) => {
-          return mov.type === 'IN' ? sum + mov.quantity : sum - mov.quantity;
-        }, 0);
+        const locked = await tx.$queryRaw<{ quantity: number }[]>`
+          SELECT quantity FROM stock_balances WHERE productId = ${item.componentId} FOR UPDATE
+        `;
+        const balance = Number(locked[0]?.quantity ?? 0);
 
         if (balance < item.requiredQty) {
           throw new Error(`Estoque insuficiente para ${item.componentCode}: disponível ${balance}, necessário ${item.requiredQty}`);
         }
       }
 
-      // ✅ FASE 2: Todos os estoques validados, agora registrar TODAS as saídas
+      // ✅ FASE 2: Todos os estoques validados e travados, agora registrar TODAS as saídas
       const reservations = [];
 
       for (const item of requiredItems) {
-        const movement = await tx.stockMovement.create({
-          data: {
-            productId: item.componentId,
-            type: 'OUT',
-            quantity: item.requiredQty,
-            reason: 'Reserva para produção',
-            reference: order.orderNumber,
-            referenceType: 'MANUAL',
-            userId,
-          },
-          include: {
-            product: true,
-          },
+        const movement = await this.applyMovement(tx, {
+          productId: item.componentId,
+          type: 'OUT',
+          quantity: item.requiredQty,
+          reason: 'Reserva para produção',
+          reference: order.orderNumber,
+          referenceType: 'MANUAL',
+          userId,
         });
 
         reservations.push(movement);

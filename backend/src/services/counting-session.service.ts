@@ -1,5 +1,6 @@
 import { PrismaClient, CountingSession, SessionStatus } from '@prisma/client';
 import countingPlanService from './counting-plan.service';
+import stockService from './stock.service';
 
 const prisma = new PrismaClient();
 
@@ -378,19 +379,23 @@ class CountingSessionService {
       const difference = Number(item.difference);
       if (difference === 0) continue;
 
-      // Criar movimentação de ajuste
-      const movement = await prisma.stockMovement.create({
-        data: {
-          productId: item.productId,
-          type: 'ADJUSTMENT',
-          quantity: Math.abs(difference),
-          reason: `Ajuste por contagem - Sessão ${session.code}`,
-          reference: session.id,
-          referenceType: 'COUNTING',
-          countingSessionId: session.id,
-          userId,
-          notes: item.reason || undefined,
-        },
+      // Criar movimentação de ajuste via stockService: mantém o saldo persistido
+      // (stock_balances) sincronizado e usa o sinal correto do tipo.
+      // ✅ CORREÇÃO: antes gravava sempre type 'ADJUSTMENT' com Math.abs(difference),
+      // e o cálculo de saldo somava QUALQUER movimentação ADJUSTMENT - ou seja, uma
+      // contagem que encontrasse MENOS estoque físico (difference negativo, quebra)
+      // aumentava o saldo em vez de diminuir. difference = countedQty - systemQty,
+      // então difference > 0 é sobra (IN) e difference < 0 é quebra (OUT).
+      const movement = await stockService.registerMovement({
+        productId: item.productId,
+        type: difference > 0 ? 'IN' : 'OUT',
+        quantity: Math.abs(difference),
+        reason: `Ajuste por contagem - Sessão ${session.code}`,
+        reference: session.id,
+        referenceType: 'COUNTING',
+        countingSessionId: session.id,
+        userId,
+        notes: item.reason || undefined,
       });
 
       // Marcar item como ajustado
