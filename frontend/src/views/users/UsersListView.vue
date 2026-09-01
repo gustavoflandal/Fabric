@@ -52,7 +52,7 @@
             <Input
               v-model="searchQuery"
               placeholder="Buscar por nome ou e-mail..."
-              @input="handleSearch"
+              @input="debouncedSearch"
             />
           </div>
         </div>
@@ -192,9 +192,13 @@ import Button from '@/components/common/Button.vue';
 import Input from '@/components/common/Input.vue';
 import Card from '@/components/common/Card.vue';
 import UserFormModal from '@/components/users/UserFormModal.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const users = ref<User[]>([]);
 const loading = ref(false);
@@ -230,6 +234,7 @@ const handleSearch = () => {
   pagination.value.page = 1;
   loadUsers();
 };
+const debouncedSearch = useDebounce(handleSearch, 350);
 
 const changePage = (page: number) => {
   pagination.value.page = page;
@@ -251,7 +256,7 @@ const handleModalSuccess = () => {
 };
 
 const deleteUser = async (user: User) => {
-  if (!confirm(`Deseja realmente excluir o usuário ${user.name}?`)) {
+  if (!(await confirmDialog(`Deseja realmente excluir o usuário ${user.name}?`))) {
     return;
   }
 
@@ -260,7 +265,7 @@ const deleteUser = async (user: User) => {
     loadUsers();
   } catch (error) {
     console.error('Erro ao excluir usuário:', error);
-    alert('Erro ao excluir usuário');
+    toast.error('Erro ao excluir usuário');
   }
 };
 

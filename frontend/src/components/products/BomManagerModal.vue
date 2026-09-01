@@ -257,6 +257,8 @@ import { useProductStore } from '@/stores/product.store'
 import type { Product } from '@/services/product.service'
 import type { Bom } from '@/services/bom.service'
 import unitOfMeasureService from '@/services/unit-of-measure.service'
+import { useToast } from '@/composables/useToast'
+import { confirmDialog } from '@/composables/useConfirm'
 
 type FormMode = 'create' | 'edit'
 
@@ -297,6 +299,7 @@ const emit = defineEmits<{
 
 const bomStore = useBomStore()
 const productStore = useProductStore()
+const toast = useToast()
 const loading = computed(() => bomStore.loading)
 const error = computed(() => bomStore.error)
 const boms = computed(() => (props.product ? bomStore.getCachedBoms(props.product.id) : []))
@@ -428,7 +431,7 @@ const handleSubmit = async () => {
         version: form.version,
         items: payloadItems,
       })
-      alert('BOM criada com sucesso!')
+      toast.success('BOM criada com sucesso!')
     } else if (editingBomId.value) {
       await bomStore.updateBom(editingBomId.value, props.product.id, {
         description: form.description || undefined,
@@ -438,16 +441,16 @@ const handleSubmit = async () => {
         version: form.version,
         items: payloadItems,
       })
-      alert('BOM atualizada com sucesso!')
+      toast.success('BOM atualizada com sucesso!')
     } else {
-      alert('Nenhuma BOM selecionada para edição.')
+      toast.warning('Nenhuma BOM selecionada para edição.')
       return
     }
 
     await bomStore.fetchByProduct(props.product.id)
     closeForm()
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar BOM')
+    toast.error(error.response?.data?.message || 'Erro ao salvar BOM')
   }
 }
 
@@ -456,22 +459,22 @@ const setActive = async (bom: Bom) => {
   try {
     await bomStore.setActiveBom(bom.id, props.product.id, true)
     await bomStore.fetchByProduct(props.product.id)
-    alert('BOM ativada com sucesso!')
+    toast.success('BOM ativada com sucesso!')
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao ativar BOM')
+    toast.error(error.response?.data?.message || 'Erro ao ativar BOM')
   }
 }
 
 const deleteBom = async (bom: Bom) => {
   if (!props.product) return
-  if (!confirm(`Deseja excluir a BOM versão ${bom.version}?`)) return
+  if (!(await confirmDialog(`Deseja excluir a BOM versão ${bom.version}?`))) return
 
   try {
     await bomStore.deleteBom(bom.id, props.product.id)
     await bomStore.fetchByProduct(props.product.id)
-    alert('BOM excluída com sucesso!')
+    toast.success('BOM excluída com sucesso!')
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao excluir BOM')
+    toast.error(error.response?.data?.message || 'Erro ao excluir BOM')
   }
 }
 
@@ -480,7 +483,7 @@ const explodeBom = async (bom: Bom) => {
     explosionResult.value = await bomStore.explode(bom.id)
     showExplosion.value = true
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao realizar explosão da BOM')
+    toast.error(error.response?.data?.message || 'Erro ao realizar explosão da BOM')
   }
 }
 

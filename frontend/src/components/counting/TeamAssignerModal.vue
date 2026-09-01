@@ -107,6 +107,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -117,6 +118,8 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'saved'): void;
 }>();
+
+const toast = useToast();
 
 const loading = ref(false);
 const users = ref<any[]>([]);
@@ -157,7 +160,7 @@ const saveAssignments = async () => {
     emit('close');
   } catch (error) {
     console.error('Erro ao salvar atribuições:', error);
-    alert('Erro ao salvar equipe. Tente novamente.');
+    toast.error('Erro ao salvar equipe. Tente novamente.');
   } finally {
     loading.value = false;
   }

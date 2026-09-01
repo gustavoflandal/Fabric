@@ -187,10 +187,13 @@ import { useWarehouseStore } from '@/stores/warehouse.store';
 import { useAuthStore } from '@/stores/auth.store';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const warehouseStore = useWarehouseStore();
+const toast = useToast();
 
 const search = ref('');
 const warehouses = ref([]);
@@ -263,37 +266,37 @@ const handleSubmit = async () => {
   try {
     if (editingWarehouse.value) {
       await warehouseStore.updateWarehouse(editingWarehouse.value.id, formData.value);
-      alert('Armazém atualizado com sucesso!');
+      toast.success('Armazém atualizado com sucesso!');
     } else {
       await warehouseStore.createWarehouse(formData.value);
-      alert('Armazém criado com sucesso!');
+      toast.success('Armazém criado com sucesso!');
     }
     closeModal();
     await loadWarehouses();
   } catch (error) {
-    alert(error.response?.data?.message || 'Erro ao salvar armazém');
+    toast.error(error.response?.data?.message || 'Erro ao salvar armazém');
   }
 };
 
 const handleToggleActive = async (warehouse) => {
-  if (confirm(`Deseja ${warehouse.active ? 'desativar' : 'ativar'} o armazém "${warehouse.name}"?`)) {
+  if (await confirmDialog(`Deseja ${warehouse.active ? 'desativar' : 'ativar'} o armazém "${warehouse.name}"?`)) {
     try {
       await warehouseStore.updateWarehouse(warehouse.id, { active: !warehouse.active });
       await loadWarehouses();
     } catch (error) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error(error.response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
 const handleDelete = async (warehouse) => {
-  if (confirm(`Deseja realmente excluir o armazém "${warehouse.name}"?`)) {
+  if (await confirmDialog(`Deseja realmente excluir o armazém "${warehouse.name}"?`)) {
     try {
       await warehouseStore.deleteWarehouse(warehouse.id);
-      alert('Armazém excluído com sucesso!');
+      toast.success('Armazém excluído com sucesso!');
       await loadWarehouses();
     } catch (error) {
-      alert(error.response?.data?.message || 'Erro ao excluir armazém');
+      toast.error(error.response?.data?.message || 'Erro ao excluir armazém');
     }
   }
 };

@@ -174,9 +174,11 @@ import { useRouter, useRoute } from 'vue-router';
 import { useCountingStore } from '@/stores/counting.store';
 import { useAuthStore } from '@/stores/auth.store';
 import Button from '@/components/common/Button.vue';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const route = useRoute();
+const toast = useToast();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
 
@@ -237,7 +239,7 @@ const submitCount = async () => {
     nextItem();
   } catch (error) {
     console.error('Erro ao registrar contagem:', error);
-    alert('Erro ao registrar contagem. Tente novamente.');
+    toast.error('Erro ao registrar contagem. Tente novamente.');
   }
 };
 
@@ -265,7 +267,7 @@ const completeSession = async () => {
     router.push(`/counting/sessions/${route.params.id}/report`);
   } catch (error) {
     console.error('Erro ao finalizar sessão:', error);
-    alert('Erro ao finalizar sessão. Tente novamente.');
+    toast.error('Erro ao finalizar sessão. Tente novamente.');
   }
 };
 </script>

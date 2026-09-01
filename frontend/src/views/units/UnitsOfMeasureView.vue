@@ -50,7 +50,7 @@
               type="text"
               placeholder="Código, nome ou símbolo..."
               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @input="handleFilterChange"
+              @input="debouncedFilterChange"
             />
           </div>
 
@@ -318,10 +318,14 @@ import { useUnitOfMeasureStore } from '@/stores/unit-of-measure.store';
 import type { UnitOfMeasure } from '@/services/unit-of-measure.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const unitStore = useUnitOfMeasureStore();
+const toast = useToast();
 
 const units = ref<UnitOfMeasure[]>([]);
 const loading = ref(false);
@@ -374,6 +378,7 @@ const handleFilterChange = () => {
   pagination.value.page = 1;
   loadUnits();
 };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 
 const clearFilters = () => {
   filters.value = {
@@ -422,37 +427,37 @@ const handleSubmit = async () => {
   try {
     if (editingUnit.value) {
       await unitStore.updateUnit(editingUnit.value.id, formData.value);
-      alert('Unidade atualizada com sucesso!');
+      toast.success('Unidade atualizada com sucesso!');
     } else {
       await unitStore.createUnit(formData.value);
-      alert('Unidade criada com sucesso!');
+      toast.success('Unidade criada com sucesso!');
     }
     closeModal();
     await loadUnits();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar unidade');
+    toast.error(error.response?.data?.message || 'Erro ao salvar unidade');
   }
 };
 
 const handleToggleActive = async (unit: UnitOfMeasure) => {
-  if (confirm(`Deseja ${unit.active ? 'desativar' : 'ativar'} a unidade "${unit.name}"?`)) {
+  if (await confirmDialog(`Deseja ${unit.active ? 'desativar' : 'ativar'} a unidade "${unit.name}"?`)) {
     try {
       await unitStore.toggleActive(unit.id);
       await loadUnits();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error(error.response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
 const handleDelete = async (unit: UnitOfMeasure) => {
-  if (confirm(`Deseja realmente excluir a unidade "${unit.name}"?\n\nEsta ação não pode ser desfeita.`)) {
+  if (await confirmDialog(`Deseja realmente excluir a unidade "${unit.name}"?\n\nEsta ação não pode ser desfeita.`)) {
     try {
       await unitStore.deleteUnit(unit.id);
-      alert('Unidade excluída com sucesso!');
+      toast.success('Unidade excluída com sucesso!');
       await loadUnits();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao excluir unidade');
+      toast.error(error.response?.data?.message || 'Erro ao excluir unidade');
     }
   }
 };

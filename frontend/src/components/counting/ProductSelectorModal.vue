@@ -74,6 +74,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useAuthStore } from '@/stores/auth.store';
+import { useToast } from '@/composables/useToast';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -85,6 +86,7 @@ const emit = defineEmits<{
   (e: 'select', products: any[]): void;
 }>();
 
+const toast = useToast();
 const loading = ref(false);
 const searchQuery = ref('');
 const products = ref<any[]>([]);
@@ -129,7 +131,7 @@ const loadProducts = async () => {
     products.value = response.data.data || response.data;
   } catch (error) {
     console.error('Erro ao carregar produtos:', error);
-    alert('Erro ao carregar produtos. Verifique o console.');
+    toast.error('Erro ao carregar produtos. Verifique o console.');
   } finally {
     loading.value = false;
   }
