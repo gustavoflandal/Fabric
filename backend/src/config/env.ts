@@ -85,7 +85,11 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    // Aceita uma lista separada por vírgula (dev usa 3 portas Vite diferentes).
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5174,http://localhost:5175')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   audit: {
