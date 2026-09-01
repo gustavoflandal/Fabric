@@ -144,7 +144,13 @@ export const useAuthStore = defineStore('auth', () => {
     const response = await authService.refreshToken(refreshToken.value)
     accessToken.value = response.accessToken
     localStorage.setItem('accessToken', response.accessToken)
-    
+
+    // Backend rotaciona o refresh token a cada uso (Fase 2 do cronograma) -
+    // o token antigo é revogado, então o novo precisa ser persistido aqui
+    // ou o próximo refresh falhará.
+    refreshToken.value = response.refreshToken
+    localStorage.setItem('refreshToken', response.refreshToken)
+
     // Recarregar permissões após renovar token
     if (import.meta.env.DEV) {
       console.log('🔄 Recarregando permissões após refresh token...')

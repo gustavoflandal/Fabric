@@ -25,6 +25,11 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+export interface RefreshResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export class AuthService {
   async register(data: RegisterDto): Promise<AuthResponse> {
     // Verificar se usuário já existe
@@ -51,7 +56,10 @@ export class AuthService {
     // Gerar tokens
     const payload = { userId: user.id, email: user.email, name: user.name };
     const accessToken = JwtUtil.generateAccessToken(payload);
-    const refreshToken = JwtUtil.generateRefreshToken(payload);
+    const refresh = JwtUtil.generateRefreshToken(payload);
+    await prisma.refreshToken.create({
+      data: { userId: user.id, jti: refresh.jti, expiresAt: refresh.expiresAt },
+    });
 
     return {
       user: {
@@ -60,7 +68,7 @@ export class AuthService {
         name: user.name,
       },
       accessToken,
-      refreshToken,
+      refreshToken: refresh.token,
     };
   }
 
@@ -111,7 +119,10 @@ export class AuthService {
     // Gerar tokens
     const payload = { userId: user.id, email: user.email, name: user.name };
     const accessToken = JwtUtil.generateAccessToken(payload);
-    const refreshToken = JwtUtil.generateRefreshToken(payload);
+    const refresh = JwtUtil.generateRefreshToken(payload);
+    await prisma.refreshToken.create({
+      data: { userId: user.id, jti: refresh.jti, expiresAt: refresh.expiresAt },
+    });
 
     return {
       user: {
@@ -120,14 +131,32 @@ export class AuthService {
         name: user.name,
       },
       accessToken,
-      refreshToken,
+      refreshToken: refresh.token,
     };
   }
 
-  async refreshToken(token: string): Promise<{ accessToken: string }> {
+  /**
+   * ✅ Fase 2 item 2.3 do cronograma: além de checar a assinatura/expiração
+   * do JWT, agora confirma que o `jti` existe em RefreshToken, pertence a
+   * esse usuário e não foi revogado - sem isso, um refresh token roubado
+   * continuava valido mesmo depois de um logout, pelos 7 dias inteiros
+   * (o JWT sozinho não sabia nada sobre revogação).
+   *
+   * Rotação: o token usado é revogado e um novo par access+refresh é
+   * emitido a cada chamada - um refresh token só pode ser usado uma vez.
+   * Se o mesmo `jti` for apresentado de novo (já revogado), é sinal de que
+   * o token vazou e está sendo reusado; a chamada é rejeitada.
+   */
+  async refreshToken(token: string): Promise<RefreshResponse> {
     try {
-      // Verificar refresh token
+      // Verificar refresh token (assinatura e expiração)
       const payload = JwtUtil.verifyRefreshToken(token);
+
+      const stored = await prisma.refreshToken.findUnique({ where: { jti: payload.jti } });
+
+      if (!stored || stored.userId !== payload.userId || stored.revokedAt || stored.expiresAt < new Date()) {
+        throw new AppError(401, 'Token inválido');
+      }
 
       // Verificar se usuário ainda existe e está ativo
       const user = await prisma.user.findUnique({
@@ -138,14 +167,40 @@ export class AuthService {
         throw new AppError(401, 'Token inválido');
       }
 
-      // Gerar novo access token
+      // Rotação: revoga o token usado e emite um novo par
       const newPayload = { userId: user.id, email: user.email, name: user.name };
       const accessToken = JwtUtil.generateAccessToken(newPayload);
+      const newRefresh = JwtUtil.generateRefreshToken(newPayload);
 
-      return { accessToken };
+      await prisma.$transaction([
+        prisma.refreshToken.update({
+          where: { jti: payload.jti },
+          data: { revokedAt: new Date() },
+        }),
+        prisma.refreshToken.create({
+          data: { userId: user.id, jti: newRefresh.jti, expiresAt: newRefresh.expiresAt },
+        }),
+      ]);
+
+      return { accessToken, refreshToken: newRefresh.token };
     } catch (error) {
       throw new AppError(401, 'Token inválido ou expirado');
     }
+  }
+
+  /**
+   * ✅ Fase 2 item 2.3 do cronograma: logout agora revoga de verdade -
+   * antes só retornava 200 sem invalidar nada ("Futuramente pode
+   * implementar blacklist de tokens"). Revoga todos os refresh tokens
+   * ativos do usuário (todas as sessões), não só a que fez a chamada -
+   * mais simples que exigir o cliente mandar o refresh token no logout, e
+   * é o comportamento que a maioria dos usuários espera de "sair".
+   */
+  async logout(userId: string): Promise<void> {
+    await prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   async getMe(userId: string) {
