@@ -82,6 +82,18 @@ export class AuthService {
       throw new AppError(401, 'Credenciais inválidas');
     }
 
+    // ✅ Fase 2 item 2.4 do cronograma: bloqueio de conta por tentativas
+    // falhas - antes só existia rate limit por IP (authLimiter), que não
+    // protege contra um atacante distribuído tentando poucas senhas por IP
+    // diferente contra a MESMA conta.
+    const MAX_FAILED_ATTEMPTS = 5;
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
+
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      throw new AppError(423, `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${minutesLeft} min.`);
+    }
+
     // Verificar senha (com proteção para dados legados/corrompidos)
     let isPasswordValid = false;
     try {
@@ -91,10 +103,25 @@ export class AuthService {
         userId: user.id,
         email: user.email,
       });
-      throw new AppError(401, 'Credenciais inválidas');
+      isPasswordValid = false;
     }
 
     if (!isPasswordValid) {
+      const attempts = user.failedLoginAttempts + 1;
+      const shouldLock = attempts >= MAX_FAILED_ATTEMPTS;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: shouldLock ? 0 : attempts,
+          lockedUntil: shouldLock ? new Date(Date.now() + LOCKOUT_DURATION_MS) : null,
+        },
+      });
+
+      if (shouldLock) {
+        logger.warn('Conta bloqueada por excesso de tentativas de login', { userId: user.id, email: user.email });
+      }
+
       throw new AppError(401, 'Credenciais inválidas');
     }
 
@@ -103,11 +130,11 @@ export class AuthService {
       throw new AppError(403, 'Usuário inativo');
     }
 
-    // Atualizar último login (não deve bloquear autenticação)
+    // Login bem-sucedido: zera tentativas e atualiza último login (não deve bloquear autenticação)
     try {
       await prisma.user.update({
         where: { id: user.id },
-        data: { lastLogin: new Date() },
+        data: { lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null },
       });
     } catch (error) {
       logger.warn('Não foi possível atualizar lastLogin', {

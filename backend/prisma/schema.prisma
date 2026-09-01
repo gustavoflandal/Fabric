@@ -21,9 +21,13 @@ model User {
   name          String
   active        Boolean   @default(true)
   lastLogin     DateTime?
+  // ✅ Fase 2 item 2.4 do cronograma: bloqueio de conta por tentativas de
+  // login falhas (nao existia nenhum controle por conta, so rate limit por IP)
+  failedLoginAttempts Int  @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
+
   roles         UserRole[]
   auditLogs     AuditLog[]
   productionPointings ProductionPointing[]
