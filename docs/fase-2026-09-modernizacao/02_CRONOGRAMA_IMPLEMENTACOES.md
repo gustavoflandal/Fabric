@@ -106,14 +106,16 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 
 | # | Ação | Esforço | Status |
 |---|---|---|---|
-| 5.1 | Trocar `alert()`/`confirm()` por `notification.store`/modal padronizado, começando por `WorkCentersView.vue` e auditando as demais 43 views | 2-3 dias | 🚧 Em andamento (subagente) — escopo real: 27 arquivos |
-| 5.2 | Debounce padronizado em campos de busca (componente/composable reutilizável) | 1 dia | 🚧 Em andamento (mesmo subagente) — escopo real: 9+ arquivos |
-| 5.3 | Auditoria básica de acessibilidade (labels, focus trap, `aria-label`) nas views mais usadas | 2 dias | ⏸️ Pendente — depende dos itens 5.1/5.2 terminarem (mesmos arquivos) |
+| 5.1 | Trocar `alert()`/`confirm()` por `notification.store`/modal padronizado, começando por `WorkCentersView.vue` e auditando as demais 43 views | 2-3 dias | ✅ Feito — 25 de 27 arquivos (os outros 2 eram falso positivo); infraestrutura nova (`useToast`, `useConfirm`, `ToastContainer`, `ConfirmDialogContainer`); testado com Playwright ao vivo |
+| 5.2 | Debounce padronizado em campos de busca (componente/composable reutilizável) | 1 dia | ✅ Feito — `useDebounce`, aplicado em 11 arquivos |
+| 5.3 | Auditoria básica de acessibilidade (labels, focus trap, `aria-label`) nas views mais usadas | 2 dias | 🟡 Parcial — `WorkCentersView.vue` (a view citada na auditoria original) totalmente corrigida; as outras 43 views ficam para uma leva dedicada, usando esse commit como padrão |
 | 5.4 | Decidir formalmente e documentar em `docs/` o futuro do frontend | 0,5 dia (decisão) | ✅ Feito — `03_DECISAO_STACK_FRONTEND.md` |
 | 5.5 | `events/listeners.ts`: decidir se os 4 eventos emitidos ganham consumidores reais ou se a infraestrutura é removida | 1-2 dias | ✅ Feito — decisão: manter como está; achado e corrigido um bug real (2 dos listeners nunca gravavam por causa de um campo inexistente) |
 | 5.6 | Normalização de endereço duplicado entre `Supplier`/`Customer`/`Warehouse`; política de retenção/particionamento de `audit_logs` | 2-3 dias | 🟡 Parcial — retenção já existia (job diário, 90 dias), só faltava ser configurável (feito). Particionamento e normalização de endereço adiados com justificativa |
 
-**Entregável:** UX consistente, decisão de stack registrada, dívida técnica residual reduzida.
+**Entregável:** UX consistente, decisão de stack registrada, dívida técnica residual reduzida. **Fase 5 concluída em 01/09/2026** (5.3 e 5.6 parciais, com justificativa e escopo do que falta documentados acima).
+
+**Cronograma original de 5 fases: completo.** As seis pendências parciais/adiadas ao longo de todas as fases (Float→Decimal, lock otimista nos 4 models restantes, auditoria de acessibilidade nas 43 views restantes, particionamento de audit_logs, normalização de endereço, validators de counting/mrp) ficam documentadas nos respectivos itens acima como candidatas a uma Fase 6, caso o time queira continuar.
 
 ---
 
