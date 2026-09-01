@@ -83,14 +83,6 @@
             </Button>
           </div>
 
-          <div class="text-center">
-            <p class="text-sm text-gray-600">
-              Não tem uma conta?
-              <RouterLink to="/register" class="font-medium text-primary-600 hover:text-primary-500">
-                Cadastre-se
-              </RouterLink>
-            </p>
-          </div>
         </form>
       </Card>
 
