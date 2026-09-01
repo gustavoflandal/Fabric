@@ -86,6 +86,15 @@ async function main() {
     { resource: 'customers', action: 'update', description: 'Editar clientes' },
     { resource: 'customers', action: 'delete', description: 'Excluir clientes' },
     
+    // Unidades de Medida (Fase 2 do cronograma - RBAC estendido)
+    { resource: 'units_of_measure', action: 'create', description: 'Criar unidades de medida' },
+    { resource: 'units_of_measure', action: 'read', description: 'Visualizar unidades de medida' },
+    { resource: 'units_of_measure', action: 'update', description: 'Editar unidades de medida' },
+    { resource: 'units_of_measure', action: 'delete', description: 'Excluir unidades de medida' },
+
+    // Dashboard geral (Fase 2 do cronograma - RBAC estendido)
+    { resource: 'dashboard', action: 'read', description: 'Visualizar dashboard geral' },
+
     // Estoque
     { resource: 'stock', action: 'read', description: 'Visualizar estoque' },
     { resource: 'stock', action: 'update', description: 'Movimentar estoque' },

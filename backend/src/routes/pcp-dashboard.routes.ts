@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import pcpDashboardController from '../controllers/pcp-dashboard.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { requirePermission } from '../middleware/permission.middleware';
 
 const router = Router();
 
 // Todas as rotas requerem autenticação
 router.use(authMiddleware);
+router.use(requirePermission('pcp', 'dashboard.view'));
 
 /**
  * @route   GET /api/v1/pcp/dashboard
