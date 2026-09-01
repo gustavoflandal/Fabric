@@ -88,15 +88,17 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 
 ## Fase 4 — Qualidade de dados e performance (Semanas 8-9, 27/10 a 07/11/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 4.1 | Migrar `Float` → `Decimal` em quantidades e custos, por domínio, começando por estoque e compras | 1 semana |
-| 4.2 | Adicionar `version Int` (lock otimista) em `ProductionOrder`, `ProductionOrderOperation`, `CountingItem`, `CountingSession`, `PurchaseOrderItem` | 1 semana |
-| 4.3 | Índices compostos faltantes (`stock_movements`, `audit_logs`, `production_pointings`, `production_orders`) + constraints únicas faltantes (`CountingItem`, `BOMItem`, `RoutingOperation`, `Supplier.document`, `Customer.document`) | 2-3 dias |
-| 4.4 | Padronizar tratamento de erros: `AppError` em todos os services, remover `try/catch` locais nos controllers em favor de `next(err)`/`asyncHandler` | 2-3 dias |
-| 4.5 | FKs de auditoria: `createdBy`/`approvedBy`/`receivedBy` apontando para `users` | 1 dia |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 4.1 | Migrar `Float` → `Decimal` em quantidades e custos, por domínio, começando por estoque e compras | 1 semana | ⏸️ Adiado deliberadamente — ver nota abaixo |
+| 4.2 | Adicionar `version Int` (lock otimista) em `ProductionOrder`, `ProductionOrderOperation`, `CountingItem`, `CountingSession`, `PurchaseOrderItem` | 1 semana | 🟡 Parcial — coluna em todos os 5 models; checagem de fato (compare-and-swap) só ligada em `production-order.service.ts::update()` por enquanto |
+| 4.3 | Índices compostos faltantes (`stock_movements`, `audit_logs`, `production_pointings`, `production_orders`) + constraints únicas faltantes (`CountingItem`, `BOMItem`, `RoutingOperation`, `Supplier.document`, `Customer.document`) | 2-3 dias | ✅ Feito |
+| 4.4 | Padronizar tratamento de erros: `AppError` em todos os services, remover `try/catch` locais nos controllers em favor de `next(err)`/`asyncHandler` | 2-3 dias | 🚧 Em andamento (subagente) |
+| 4.5 | FKs de auditoria: `createdBy`/`approvedBy`/`receivedBy` apontando para `users` | 1 dia | ✅ Feito |
 
 **Entregável:** dados financeiros/de estoque com precisão correta, sem writes concorrentes perdidos, API com contrato de erro único.
+
+**Nota sobre o item 4.1 (adiado):** é o item de maior risco de todo o cronograma até aqui. Trocar `Float` por `Decimal` não é só uma migration de schema - exige reescrever a aritmética em todo lugar que lê/escreve esses campos (Prisma `Decimal` não aceita `+`/`-`/`*` direto como `number`, precisa de `.plus()`/`.minus()`/conversão explícita), e a serialização JSON de `Decimal` é uma STRING por padrão, não um número - qualquer frontend que hoje espera um `number` desses campos (ex: `ProductsView.vue`, exibição de custos) quebraria silenciosamente sem uma revisão cuidadosa de cada consumidor. Diferente dos outros itens desta fase, isso não é seguro de fazer em escopo reduzido "só para testar" - fazer errado é pior do que não fazer. Recomendação: tratar como uma fase própria, focada, com tempo para revisar cada consumidor (frontend e services) por domínio, começando por `Product.standardCost/lastCost/averageCost` e os campos de `PurchaseOrder`/`PurchaseOrderItem`.
 
 ---
 
