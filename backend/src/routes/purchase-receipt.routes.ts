@@ -2,6 +2,8 @@ import { Router } from 'express';
 import purchaseReceiptController from '../controllers/purchase-receipt.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
+import { validate } from '../middleware/validation.middleware';
+import { createPurchaseReceiptSchema, cancelPurchaseReceiptSchema } from '../validators/purchase-receipt.validator';
 
 const router = Router();
 
@@ -26,6 +28,7 @@ router.get(
 router.post(
   '/',
   requirePermission('recebimentos_compra', 'criar'),
+  validate(createPurchaseReceiptSchema),
   purchaseReceiptController.create
 );
 
@@ -33,6 +36,7 @@ router.post(
 router.delete(
   '/:id',
   requirePermission('recebimentos_compra', 'excluir'),
+  validate(cancelPurchaseReceiptSchema),
   purchaseReceiptController.cancel
 );
 

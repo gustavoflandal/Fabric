@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import { strongPasswordSchema } from './common.validator';
 
 export const registerSchema = Joi.object({
   name: Joi.string().min(3).max(100).required().messages({
@@ -10,10 +11,7 @@ export const registerSchema = Joi.object({
     'string.email': 'E-mail inválido',
     'any.required': 'E-mail é obrigatório',
   }),
-  password: Joi.string().min(6).required().messages({
-    'string.min': 'Senha deve ter no mínimo 6 caracteres',
-    'any.required': 'Senha é obrigatória',
-  }),
+  password: strongPasswordSchema.required(),
 });
 
 export const loginSchema = Joi.object({

@@ -56,13 +56,17 @@ export class AuthController {
     }
   }
 
-  async logout(req: Request, res: Response) {
-    // Por enquanto apenas retorna sucesso
-    // Futuramente pode implementar blacklist de tokens
-    res.status(200).json({
-      status: 'success',
-      message: 'Logout realizado com sucesso',
-    });
+  async logout(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      await authService.logout(req.userId!);
+
+      res.status(200).json({
+        status: 'success',
+        message: 'Logout realizado com sucesso',
+      });
+    } catch (error) {
+      next(error);
+    }
   }
 }
 

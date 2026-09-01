@@ -21,9 +21,13 @@ model User {
   name          String
   active        Boolean   @default(true)
   lastLogin     DateTime?
+  // ✅ Fase 2 item 2.4 do cronograma: bloqueio de conta por tentativas de
+  // login falhas (nao existia nenhum controle por conta, so rate limit por IP)
+  failedLoginAttempts Int  @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
+
   roles         UserRole[]
   auditLogs     AuditLog[]
   productionPointings ProductionPointing[]
@@ -31,15 +35,37 @@ model User {
   notifications Notification[]
   notificationPreferences NotificationPreference[]
   countingAssignments CountingAssignment[]
-  
+  refreshTokens RefreshToken[]
+
   // Contagem de Estoque
   countingPlansCreated CountingPlan[] @relation("CountingPlanCreator")
   sessionsAssigned CountingSession[] @relation("SessionAssignedTo")
   sessionsCompleted CountingSession[] @relation("SessionCompletedBy")
   itemsCounted CountingItem[] @relation("ItemCountedBy")
   itemsRecounted CountingItem[] @relation("ItemRecountedBy")
-  
+
   @@map("users")
+}
+
+// ✅ Fase 2 item 2.3 do cronograma: refresh tokens persistidos para permitir
+// revogacao/rotacao real. Antes o refresh token era puramente stateless (so
+// a assinatura JWT era checada) - logout nao invalidava nada, e um token
+// roubado continuava valido pelos 7 dias inteiros inteiros. So o `jti` e
+// guardado (nao o token inteiro): ele e um identificador aleatorio sem valor
+// sozinho, quem prova posse e a assinatura JWT que so o servidor sabe validar.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  jti       String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model Role {

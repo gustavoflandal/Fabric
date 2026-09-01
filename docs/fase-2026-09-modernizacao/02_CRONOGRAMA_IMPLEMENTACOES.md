@@ -21,7 +21,7 @@ Não espera sprint planning. São correções pequenas e isoladas com risco de s
 | 0.5 | Removidos `stock.service.old.ts` e a rota de debug `/counting/test-direct` | Limpeza | 1h | ✅ Feito |
 
 **Pendências operacionais pós-Sprint 0** (fora do escopo de código, para quem for aplicar em outros ambientes):
-- Aplicar as novas credenciais (MySQL e JWT) em qualquer ambiente além desta máquina de desenvolvimento (produção, CI, outras estações) — os valores antigos vazados no git não devem ser reaproveitados em lugar nenhum.
+- Aplicar as novas credenciais (MySQL e JWT) em qualquer ambiente além desta máquina de desenvolvimento (produção, CI, outs estações) — os valores antigos vazados no git não devem ser reaproveitados em lugar nenhum.
 - Sessões de usuário existentes foram invalidadas pela troca dos JWT secrets (esperado).
 - Avaliar se vale reescrever o histórico do git para remover o segredo antigo do commit `14b5294` (não feito aqui por ser uma operação destrutiva separada — ver commit `a6f6dee`).
 
@@ -53,17 +53,19 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 
 ## Fase 2 — RBAC, validação e autenticação completas (Semanas 4-5, 29/09 a 10/10/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 2.1 | Estender `requirePermission` aos ~20 módulos restantes (stock, production-order, mrp, reports, bom, routing, product, supplier, customer, work-center, dashboard, etc.) | 2 dias |
-| 2.2 | Ampliar `validators/` para os endpoints hoje sem schema (stock, counting, purchase-receipt, mrp, warehouse) | 2-3 dias |
-| 2.3 | Refresh tokens persistidos (tabela com `jti`, hash, expiração, `revokedAt`), rotação no refresh, revogação real no logout | 3 dias |
-| 2.4 | Rate limit em `/auth/refresh`; senha mínima 12 chars com complexidade; lockout de conta | 1-2 dias |
-| 2.5 | Auditoria cobrindo login/logout/falha de auth; `app.set('trust proxy', 1)`; restringir/remover `DELETE /audit-logs/clean` | 1 dia |
-| 2.6 | CORS via variável de ambiente (remover hardcode de localhost) | 2h |
-| 2.7 | Teste de integração/lint customizado que falha o CI se uma rota mutante não tiver `requirePermission` (evita regressão dos itens 0.1/2.1) | 1 dia |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 2.1 | Estender `requirePermission` aos ~20 módulos restantes (stock, production-order, mrp, reports, bom, routing, product, supplier, customer, work-center, dashboard, etc.) | 2 dias | ✅ Feito — 18 arquivos de rotas, testado com admin (200) e usuário sem perfil (403) |
+| 2.2 | Ampliar `validators/` para os endpoints hoje sem schema (stock, counting, purchase-receipt, mrp, warehouse) | 2-3 dias | 🟡 Parcial — stock, purchase-receipt, warehouse/warehouse-structure/storage-position feitos. `counting.routes.ts` (28 endpoints) e `mrp.routes.ts` ficaram de fora por escopo |
+| 2.3 | Refresh tokens persistidos (tabela com `jti`, hash, expiração, `revokedAt`), rotação no refresh, revogação real no logout | 3 dias | ✅ Feito — testado ao vivo: rotação, reuso rejeitado, logout revoga |
+| 2.4 | Rate limit em `/auth/refresh`; senha mínima 12 chars com complexidade; lockout de conta | 1-2 dias | ✅ Feito — testado ao vivo: bloqueio após 5 tentativas (423), senha fraca rejeitada (400) |
+| 2.5 | Auditoria cobrindo login/logout/falha de auth; IP não mais forjável; restringir leitura/exclusão de `audit-logs` | 1 dia | ✅ Feito — `trust proxy` deliberadamente **não** habilitado (ver nota abaixo); `getIpAddress` trocado para `req.ip` em vez de headers forjáveis |
+| 2.6 | CORS via variável de ambiente (remover hardcode de localhost) | 2h | ✅ Feito |
+| 2.7 | Teste de integração/lint customizado que falha o CI se uma rota mutante não tiver `requirePermission` | 1 dia | ⏸️ Adiado — depende da Fase 3 (fundação de testes ainda não existe) |
 
-**Entregável:** toda escrita da API exige a permissão correta; sessão de usuário auditável e revogável.
+**Entregável:** toda escrita da API exige a permissão correta; sessão de usuário auditável e revogável. **Fase 2 concluída em 01/09/2026** (itens 2.2 parcial e 2.7 adiado, ver acima).
+
+**Nota sobre `trust proxy`:** a recomendação original era `app.set('trust proxy', 1)`. Na implementação, avaliamos a topologia atual (`docker-compose.yml` — backend exposto direto, sem reverse proxy na frente) e concluímos que habilitar isso SEM um proxy real na frente tornaria o IP mais fácil de forjar, não mais difícil. Optamos por usar `req.ip`/`req.socket.remoteAddress` sem confiar em `X-Forwarded-For`, e deixamos documentado no código para habilitar `trust proxy` se um reverse proxy real for adicionado em produção.
 
 ---
 
