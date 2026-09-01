@@ -145,7 +145,10 @@ model AuditLog {
   user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([resource])
+  @@index([resourceId])
+  @@index([resource, resourceId, createdAt])
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
@@ -196,7 +199,7 @@ model Supplier {
   code          String    @unique
   name          String
   legalName     String?
-  document      String?
+  document      String?   @unique
   email         String?
   phone         String?
   address       String?
@@ -222,7 +225,7 @@ model Customer {
   code          String    @unique
   name          String
   legalName     String?
-  document      String?
+  document      String?   @unique
   email         String?
   phone         String?
   address       String?
@@ -354,6 +357,8 @@ model BOMItem {
   unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
   
   @@index([bomId])
+  @@unique([bomId, componentId])
+  @@unique([bomId, sequence])
   @@map("bom_items")
 }
 
@@ -392,6 +397,7 @@ model RoutingOperation {
   workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
   
   @@index([routingId])
+  @@unique([routingId, sequence])
   @@map("routing_operations")
 }
 
@@ -428,6 +434,7 @@ model ProductionOrder {
   
   @@index([status])
   @@index([scheduledStart])
+  @@index([status, scheduledStart])
   @@index([productId])
   @@map("production_orders")
 }
@@ -493,6 +500,8 @@ model ProductionPointing {
   @@index([workCenterId])
   @@index([userId])
   @@index([startTime])
+  @@index([operationId, startTime])
+  @@index([userId, startTime])
   @@map("production_pointings")
 }
 
@@ -518,9 +527,11 @@ model StockMovement {
   countingSession CountingSession? @relation("CountingAdjustments", fields: [countingSessionId], references: [id])
   
   @@index([productId])
+  @@index([productId, createdAt])
   @@index([type])
   @@index([createdAt])
   @@index([reference])
+  @@index([referenceType, reference])
   @@map("stock_movements")
 }
 
@@ -857,6 +868,7 @@ model CountingSession {
   @@index([planId])
   @@index([status, scheduledDate])
   @@index([assignedTo])
+  @@unique([planId, scheduledDate])
   @@map("counting_sessions")
 }
 
@@ -909,6 +921,7 @@ model CountingItem {
   @@index([productId])
   @@index([hasDifference])
   @@index([countedBy])
+  @@unique([sessionId, productId, locationId])
   @@map("counting_items")
 }
 
