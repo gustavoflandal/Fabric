@@ -104,14 +104,14 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 
 ## Fase 5 — Débito técnico e UX (Semana 10, 10-14/11/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 5.1 | Trocar `alert()`/`confirm()` por `notification.store`/modal padronizado, começando por `WorkCentersView.vue` e auditando as demais 43 views | 2-3 dias |
-| 5.2 | Debounce padronizado em campos de busca (componente/composable reutilizável) | 1 dia |
-| 5.3 | Auditoria básica de acessibilidade (labels, focus trap, `aria-label`) nas views mais usadas | 2 dias |
-| 5.4 | Decidir formalmente e documentar em `docs/` o futuro do frontend: permanecer 100% Vue, ou reabrir React como decisão de arquitetura nova (módulo piloto isolado, dependências reais desde o commit zero) | 0,5 dia (decisão) |
-| 5.5 | `events/listeners.ts`: decidir se os 4 eventos emitidos ganham consumidores reais ou se a infraestrutura é removida | 1-2 dias |
-| 5.6 | Normalização de endereço duplicado entre `Supplier`/`Customer`/`Warehouse`; política de retenção/particionamento de `audit_logs` | 2-3 dias |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 5.1 | Trocar `alert()`/`confirm()` por `notification.store`/modal padronizado, começando por `WorkCentersView.vue` e auditando as demais 43 views | 2-3 dias | 🚧 Em andamento (subagente) — escopo real: 27 arquivos |
+| 5.2 | Debounce padronizado em campos de busca (componente/composable reutilizável) | 1 dia | 🚧 Em andamento (mesmo subagente) — escopo real: 9+ arquivos |
+| 5.3 | Auditoria básica de acessibilidade (labels, focus trap, `aria-label`) nas views mais usadas | 2 dias | ⏸️ Pendente — depende dos itens 5.1/5.2 terminarem (mesmos arquivos) |
+| 5.4 | Decidir formalmente e documentar em `docs/` o futuro do frontend | 0,5 dia (decisão) | ✅ Feito — `03_DECISAO_STACK_FRONTEND.md` |
+| 5.5 | `events/listeners.ts`: decidir se os 4 eventos emitidos ganham consumidores reais ou se a infraestrutura é removida | 1-2 dias | ✅ Feito — decisão: manter como está; achado e corrigido um bug real (2 dos listeners nunca gravavam por causa de um campo inexistente) |
+| 5.6 | Normalização de endereço duplicado entre `Supplier`/`Customer`/`Warehouse`; política de retenção/particionamento de `audit_logs` | 2-3 dias | 🟡 Parcial — retenção já existia (job diário, 90 dias), só faltava ser configurável (feito). Particionamento e normalização de endereço adiados com justificativa |
 
 **Entregável:** UX consistente, decisão de stack registrada, dívida técnica residual reduzida.
 
