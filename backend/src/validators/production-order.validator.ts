@@ -36,6 +36,8 @@ export const updateProductionOrderSchema = Joi.object({
   scheduledEnd: Joi.date().iso(),
   priority: Joi.number().integer().min(1).max(10),
   notes: Joi.string().trim().allow('', null),
+  // ✅ Fase 4 item 4.2: opcional - ver comentário em production-order.service.ts
+  version: Joi.number().integer().min(0),
 }).min(1);
 
 export const changeStatusSchema = Joi.object({

@@ -20,6 +20,12 @@ export interface UpdateProductionOrderDto {
   scheduledEnd?: string;
   priority?: number;
   notes?: string;
+  // ✅ Fase 4 item 4.2 do cronograma: opcional, para não quebrar clientes
+  // existentes que ainda não enviam a versão lida. Quando enviado, é
+  // checado contra o valor atual no banco (lock otimista) - se alguém mais
+  // já alterou o registro nesse meio-tempo, a atualização é rejeitada em
+  // vez de sobrescrever silenciosamente ("lost update").
+  version?: number;
 }
 
 export class ProductionOrderService {
@@ -192,6 +198,35 @@ export class ProductionOrderService {
   }
 
   async update(id: string, data: UpdateProductionOrderDto) {
+    // ✅ Fase 4 item 4.2: lock otimista opcional via `version`.
+    if (data.version !== undefined) {
+      const result = await prisma.productionOrder.updateMany({
+        where: { id, version: data.version },
+        data: {
+          orderNumber: data.orderNumber,
+          quantity: data.quantity,
+          scheduledStart: data.scheduledStart ? new Date(data.scheduledStart) : undefined,
+          scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : undefined,
+          priority: data.priority,
+          notes: data.notes,
+          version: { increment: 1 },
+        },
+      });
+
+      if (result.count === 0) {
+        const exists = await prisma.productionOrder.findUnique({ where: { id }, select: { id: true } });
+        if (!exists) {
+          throw new AppError(404, 'Ordem de produção não encontrada');
+        }
+        throw new AppError(409, 'Esta ordem de produção foi alterada por outra pessoa. Recarregue e tente novamente.');
+      }
+
+      return prisma.productionOrder.findUnique({
+        where: { id },
+        include: { product: { select: { id: true, code: true, name: true, type: true } } },
+      });
+    }
+
     return prisma.productionOrder.update({
       where: { id },
       data: {
@@ -201,6 +236,7 @@ export class ProductionOrderService {
         scheduledEnd: data.scheduledEnd ? new Date(data.scheduledEnd) : undefined,
         priority: data.priority,
         notes: data.notes,
+        version: { increment: 1 },
       },
       include: {
         product: { select: { id: true, code: true, name: true, type: true } },

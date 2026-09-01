@@ -423,6 +423,12 @@ model ProductionOrder {
   scrapQty      Float     @default(0)
   priority      Int       @default(5)
   status        String    @default("PLANNED")
+  // ✅ Fase 4 item 4.2 do cronograma: lock otimista (evita "lost update" quando
+  // dois usuarios editam a mesma ordem em telas abertas ao mesmo tempo -
+  // diferente dos locks pessimistas ja adicionados nas Fases 1/3 para as
+  // race conditions especificas ja encontradas, este cobre o caso geral de
+  // edicao concorrente via formulario)
+  version       Int       @default(0)
   
   scheduledStart DateTime
   scheduledEnd  DateTime
@@ -456,7 +462,9 @@ model ProductionOrderOperation {
   sequence      Int
   workCenterId  String
   description   String
-  
+  // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder)
+  version       Int       @default(0)
+
   plannedQty    Float
   completedQty  Float     @default(0)
   scrapQty      Float     @default(0)
@@ -643,6 +651,11 @@ model PurchaseOrderItem {
   discount      Float     @default(0)
   totalPrice    Float
   notes         String?
+  // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder) -
+  // protege receivedQty contra "lost update" quando dois recebimentos do
+  // mesmo item de pedido são processados perto um do outro sem estarem
+  // dentro da mesma transação
+  version       Int       @default(0)
   
   order         PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product       Product   @relation(fields: [productId], references: [id])
@@ -856,7 +869,9 @@ model CountingSession {
   code              String              @unique
   planId            String
   status            SessionStatus       @default(SCHEDULED)
-  
+  // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder)
+  version           Int                 @default(0)
+
   // Datas
   scheduledDate     DateTime
   startedAt         DateTime?
@@ -897,7 +912,12 @@ model CountingItem {
   sessionId         String
   productId         String
   locationId        String?
-  
+  // ✅ Fase 4 item 4.2: lock otimista - camada extra alem do lock pessimista
+  // (SELECT ... FOR UPDATE) ja adicionado em count()/recount() na Fase 3;
+  // esse cobre chamadas concorrentes na MESMA requisicao logica, este cobre
+  // o cliente que ficou com dados desatualizados na tela por mais tempo
+  version           Int                 @default(0)
+
   // Quantidades
   systemQty         Decimal             @db.Decimal(10, 2)
   countedQty        Decimal?            @db.Decimal(10, 2)
