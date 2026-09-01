@@ -10,13 +10,20 @@
 
 Não espera sprint planning. São correções pequenas e isoladas com risco de segurança ativo.
 
-| # | Ação | Área | Esforço | Responsável sugerido |
+**Status: ✅ concluído em 01/09/2026, branch `sprint-0-seguranca` (aguardando merge em `main`).**
+
+| # | Ação | Área | Esforço | Status |
 |---|---|---|---|---|
-| 0.1 | Aplicar `requirePermission` em `user.routes.ts`, `role.routes.ts`, `permission.routes.ts` | Segurança | 2-4h | Backend |
-| 0.2 | Fechar `POST /auth/register` (remover ou exigir permissão `users:create`) | Segurança | 1h | Backend |
-| 0.3 | `git rm --cached backend/.env.migration`, corrigir `.gitignore` para `.env*` (exceto `.env.example`), **rotacionar** senha do MySQL e ambos os JWT secrets | Segurança | 4h | Backend/DevOps |
-| 0.4 | Remover código React morto (`App.tsx`, `src/pages/`, `src/features/`) e destravar `npm run build` do frontend | Frontend | 2-4h | Frontend |
-| 0.5 | Remover `backend/src/services/stock.service.old.ts` e a rota de debug `/counting/test-direct` | Limpeza | 1h | Backend |
+| 0.1 | Aplicar `requirePermission` em `user.routes.ts`, `role.routes.ts`, `permission.routes.ts` | Segurança | 2-4h | ✅ Feito |
+| 0.2 | Fechar `POST /auth/register` (exige `users:create`); removida tela pública de cadastro no frontend | Segurança | 1h | ✅ Feito |
+| 0.3 | `.env.migration` removido do git, `.gitignore` corrigido para `.env.*` (exceto `.env.example`), **credenciais rotacionadas** (MySQL root/fabric + ambos JWT secrets, aplicadas ao ambiente rodando) | Segurança | 4h | ✅ Feito |
+| 0.4 | Código React morto removido (`App.tsx`, `src/pages/`, `src/features/`) | Frontend | 2-4h | ✅ Feito — `npm run build` segue quebrado por ~30 erros de type-check pré-existentes **não relacionados**, descobertos como efeito colateral (ver commit `ca12cae`); adicionar item novo ao cronograma para tratá-los |
+| 0.5 | Removidos `stock.service.old.ts` e a rota de debug `/counting/test-direct` | Limpeza | 1h | ✅ Feito |
+
+**Pendências operacionais pós-Sprint 0** (fora do escopo de código, para quem for aplicar em outros ambientes):
+- Aplicar as novas credenciais (MySQL e JWT) em qualquer ambiente além desta máquina de desenvolvimento (produção, CI, outras estações) — os valores antigos vazados no git não devem ser reaproveitados em lugar nenhum.
+- Sessões de usuário existentes foram invalidadas pela troca dos JWT secrets (esperado).
+- Avaliar se vale reescrever o histórico do git para remover o segredo antigo do commit `14b5294` (não feito aqui por ser uma operação destrutiva separada — ver commit `a6f6dee`).
 
 **Entregável:** sistema sem escalada de privilégio óbvia, sem segredo vazado ativo, com build funcionando.
 
