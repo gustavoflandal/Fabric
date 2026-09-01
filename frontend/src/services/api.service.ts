@@ -1,8 +1,10 @@
 import axios, { type AxiosInstance, type AxiosError } from 'axios'
 import { useAuthStore } from '@/stores/auth.store'
 
+const baseURL = import.meta.env.VITE_API_URL || '/api/v1'
+
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1',
+  baseURL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',

@@ -88,6 +88,16 @@ async function main() {
     { resource: 'reports', action: 'production', description: 'Relatório de produção' },
     { resource: 'reports', action: 'efficiency', description: 'Relatório de eficiência' },
     { resource: 'reports', action: 'quality', description: 'Relatório de qualidade' },
+
+    // Módulos (usado pelo frontend para liberar navegação)
+    { resource: 'modules', action: 'view_general', description: 'Acessar módulo geral' },
+    { resource: 'modules', action: 'view_pcp', description: 'Acessar módulo PCP' },
+    { resource: 'modules', action: 'view_wms', description: 'Acessar módulo WMS' },
+    { resource: 'modules', action: 'view_yms', description: 'Acessar módulo YMS' },
+
+    // Permissões específicas utilizadas no frontend
+    { resource: 'pcp', action: 'dashboard.view', description: 'Visualizar dashboard do PCP' },
+    { resource: 'counting', action: 'plans.print', description: 'Imprimir plano de contagem' },
     
     // Logs de Auditoria
     { resource: 'audit_logs', action: 'read', description: 'Visualizar logs de auditoria' },

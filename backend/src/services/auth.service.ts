@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { logger } from '../config/logger';
 import { PasswordUtil } from '../utils/password.util';
 import { JwtUtil } from '../utils/jwt.util';
 import { AppError } from '../middleware/error.middleware';
@@ -73,8 +74,17 @@ export class AuthService {
       throw new AppError(401, 'Credenciais inválidas');
     }
 
-    // Verificar senha
-    const isPasswordValid = await PasswordUtil.compare(data.password, user.password);
+    // Verificar senha (com proteção para dados legados/corrompidos)
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await PasswordUtil.compare(data.password, user.password);
+    } catch (error) {
+      logger.warn('Falha ao validar hash de senha no login', {
+        userId: user.id,
+        email: user.email,
+      });
+      throw new AppError(401, 'Credenciais inválidas');
+    }
 
     if (!isPasswordValid) {
       throw new AppError(401, 'Credenciais inválidas');
@@ -85,11 +95,18 @@ export class AuthService {
       throw new AppError(403, 'Usuário inativo');
     }
 
-    // Atualizar último login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
+    // Atualizar último login (não deve bloquear autenticação)
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      });
+    } catch (error) {
+      logger.warn('Não foi possível atualizar lastLogin', {
+        userId: user.id,
+        email: user.email,
+      });
+    }
 
     // Gerar tokens
     const payload = { userId: user.id, email: user.email, name: user.name };

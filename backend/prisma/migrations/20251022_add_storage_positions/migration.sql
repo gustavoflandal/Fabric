@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE `storage_positions` (
+CREATE TABLE IF NOT EXISTS `storage_positions` (
     `id` VARCHAR(191) NOT NULL,
     `structureId` VARCHAR(191) NOT NULL,
     `warehouseCode` VARCHAR(191) NOT NULL,
@@ -25,4 +25,28 @@ CREATE TABLE `storage_positions` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- AddForeignKey
-ALTER TABLE `storage_positions` ADD CONSTRAINT `storage_positions_structureId_fkey` FOREIGN KEY (`structureId`) REFERENCES `warehouse_structures`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+SET @fk_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'storage_positions'
+        AND CONSTRAINT_NAME = 'storage_positions_structureId_fkey'
+        AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+);
+
+SET @ref_table_exists := (
+    SELECT COUNT(*)
+    FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'warehouse_structures'
+);
+
+SET @fk_sql := IF(
+    @fk_exists = 0 AND @ref_table_exists = 1,
+    'ALTER TABLE `storage_positions` ADD CONSTRAINT `storage_positions_structureId_fkey` FOREIGN KEY (`structureId`) REFERENCES `warehouse_structures`(`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+    'SELECT 1'
+);
+
+PREPARE stmt_fk FROM @fk_sql;
+EXECUTE stmt_fk;
+DEALLOCATE PREPARE stmt_fk;
