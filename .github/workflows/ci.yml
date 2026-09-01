@@ -1,0 +1,150 @@
+name: CI
+
+# Fase 3 do cronograma de modernizacao (docs/fase-2026-09-modernizacao/02_CRONOGRAMA_IMPLEMENTACOES.md,
+# item 3.6): primeiro workflow de CI do projeto. Roda em todo push e em todo
+# pull request, cobrindo build + type-check (backend e frontend) + a suite de
+# testes automatizados do backend (fundacao criada nos itens 3.1-3.3 desta
+# mesma fase).
+#
+# Backend e frontend rodam como jobs separados e independentes (nao ha
+# dependencia entre eles - package.json's distintos, sem workspaces no repo)
+# para paralelizar e para que uma falha num nao bloqueie o feedback do outro.
+
+on:
+  push:
+  pull_request:
+
+# Cancela execucoes obsoletas do mesmo branch/PR quando novos commits chegam,
+# para nao gastar minutos de runner com resultados que vao ser descartados.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (build, type-check, testes)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      # INFORMATIVO (continue-on-error): o projeto ja tem hoje, antes de
+      # qualquer mudanca desta fase, ~70 erros de TypeScript pre-existentes
+      # espalhados por arquivos nao relacionados ao trabalho de testes desta
+      # fase (`tsc --noEmit` ja falha na branch base). Corrigir esses erros e
+      # um item futuro do cronograma, fora de escopo aqui. Rodamos o
+      # type-check mesmo assim para ele aparecer no log/summary do job
+      # (visibilidade continua), mas sem bloquear o PR por causa de debito
+      # tecnico que essa mudanca nao introduziu.
+      #
+      # TODO (fase futura): depois que os erros pre-existentes forem
+      # corrigidos, remover `continue-on-error: true` deste step para que o
+      # type-check volte a ser obrigatorio/bloqueante.
+      - name: Type-check (informativo - erros pre-existentes, ver nota acima)
+        run: npm run type-check
+        continue-on-error: true
+
+      # INFORMATIVO pelo mesmo motivo do type-check: build roda por cima do
+      # mesmo codigo-fonte com os mesmos ~70 erros de tipo pre-existentes, e
+      # `tsc` (chamado por `npm run build`) tende a falhar pelas mesmas causas.
+      # TODO (fase futura): apertar para bloqueante junto com o type-check.
+      - name: Build (informativo - erros pre-existentes, ver nota acima)
+        run: npm run build
+        continue-on-error: true
+
+      # BLOQUEANTE (sem continue-on-error): estes sao os testes novos criados
+      # nesta fase (itens 3.1-3.3) e devem sempre passar. `test:integration`
+      # ja encadeia tudo que e necessario (script definido em
+      # backend/package.json):
+      #   1. test:db:up      -> sobe um MySQL 8 efemero via
+      #                         `docker compose -f ../docker-compose.test.yml
+      #                         up -d --wait` (o --wait usa o healthcheck do
+      #                         compose para so seguir quando o banco estiver
+      #                         pronto para aceitar conexoes)
+      #   2. test:db:migrate -> `prisma migrate deploy` contra o banco de
+      #                         teste, usando as credenciais efemeras de
+      #                         backend/.env.test (nao e segredo real -
+      #                         proposital e seguramente versionado, ver
+      #                         comentario no proprio arquivo)
+      #   3. jest --runInBand -> roda a suite real (inclui testes de
+      #                         concorrencia em stock/counting-item que
+      #                         dependem de um banco real com locks de
+      #                         verdade, por isso nao usa SQLite in-memory
+      #                         nem mocks do Prisma)
+      #
+      # Runners hospedados do GitHub (ubuntu-latest) ja tem Docker Engine e o
+      # plugin `docker compose` (v2) pre-instalados, entao este script roda
+      # sem nenhuma configuracao adicional de servico.
+      - name: Testes de integracao (jest, MySQL real via docker-compose.test.yml)
+        run: npm run test:integration
+
+      # Encerra o container do MySQL de teste ao final do job. Nao e
+      # estritamente necessario (o runner e destruido logo em seguida de
+      # qualquer forma), mas evita depender disso silenciosamente e deixa o
+      # comportamento explicito; roda mesmo se os testes falharem, para nao
+      # deixar containers presos caso o job passe a rodar em runners
+      # self-hosted no futuro.
+      - name: Derrubar MySQL de teste
+        if: always()
+        run: npm run test:db:down
+
+  frontend:
+    name: Frontend (type-check, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      # INFORMATIVO (continue-on-error): confirmado quebrado hoje, antes de
+      # qualquer mudanca desta fase, por ~30 erros de type-check pre-
+      # existentes em views/stores Vue (documentado em
+      # docs/fase-2026-09-modernizacao/02_CRONOGRAMA_IMPLEMENTACOES.md,
+      # Sprint 0 item 0.4). Corrigir esses erros e trabalho futuro, fora de
+      # escopo aqui. Roda mesmo assim para o resultado ficar visivel no
+      # log/summary do job, sem bloquear o PR.
+      #
+      # TODO (fase futura): remover `continue-on-error: true` assim que os
+      # erros pre-existentes forem corrigidos, tornando o type-check
+      # bloqueante.
+      - name: Type-check (informativo - erros pre-existentes, ver nota acima)
+        run: npm run type-check
+        continue-on-error: true
+
+      # INFORMATIVO pelo mesmo motivo: `npm run build` do frontend roda
+      # `vue-tsc && vite build`, ou seja, o proprio build embute o
+      # type-check acima e falha pelos mesmos ~30 erros pre-existentes hoje.
+      # TODO (fase futura): apertar para bloqueante junto com o type-check.
+      - name: Build (informativo - erros pre-existentes, ver nota acima)
+        run: npm run build
+        continue-on-error: true
