@@ -2,6 +2,7 @@ import { Router } from 'express';
 import roleController from '../controllers/role.controller';
 import { validate } from '../middleware/validation.middleware';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { requirePermission } from '../middleware/permission.middleware';
 import {
   createRoleSchema,
   updateRoleSchema,
@@ -14,13 +15,13 @@ const router = Router();
 router.use(authMiddleware);
 
 // CRUD de perfis
-router.get('/', roleController.getAll);
-router.get('/:id', roleController.getById);
-router.post('/', validate(createRoleSchema), roleController.create);
-router.put('/:id', validate(updateRoleSchema), roleController.update);
-router.delete('/:id', roleController.delete);
+router.get('/', requirePermission('roles', 'read'), roleController.getAll);
+router.get('/:id', requirePermission('roles', 'read'), roleController.getById);
+router.post('/', requirePermission('roles', 'create'), validate(createRoleSchema), roleController.create);
+router.put('/:id', requirePermission('roles', 'update'), validate(updateRoleSchema), roleController.update);
+router.delete('/:id', requirePermission('roles', 'delete'), roleController.delete);
 
 // Atribuir permissões
-router.post('/:id/permissions', validate(assignPermissionsSchema), roleController.assignPermissions);
+router.post('/:id/permissions', requirePermission('roles', 'update'), validate(assignPermissionsSchema), roleController.assignPermissions);
 
 export default router;
