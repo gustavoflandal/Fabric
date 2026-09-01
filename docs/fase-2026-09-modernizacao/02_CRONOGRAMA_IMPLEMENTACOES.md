@@ -76,11 +76,11 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 | 3.1 | `backend/jest.config.js` + `docker-compose.test.yml` (MySQL real) + script `test:integration` | 1,5 dia | ✅ Feito |
 | 3.2 | Testes de concorrência (2 requisições paralelas) em `stock.service.ts` (`registerMovement`/`reserveForOrder`) | 3 dias | ✅ Feito |
 | 3.3 | Testes de concorrência em `counting-item.service.ts` (`count`/`recount`) | 2 dias | ✅ Feito — **achou e corrigiu um bug real** (ver nota abaixo) |
-| 3.4 | Suíte unitária `auth.service.ts`/`permission.service.ts` (login, JWT, RBAC) | 1,5 dia | 🚧 Em andamento (subagente) |
+| 3.4 | Suíte unitária `auth.service.ts`/`permission.service.ts` (login, JWT, RBAC) | 1,5 dia | ✅ Feito — a checagem de permissão de fato vive em `permission.middleware.ts`, não em `permission.service.ts` (CRUD puro); testes cobrem os dois |
 | 3.5 | Testes de integração via `supertest`: login/RBAC de ponta a ponta, concorrência de estoque via HTTP | 2-3 dias | ✅ Feito (escopo ajustado: contagem/recebimento/MRP concorrentes ficaram para uma leva futura) |
 | 3.6 | CI: rodar `build` + `type-check` (backend e frontend) + suíte de testes em todo PR | 1 dia | ✅ Feito |
 
-**Entregável:** rede de segurança mínima nos serviços de maior risco financeiro/operacional, rodando em CI.
+**Entregável:** rede de segurança mínima nos serviços de maior risco financeiro/operacional, rodando em CI. **Fase 3 concluída em 01/09/2026 — 44 testes automatizados em 8 arquivos, todos passando, rodando em CI a cada push/PR.**
 
 **Achado importante do item 3.3:** o teste de concorrência escrito para `counting-item.service.ts::count()` provou que a correção anterior (um comentário "✅ CORREÇÃO RACE CONDITION" já existente no código, cobrindo só a escrita) era incompleta — duas chamadas `count()` simultâneas no mesmo item conseguiam as duas ter sucesso, a segunda sobrescrevendo a primeira silenciosamente. Mesma classe de bug do `registerMovement()` da Fase 1. Corrigido movendo a leitura+checagem de status para dentro da transação, com `SELECT ... FOR UPDATE`. Isso reforça a lição da Fase 1: comentários "✅ CORREÇÃO" no código não são garantia sem um teste de concorrência real cobrindo.
 
