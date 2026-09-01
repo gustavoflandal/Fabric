@@ -9,6 +9,7 @@ type TransactionClient = Prisma.TransactionClient;
 export interface CreateProductionPointingDto {
   productionOrderId: string;
   operationId: string;
+  workCenterId: string;
   startTime: string;
   endTime: string;
   goodQuantity: number;
@@ -71,6 +72,7 @@ export class ProductionPointingService {
         data: {
           productionOrderId: data.productionOrderId,
           operationId: data.operationId,
+          workCenterId: data.workCenterId,
           userId,
           startTime: new Date(data.startTime),
           endTime: new Date(data.endTime),
@@ -345,21 +347,24 @@ export class ProductionPointingService {
         throw new Error('Apontamento não encontrado');
       }
 
-      // Calcular tempo decorrido se endTime foi fornecido
-      let elapsedTime = pointing.elapsedTime;
+      // Calcular tempo decorrido se endTime foi fornecido. ProductionPointing
+      // não tem um campo "elapsedTime" separado (drift antigo tentava gravar
+      // um que nunca existiu) - runTime já representa o tempo do apontamento,
+      // então recalculamos e gravamos nele.
+      let runTime = pointing.runTime;
       if (data.endTime) {
         const start = pointing.startTime;
         const end = new Date(data.endTime);
-        elapsedTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
+        runTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
       }
 
       const updated = await tx.productionPointing.update({
         where: { id },
         data: {
           endTime: data.endTime ? new Date(data.endTime) : undefined,
-          goodQty: data.goodQuantity,
-          scrapQty: data.scrapQuantity,
-          elapsedTime,
+          quantityGood: data.goodQuantity,
+          quantityScrap: data.scrapQuantity,
+          runTime,
           notes: data.notes,
         },
         include: {
@@ -418,18 +423,18 @@ export class ProductionPointingService {
         throw new Error('Apontamento já foi finalizado');
       }
 
-      // Calcular tempo decorrido
+      // Calcular tempo decorrido e gravar em runTime (ver comentário em update())
       const start = pointing.startTime;
       const end = new Date(data.endTime);
-      const elapsedTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
+      const runTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
 
       const updated = await tx.productionPointing.update({
         where: { id },
         data: {
           endTime: new Date(data.endTime),
-          goodQty: data.goodQuantity,
-          scrapQty: data.scrapQuantity || 0,
-          elapsedTime,
+          quantityGood: data.goodQuantity,
+          quantityScrap: data.scrapQuantity || 0,
+          runTime,
           notes: data.notes,
         },
         include: {
@@ -584,9 +589,9 @@ export class ProductionPointingService {
       where: { operationId },
     });
 
-    const completedQty = pointings.reduce((sum, p) => sum + p.goodQty, 0);
-    const scrapQty = pointings.reduce((sum, p) => sum + p.scrapQty, 0);
-    const actualTime = pointings.reduce((sum, p) => sum + p.elapsedTime, 0);
+    const completedQty = pointings.reduce((sum, p) => sum + p.quantityGood, 0);
+    const scrapQty = pointings.reduce((sum, p) => sum + p.quantityScrap, 0);
+    const actualTime = pointings.reduce((sum, p) => sum + p.runTime, 0);
 
     // Atualizar operação
     const operation = await tx.productionOrderOperation.update({
@@ -676,11 +681,15 @@ export class ProductionPointingService {
       status = 'IN_PROGRESS';
     }
 
+    // ✅ Fase 1 item 1.5: escrevia em `actualQuantity`, campo que nunca
+    // existiu em ProductionOrderOperation (o campo real, ja usado
+    // corretamente por updateOperationProgress/updateOrderProgress abaixo,
+    // e completedQty) - toda chamada falhava no Prisma.
     await tx.productionOrderOperation.update({
       where: { id: operationId },
       data: {
         status,
-        actualQuantity: pointed,
+        completedQty: pointed,
       },
     });
 

@@ -144,7 +144,8 @@ model WorkCenter {
   
   operations    RoutingOperation[]
   productionOperations ProductionOrderOperation[]
-  
+  productionPointings ProductionPointing[]
+
   @@map("work_centers")
 }
 
@@ -441,26 +442,29 @@ model ProductionPointing {
   id            String    @id @default(uuid())
   productionOrderId String
   operationId   String
+  workCenterId  String
   userId        String
-  
+
   quantityGood  Float
   quantityScrap Float     @default(0)
-  
+
   setupTime     Float     @default(0)
   runTime       Float
-  
+
   startTime     DateTime
   endTime       DateTime
-  
+
   notes         String?
   createdAt     DateTime  @default(now())
-  
+
   productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
   operation     ProductionOrderOperation @relation(fields: [operationId], references: [id])
+  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
   user          User      @relation(fields: [userId], references: [id])
-  
+
   @@index([productionOrderId])
   @@index([operationId])
+  @@index([workCenterId])
   @@index([userId])
   @@index([startTime])
   @@map("production_pointings")
