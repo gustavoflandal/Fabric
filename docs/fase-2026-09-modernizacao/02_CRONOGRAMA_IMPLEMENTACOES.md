@@ -40,9 +40,14 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 | 1.3 | Corrigir FK inválida `stock_movements.reference` → criar `countingSessionId` dedicado e migrar dados | 1-2 dias | ✅ Feito |
 | 1.4 | Reconciliar drift schema↔migrations: gerar migration para `warehouses`/`warehouse_structures`, corrigir `snake_case` de `counting_plan_products`/`counting_assignments`, remover migration vazia duplicada | 3-5 dias | ✅ Feito — `prisma migrate diff` confirma zero drift |
 | 1.5 | Envolver `production-pointing.service.ts` (apontamento + consumo de material + movimento de estoque + status da OP) em `$transaction` | 1-2 dias | ✅ Feito, com achado adicional: o módulo estava **totalmente inoperante** (schema drift em `workCenterId`/nomes de campo — não só falta de transação). Corrigido por completo, testado ao vivo end-to-end |
-| 1.6 | Corrigir atomicidade de `purchase-receipt.service.ts` (`cancel()`, `updateProductCosts()`) | 1 dia | 🚧 Em andamento |
+| 1.6 | Corrigir atomicidade de `purchase-receipt.service.ts` (`cancel()`, `updateProductCosts()`) | 1 dia | ✅ Feito, com o mesmo tipo de achado adicional do item 1.5: o módulo de recebimentos também estava **totalmente inoperante** (drift `purchaseOrderId`/`orderId`, `quantityReceived`/`acceptedQty`, `req.user.id` inexistente). Corrigido por completo, testado ao vivo end-to-end (criar recebimento → saldo/custo → status do pedido → cancelar → estorno → reversão de status) |
 
-**Entregável:** operações de estoque e produção consistentes sob concorrência; schema íntegro e alinhado às migrations.
+**Entregável:** operações de estoque e produção consistentes sob concorrência; schema íntegro e alinhado às migrations. **Fase 1 concluída em 01/09/2026.**
+
+### Achados novos desta fase, não corrigidos (candidatos a itens futuros do cronograma)
+
+- **Geração de número sequencial insegura**: `purchase-receipt.service.ts` gera `receiptNumber` via `purchaseReceipt.count() + 1` — não é atômico sob concorrência (duas criações simultâneas podem colidir) e reaproveita números após um cancelamento (confirmado ao vivo). O mesmo padrão (`count() + 1` para número de documento) provavelmente se repete em outros services de numeração sequencial (ex: `orderNumber` de `production-order.service.ts`/`purchase-order.service.ts`) — vale uma varredura dedicada em vez de corrigir arquivo por arquivo.
+- **Dois módulos sem nenhuma cobertura de frontend**: apontamentos de produção e recebimentos de compra têm backend funcional agora, mas nenhuma tela consome essas APIs. Fica como pendência de produto, não técnica.
 
 ---
 
