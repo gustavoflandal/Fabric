@@ -77,17 +77,8 @@ router.use('/purchase-receipts', purchaseReceiptRoutes);
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);
 
-// Rotas de contagem de estoque - TESTE
-router.get('/counting/test-direct', (_req, res) => {
-  res.json({ message: 'Direct route works!' });
-});
-
-try {
-  router.use('/counting', countingRoutes);
-  console.log('✅ Counting routes loaded successfully');
-} catch (error) {
-  console.error('❌ Error loading counting routes:', error);
-}
+// Rotas de contagem de estoque
+router.use('/counting', countingRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {
