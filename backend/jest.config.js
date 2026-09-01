@@ -8,8 +8,21 @@
 // cuida da transformação dos arquivos de TESTE, não do config).
 /** @type {import('jest').Config} */
 module.exports = {
-  preset: 'ts-jest',
   testEnvironment: 'node',
+  transform: {
+    // tsconfig.jest.json tem isolatedModules: true - transpila arquivo por
+    // arquivo sem type-check full do grafo de imports transitivo, igual o
+    // tsx (usado em `npm run dev`) já faz. Sem isso, testar qualquer service
+    // esbarra em erros de TypeScript pré-existentes em arquivos não
+    // relacionados em algum ponto da cadeia de imports (`tsc --noEmit` no
+    // projeto já tem ~70 erros pré-existentes, documentados nesta fase de
+    // modernização) - o suite inteiro ficaria impossível de rodar até esses
+    // ~70 erros serem corrigidos, o que é um trabalho separado e maior. Não
+    // é uma rede de segurança perfeita (não pega erro de tipo dentro dos
+    // próprios arquivos de teste), mas destrava testar comportamento em
+    // runtime agora.
+    '^.+\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.jest.json' }],
+  },
   rootDir: '.',
   roots: ['<rootDir>/src', '<rootDir>/tests'],
   testMatch: ['**/*.test.ts', '**/*.spec.ts'],
