@@ -113,7 +113,12 @@ export const generalLimiter = rateLimit({
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: config.nodeEnv === 'development' ? 50 : 10, // Mais flexível em dev (10 em prod, 50 em dev)
+  // Fase 3 item 3.5: 'test' também precisa de um limite alto - uma suíte de
+  // integração legitimamente faz muitas chamadas de login numa janela curta
+  // (o rate limiter é por IP e o store é compartilhado entre todos os
+  // testes do processo), sem que isso represente risco real de segurança
+  // (não é o ambiente de produção).
+  max: config.nodeEnv === 'development' || config.nodeEnv === 'test' ? 50 : 10,
   skipSuccessfulRequests: true, // Não contar logins bem-sucedidos
   message: 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.'
 });

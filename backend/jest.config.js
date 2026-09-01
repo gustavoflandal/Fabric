@@ -32,4 +32,11 @@ module.exports = {
   maxWorkers: 1,
   testTimeout: 15000,
   setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.ts'],
+  // Fase 3 item 3.5: os testes de integração importam src/app.ts, que por
+  // sua vez carrega rate-limit.middleware.ts - esse módulo tem um
+  // setInterval de limpeza (5 min, sem unref) que mantém o event loop vivo
+  // para sempre e trava o Jest no final da suite. forceExit é o jeito
+  // padrão de lidar com isso sem precisar reestruturar o middleware só por
+  // causa dos testes.
+  forceExit: true,
 };
