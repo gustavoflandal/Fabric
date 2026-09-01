@@ -41,6 +41,17 @@ export class StockServiceRefactored {
    * concorrentes do mesmo produto podiam ler o mesmo saldo "fantasma" e
    * ambas decidirem que havia estoque suficiente.
    */
+  /**
+   * Versão pública de applyMovement para chamadores externos que já têm uma
+   * transação própria e precisam que a movimentação de estoque seja
+   * atômica junto com outras escritas (ex: purchase-receipt.service.ts::
+   * cancel(), onde o estorno de estoque e a exclusão do recebimento
+   * precisam ser tudo ou nada).
+   */
+  async registerMovementInTransaction(tx: TransactionClient, data: StockMovementDto) {
+    return this.applyMovement(tx, data);
+  }
+
   private async applyMovement(tx: TransactionClient, data: StockMovementDto) {
     await tx.stockBalance.upsert({
       where: { productId: data.productId },
