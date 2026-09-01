@@ -126,52 +126,68 @@ class CountingItemService {
    * Contar item
    */
   async count(id: string, data: CountItemDTO): Promise<CountingItem> {
-    const item = await this.findById(id);
-    if (!item) {
-      throw new Error('Item de contagem não encontrado');
-    }
-
-    if (item.status !== 'PENDING') {
-      throw new Error('Item já foi contado');
-    }
-
-    // Calcular divergência
-    const difference = data.countedQty - Number(item.systemQty);
-    const differencePercent = Number(item.systemQty) > 0 
-      ? (difference / Number(item.systemQty)) * 100 
-      : 0;
-
-    // Verificar tolerância
-    const plan = item.session.plan;
-    const tolerancePercent = Number(plan.tolerancePercent) || 0;
-    const toleranceQty = plan.toleranceQty || 0;
-
-    const withinTolerance =
-      Math.abs(differencePercent) <= tolerancePercent ||
-      Math.abs(difference) <= toleranceQty;
-
-    // Determinar se há divergência significativa
-    const hasDifference = !withinTolerance && difference !== 0;
-
-    // Determinar próximo status
-    let status: CountingItemStatus = 'COUNTED';
-    let finalQty = data.countedQty;
-
-    if (!hasDifference) {
-      // Dentro da tolerância - aceitar automaticamente
-      status = 'ADJUSTED';
-      finalQty = data.countedQty;
-    } else if (plan.requireRecount) {
-      // Fora da tolerância e recontagem obrigatória
-      status = 'COUNTED';
-    } else {
-      // Fora da tolerância mas recontagem não obrigatória
-      status = 'COUNTED';
-      finalQty = data.countedQty;
-    }
-
-    // ✅ CORREÇÃO RACE CONDITION: Atualizar item e contadores em transação
+    // ✅ CORREÇÃO RACE CONDITION (Fase 3, item 3.3 do cronograma - achada por
+    // um teste de concorrência automatizado, não pela auditoria original):
+    // a versão anterior já envolvia a ESCRITA numa transação (comentário
+    // "✅ CORREÇÃO RACE CONDITION" original), mas a LEITURA que decide se o
+    // item ainda está PENDING (this.findById, fora de qualquer transação)
+    // não tinha lock nenhum. Duas chamadas count() concorrentes no mesmo
+    // item podiam ambas ler status=PENDING antes de qualquer uma escrever, e
+    // ambas conseguiam gravar por cima uma da outra - a segunda sobrescrevia
+    // silenciosamente a primeira, contando o mesmo item duas vezes. Agora a
+    // trava (SELECT ... FOR UPDATE) e a checagem de status acontecem dentro
+    // da própria transação, antes de qualquer cálculo.
     return await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM counting_items WHERE id = ${id} FOR UPDATE`;
+
+      const item = await tx.countingItem.findUnique({
+        where: { id },
+        include: { session: { include: { plan: true } } },
+      });
+
+      if (!item) {
+        throw new Error('Item de contagem não encontrado');
+      }
+
+      if (item.status !== 'PENDING') {
+        throw new Error('Item já foi contado');
+      }
+
+      // Calcular divergência
+      const difference = data.countedQty - Number(item.systemQty);
+      const differencePercent = Number(item.systemQty) > 0
+        ? (difference / Number(item.systemQty)) * 100
+        : 0;
+
+      // Verificar tolerância
+      const plan = item.session.plan;
+      const tolerancePercent = Number(plan.tolerancePercent) || 0;
+      const toleranceQty = plan.toleranceQty || 0;
+
+      const withinTolerance =
+        Math.abs(differencePercent) <= tolerancePercent ||
+        Math.abs(difference) <= toleranceQty;
+
+      // Determinar se há divergência significativa
+      const hasDifference = !withinTolerance && difference !== 0;
+
+      // Determinar próximo status
+      let status: CountingItemStatus = 'COUNTED';
+      let finalQty = data.countedQty;
+
+      if (!hasDifference) {
+        // Dentro da tolerância - aceitar automaticamente
+        status = 'ADJUSTED';
+        finalQty = data.countedQty;
+      } else if (plan.requireRecount) {
+        // Fora da tolerância e recontagem obrigatória
+        status = 'COUNTED';
+      } else {
+        // Fora da tolerância mas recontagem não obrigatória
+        status = 'COUNTED';
+        finalQty = data.countedQty;
+      }
+
       const updatedItem = await tx.countingItem.update({
         where: { id },
         data: {
@@ -222,23 +238,31 @@ class CountingItemService {
    * Recontar item
    */
   async recount(id: string, data: RecountItemDTO): Promise<CountingItem> {
-    const item = await this.findById(id);
-    if (!item) {
-      throw new Error('Item de contagem não encontrado');
-    }
-
-    if (item.status !== 'COUNTED') {
-      throw new Error('Item não está aguardando recontagem');
-    }
-
-    // Calcular divergência com a recontagem
-    const difference = data.recountQty - Number(item.systemQty);
-    const differencePercent = Number(item.systemQty) > 0 
-      ? (difference / Number(item.systemQty)) * 100 
-      : 0;
-
-    // ✅ CORREÇÃO RACE CONDITION: Atualizar item e contadores em transação
+    // ✅ CORREÇÃO RACE CONDITION (Fase 3, item 3.3 - mesmo padrão de count()
+    // acima): leitura+checagem de status movidas para dentro da transação,
+    // com lock de linha.
     return await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM counting_items WHERE id = ${id} FOR UPDATE`;
+
+      const item = await tx.countingItem.findUnique({
+        where: { id },
+        include: { session: { include: { plan: true } } },
+      });
+
+      if (!item) {
+        throw new Error('Item de contagem não encontrado');
+      }
+
+      if (item.status !== 'COUNTED') {
+        throw new Error('Item não está aguardando recontagem');
+      }
+
+      // Calcular divergência com a recontagem
+      const difference = data.recountQty - Number(item.systemQty);
+      const differencePercent = Number(item.systemQty) > 0
+        ? (difference / Number(item.systemQty)) * 100
+        : 0;
+
       const updatedItem = await tx.countingItem.update({
         where: { id },
         data: {

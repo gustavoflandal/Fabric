@@ -38,3 +38,48 @@ export async function createTestUser() {
     },
   });
 }
+
+let planCounter = 0;
+let sessionCounter = 0;
+
+export async function createTestCountingPlan(
+  creatorId: string,
+  overrides: Partial<{ tolerancePercent: number; toleranceQty: number; requireRecount: boolean }> = {}
+) {
+  planCounter += 1;
+  return testPrisma.countingPlan.create({
+    data: {
+      code: `PLAN-TEST-${planCounter}`,
+      name: `Plano de Teste ${planCounter}`,
+      type: 'CYCLIC',
+      startDate: new Date(),
+      createdBy: creatorId,
+      tolerancePercent: overrides.tolerancePercent ?? 0,
+      toleranceQty: overrides.toleranceQty ?? 0,
+      requireRecount: overrides.requireRecount ?? true,
+    },
+  });
+}
+
+export async function createTestCountingSession(planId: string) {
+  sessionCounter += 1;
+  return testPrisma.countingSession.create({
+    data: {
+      code: `SESSION-TEST-${sessionCounter}`,
+      planId,
+      scheduledDate: new Date(),
+      status: 'IN_PROGRESS',
+    },
+  });
+}
+
+export async function createTestCountingItem(sessionId: string, productId: string, systemQty: number) {
+  return testPrisma.countingItem.create({
+    data: {
+      sessionId,
+      productId,
+      systemQty,
+      status: 'PENDING',
+    },
+  });
+}
