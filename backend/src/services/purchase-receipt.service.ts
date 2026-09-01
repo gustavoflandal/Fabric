@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import stockService from './stock.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreatePurchaseReceiptDto {
   purchaseOrderId: string;
@@ -30,25 +31,26 @@ export class PurchaseReceiptService {
     });
 
     if (!order) {
-      throw new Error('Pedido de compra não encontrado');
+      throw new AppError(404, 'Pedido de compra não encontrado');
     }
 
     if (order.status === 'CANCELLED') {
-      throw new Error('Não é possível receber pedido cancelado');
+      throw new AppError(400, 'Não é possível receber pedido cancelado');
     }
 
     // Validar itens
     for (const item of data.items) {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
-      
+
       if (!orderItem) {
-        throw new Error(`Item ${item.orderItemId} não encontrado no pedido`);
+        throw new AppError(404, `Item ${item.orderItemId} não encontrado no pedido`);
       }
 
       const totalReceived = orderItem.receivedQty + item.quantityReceived;
-      
+
       if (totalReceived > orderItem.quantity) {
-        throw new Error(
+        throw new AppError(
+          400,
           `Quantidade recebida (${totalReceived}) excede quantidade pedida (${orderItem.quantity}) ` +
           `para o produto ${item.productId}`
         );
@@ -339,7 +341,7 @@ export class PurchaseReceiptService {
     });
 
     if (!receipt) {
-      throw new Error('Recebimento não encontrado');
+      throw new AppError(404, 'Recebimento não encontrado');
     }
 
     return receipt;

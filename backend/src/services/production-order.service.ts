@@ -256,7 +256,7 @@ export class ProductionOrderService {
   async changeStatus(id: string, status: string, notes?: string) {
     const order = await prisma.productionOrder.findUnique({ where: { id } });
     if (!order) {
-      throw new Error('Ordem de produção não encontrada');
+      throw new AppError(404, 'Ordem de produção não encontrada');
     }
 
     const updateData: any = { status };
@@ -296,7 +296,7 @@ export class ProductionOrderService {
   async updateProgress(id: string, producedQuantity: number, scrapQuantity: number = 0) {
     const order = await prisma.productionOrder.findUnique({ where: { id } });
     if (!order) {
-      throw new Error('Ordem de produção não encontrada');
+      throw new AppError(404, 'Ordem de produção não encontrada');
     }
 
     const updateData: any = {
@@ -326,7 +326,7 @@ export class ProductionOrderService {
     });
 
     if (!order) {
-      throw new Error('Ordem de produção não encontrada');
+      throw new AppError(404, 'Ordem de produção não encontrada');
     }
 
     // Buscar BOM ativa do produto
@@ -374,7 +374,7 @@ export class ProductionOrderService {
     });
 
     if (!order) {
-      throw new Error('Ordem de produção não encontrada');
+      throw new AppError(404, 'Ordem de produção não encontrada');
     }
 
     // Buscar Routing ativo do produto

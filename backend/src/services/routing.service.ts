@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateRoutingDto {
   productId: string;
@@ -177,7 +178,7 @@ export class RoutingService {
   async update(id: string, data: UpdateRoutingDto) {
     const routing = await prisma.routing.findUnique({ where: { id } });
     if (!routing) {
-      throw new Error('Roteiro não encontrado');
+      throw new AppError(404, 'Roteiro não encontrado');
     }
 
     // Se está ativando, desativar outros roteiros do produto
@@ -260,7 +261,7 @@ export class RoutingService {
   async calculateTotalTime(id: string, quantity: number = 1) {
     const routing = await this.getById(id);
     if (!routing) {
-      throw new Error('Roteiro não encontrado');
+      throw new AppError(404, 'Roteiro não encontrado');
     }
 
     let totalSetupTime = 0;

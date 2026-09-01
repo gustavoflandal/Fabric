@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
+import { AppError } from '../middleware/error.middleware';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -66,7 +67,8 @@ export class StockServiceRefactored {
     const delta = data.type === 'OUT' ? -data.quantity : data.quantity;
 
     if (data.type === 'OUT' && currentQty < data.quantity) {
-      throw new Error(
+      throw new AppError(
+        400,
         `Estoque insuficiente. Disponível: ${currentQty}, Solicitado: ${data.quantity}`
       );
     }
@@ -113,12 +115,12 @@ export class StockServiceRefactored {
     });
 
     if (!product) {
-      throw new Error('Produto não encontrado');
+      throw new AppError(404, 'Produto não encontrado');
     }
 
     // Validar quantidade
     if (data.quantity <= 0) {
-      throw new Error('Quantidade deve ser maior que zero');
+      throw new AppError(400, 'Quantidade deve ser maior que zero');
     }
 
     const movement = await prisma.$transaction((tx) => this.applyMovement(tx, data));
@@ -160,7 +162,7 @@ export class StockServiceRefactored {
     });
 
     if (!product) {
-      throw new Error('Produto não encontrado');
+      throw new AppError(404, 'Produto não encontrado');
     }
 
     let balanceRow = await prisma.stockBalance.findUnique({ where: { productId } });
@@ -350,7 +352,7 @@ export class StockServiceRefactored {
     const difference = newQuantity - currentBalance.quantity;
 
     if (difference === 0) {
-      throw new Error('Nova quantidade é igual à quantidade atual');
+      throw new AppError(400, 'Nova quantidade é igual à quantidade atual');
     }
 
     const type = difference > 0 ? 'IN' : 'OUT';
@@ -520,7 +522,7 @@ export class StockServiceRefactored {
     const difference = data.quantity - currentBalance.quantity;
 
     if (difference === 0) {
-      throw new Error('Nova quantidade é igual à quantidade atual');
+      throw new AppError(400, 'Nova quantidade é igual à quantidade atual');
     }
 
     const type = difference > 0 ? 'IN' : 'OUT';
@@ -551,7 +553,7 @@ export class StockServiceRefactored {
       });
 
       if (!order) {
-        throw new Error('Ordem de produção não encontrada');
+        throw new AppError(404, 'Ordem de produção não encontrada');
       }
 
       // Buscar BOM ativa do produto
@@ -570,7 +572,7 @@ export class StockServiceRefactored {
       });
 
       if (!activeBom) {
-        throw new Error('BOM ativa não encontrada para o produto');
+        throw new AppError(404, 'BOM ativa não encontrada para o produto');
       }
 
       // ✅ FASE 1: Validar TODOS os estoques antes de reservar qualquer um (fail-fast).
@@ -596,7 +598,7 @@ export class StockServiceRefactored {
         const balance = Number(locked[0]?.quantity ?? 0);
 
         if (balance < item.requiredQty) {
-          throw new Error(`Estoque insuficiente para ${item.componentCode}: disponível ${balance}, necessário ${item.requiredQty}`);
+          throw new AppError(400, `Estoque insuficiente para ${item.componentCode}: disponível ${balance}, necessário ${item.requiredQty}`);
         }
       }
 

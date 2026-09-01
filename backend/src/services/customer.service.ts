@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateCustomerDto {
   code: string;
@@ -60,7 +61,7 @@ export class CustomerService {
 
   async toggleActive(id: string) {
     const customer = await this.getById(id);
-    if (!customer) throw new Error('Cliente não encontrado');
+    if (!customer) throw new AppError(404, 'Cliente não encontrado');
     return await this.update(id, { active: !customer.active });
   }
 }

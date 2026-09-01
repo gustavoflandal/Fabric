@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import countingItemService from '../services/counting-item.service';
 
 class CountingItemController {
@@ -6,7 +6,7 @@ class CountingItemController {
    * GET /api/counting/items
    * Listar itens de contagem
    */
-  async index(req: Request, res: Response) {
+  async index(req: Request, res: Response, next: NextFunction) {
     try {
       const filters = {
         sessionId: req.query.sessionId as string,
@@ -18,7 +18,7 @@ class CountingItemController {
       const items = await countingItemService.findAll(filters);
       res.json(items);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -26,7 +26,7 @@ class CountingItemController {
    * GET /api/counting/items/:id
    * Buscar item por ID
    */
-  async show(req: Request, res: Response) {
+  async show(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const item = await countingItemService.findById(id);
@@ -37,7 +37,7 @@ class CountingItemController {
 
       res.json(item);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -45,7 +45,7 @@ class CountingItemController {
    * POST /api/counting/items/:id/count
    * Contar item
    */
-  async count(req: Request, res: Response) {
+  async count(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
@@ -63,7 +63,7 @@ class CountingItemController {
       const item = await countingItemService.count(id, data);
       res.json(item);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -71,7 +71,7 @@ class CountingItemController {
    * POST /api/counting/items/:id/recount
    * Recontar item
    */
-  async recount(req: Request, res: Response) {
+  async recount(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
@@ -89,7 +89,7 @@ class CountingItemController {
       const item = await countingItemService.recount(id, data);
       res.json(item);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -97,7 +97,7 @@ class CountingItemController {
    * POST /api/counting/items/:id/accept
    * Aceitar contagem sem recontagem
    */
-  async accept(req: Request, res: Response) {
+  async accept(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const { reason } = req.body;
@@ -105,7 +105,7 @@ class CountingItemController {
       const item = await countingItemService.accept(id, reason);
       res.json(item);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -113,7 +113,7 @@ class CountingItemController {
    * POST /api/counting/items/:id/cancel
    * Cancelar contagem de item
    */
-  async cancel(req: Request, res: Response) {
+  async cancel(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const { reason } = req.body;
@@ -121,7 +121,7 @@ class CountingItemController {
       const item = await countingItemService.cancel(id, reason);
       res.json(item);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -129,7 +129,7 @@ class CountingItemController {
    * GET /api/counting/items/pending/me
    * Buscar itens pendentes do usuário logado
    */
-  async getPendingByUser(req: Request, res: Response) {
+  async getPendingByUser(req: Request, res: Response, next: NextFunction) {
     try {
       const userId = (req as any).user?.id;
 
@@ -140,7 +140,7 @@ class CountingItemController {
       const items = await countingItemService.findPendingByUser(userId);
       res.json(items);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -148,13 +148,13 @@ class CountingItemController {
    * GET /api/counting/sessions/:sessionId/divergences
    * Buscar itens com divergência de uma sessão
    */
-  async getDivergences(req: Request, res: Response) {
+  async getDivergences(req: Request, res: Response, next: NextFunction) {
     try {
       const { sessionId } = req.params;
       const items = await countingItemService.findDivergencesBySession(sessionId);
       res.json(items);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -162,13 +162,13 @@ class CountingItemController {
    * GET /api/counting/products/:productId/stats
    * Estatísticas de contagem de um produto
    */
-  async getProductStats(req: Request, res: Response) {
+  async getProductStats(req: Request, res: Response, next: NextFunction) {
     try {
       const { productId } = req.params;
       const stats = await countingItemService.getItemStats(productId);
       res.json(stats);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 }
