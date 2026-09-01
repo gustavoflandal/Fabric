@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateWorkCenterDto {
   code: string;
@@ -53,7 +54,7 @@ export class WorkCenterService {
 
   async toggleActive(id: string) {
     const workCenter = await this.getById(id);
-    if (!workCenter) throw new Error('Centro de trabalho não encontrado');
+    if (!workCenter) throw new AppError(404, 'Centro de trabalho não encontrado');
     return await this.update(id, { active: !workCenter.active });
   }
 }

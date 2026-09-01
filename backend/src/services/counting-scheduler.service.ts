@@ -32,13 +32,21 @@ class CountingSchedulerService {
    */
   private async createSession(plan: any) {
     // Lógica para criar sessão...
-    const sessionCode = `SESS-${new Date().toISOString().slice(0,10)}-${plan.code}`;
-    
+    // ✅ Fase 4 item 4.3 do cronograma: scheduledDate truncada para meia-noite
+    // (em vez do timestamp exato de `new Date()`) - a nova constraint única
+    // @@unique([planId, scheduledDate]) em CountingSession só previne sessões
+    // duplicadas do mesmo plano no mesmo dia se a data for comparável por
+    // dia; com timestamp completo (milissegundos), duas execuções do
+    // scheduler praticamente nunca colidiriam mesmo sendo o mesmo dia.
+    const today = new Date();
+    const scheduledDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const sessionCode = `SESS-${scheduledDate.toISOString().slice(0,10)}-${plan.code}`;
+
     await prisma.countingSession.create({
       data: {
         code: sessionCode,
         planId: plan.id,
-        scheduledDate: new Date(),
+        scheduledDate,
         status: 'SCHEDULED'
       }
     });

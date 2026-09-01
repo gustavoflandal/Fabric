@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface MRPRequirement {
   productId: string;
@@ -36,7 +37,7 @@ export class MRPService {
     });
 
     if (!order) {
-      throw new Error('Ordem de produção não encontrada');
+      throw new AppError(404, 'Ordem de produção não encontrada');
     }
 
     // Buscar BOM ativa do produto

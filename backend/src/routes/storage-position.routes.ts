@@ -2,6 +2,8 @@ import { Router } from 'express';
 import * as storagePositionController from '../controllers/storage-position.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
+import { validate } from '../middleware/validation.middleware';
+import { updateStoragePositionSchema } from '../validators/storage-position.validator';
 
 const router = Router();
 
@@ -33,6 +35,7 @@ router.delete(
 router.put(
   '/position/:positionId',
   requirePermission('storage_positions', 'update'),
+  validate(updateStoragePositionSchema),
   storagePositionController.updatePosition
 );
 

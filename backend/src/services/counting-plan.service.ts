@@ -1,4 +1,5 @@
 import { PrismaClient, CountingPlan, CountingType, CountingFrequency, CountingPlanStatus } from '@prisma/client';
+import { AppError } from '../middleware/error.middleware';
 
 const prisma = new PrismaClient();
 
@@ -161,7 +162,7 @@ class CountingPlanService {
   async update(id: string, data: UpdateCountingPlanDTO): Promise<CountingPlan> {
     const plan = await this.findById(id);
     if (!plan) {
-      throw new Error('Plano de contagem não encontrado');
+      throw new AppError(404, 'Plano de contagem não encontrado');
     }
 
     // Remover campos que não devem ser atualizados
@@ -206,11 +207,11 @@ class CountingPlanService {
   async activate(id: string): Promise<CountingPlan> {
     const plan = await this.findById(id);
     if (!plan) {
-      throw new Error('Plano de contagem não encontrado');
+      throw new AppError(404, 'Plano de contagem não encontrado');
     }
 
     if (plan.status === 'ACTIVE') {
-      throw new Error('Plano já está ativo');
+      throw new AppError(409, 'Plano já está ativo');
     }
 
     return await prisma.countingPlan.update({
@@ -252,12 +253,12 @@ class CountingPlanService {
   async delete(id: string): Promise<void> {
     const plan = await this.findById(id);
     if (!plan) {
-      throw new Error('Plano de contagem não encontrado');
+      throw new AppError(404, 'Plano de contagem não encontrado');
     }
 
     // Verificar se tem sessões
     if (plan.sessions && plan.sessions.length > 0) {
-      throw new Error('Não é possível deletar plano com sessões vinculadas');
+      throw new AppError(409, 'Não é possível deletar plano com sessões vinculadas');
     }
 
     await prisma.countingPlan.delete({
@@ -271,7 +272,7 @@ class CountingPlanService {
   async selectProducts(planId: string) {
     const plan = await this.findById(planId);
     if (!plan) {
-      throw new Error('Plano de contagem não encontrado');
+      throw new AppError(404, 'Plano de contagem não encontrado');
     }
 
     const criteria = plan.criteria as any;
@@ -395,7 +396,7 @@ class CountingPlanService {
   async updateNextExecution(id: string) {
     const plan = await this.findById(id);
     if (!plan) {
-      throw new Error('Plano não encontrado');
+      throw new AppError(404, 'Plano não encontrado');
     }
 
     const nextExecution = this.calculateNextExecution(new Date(), plan.frequency);

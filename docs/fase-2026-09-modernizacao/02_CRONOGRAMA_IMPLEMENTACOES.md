@@ -21,7 +21,7 @@ Não espera sprint planning. São correções pequenas e isoladas com risco de s
 | 0.5 | Removidos `stock.service.old.ts` e a rota de debug `/counting/test-direct` | Limpeza | 1h | ✅ Feito |
 
 **Pendências operacionais pós-Sprint 0** (fora do escopo de código, para quem for aplicar em outros ambientes):
-- Aplicar as novas credenciais (MySQL e JWT) em qualquer ambiente além desta máquina de desenvolvimento (produção, CI, outras estações) — os valores antigos vazados no git não devem ser reaproveitados em lugar nenhum.
+- Aplicar as novas credenciais (MySQL e JWT) em qualquer ambiente além desta máquina de desenvolvimento (produção, CI, outs estações) — os valores antigos vazados no git não devem ser reaproveitados em lugar nenhum.
 - Sessões de usuário existentes foram invalidadas pela troca dos JWT secrets (esperado).
 - Avaliar se vale reescrever o histórico do git para remover o segredo antigo do commit `14b5294` (não feito aqui por ser uma operação destrutiva separada — ver commit `a6f6dee`).
 
@@ -33,61 +33,72 @@ Não espera sprint planning. São correções pequenas e isoladas com risco de s
 
 O núcleo do problema: estoque sem saldo persistido e sem lock.
 
-| # | Ação | Esforço | Depende de |
+| # | Ação | Esforço | Status |
 |---|---|---|---|
-| 1.1 | Desenhar e migrar `StockBalance` (saldo por produto/posição) com campo `version` | 1 semana | — |
-| 1.2 | Reescrever `stock.service.ts::getBalance`/`registerMovement` para ler/escrever a linha de saldo dentro de transação com lock otimista | 1 semana | 1.1 |
-| 1.3 | Corrigir FK inválida `stock_movements.reference` → criar `countingSessionId` dedicado e migrar dados | 1-2 dias | — |
-| 1.4 | Reconciliar drift schema↔migrations: gerar migration para `warehouses`/`warehouse_structures`, corrigir `snake_case` de `counting_plan_products`/`counting_assignments`, remover migration vazia duplicada | 3-5 dias | — |
-| 1.5 | Envolver `production-pointing.service.ts` (apontamento + consumo de material + movimento de estoque + status da OP) em `$transaction` | 1-2 dias | 1.2 |
-| 1.6 | Corrigir atomicidade de `purchase-receipt.service.ts` (`cancel()`, `updateProductCosts()`) | 1 dia | 1.2 |
+| 1.1 | Desenhar e migrar `StockBalance` (saldo por produto/posição) com campo `version` | 1 semana | ✅ Feito |
+| 1.2 | Reescrever `stock.service.ts::getBalance`/`registerMovement` para ler/escrever a linha de saldo dentro de transação com lock otimista | 1 semana | ✅ Feito — testado ao vivo com 5 requisições concorrentes (ver commit) |
+| 1.3 | Corrigir FK inválida `stock_movements.reference` → criar `countingSessionId` dedicado e migrar dados | 1-2 dias | ✅ Feito |
+| 1.4 | Reconciliar drift schema↔migrations: gerar migration para `warehouses`/`warehouse_structures`, corrigir `snake_case` de `counting_plan_products`/`counting_assignments`, remover migration vazia duplicada | 3-5 dias | ✅ Feito — `prisma migrate diff` confirma zero drift |
+| 1.5 | Envolver `production-pointing.service.ts` (apontamento + consumo de material + movimento de estoque + status da OP) em `$transaction` | 1-2 dias | ✅ Feito, com achado adicional: o módulo estava **totalmente inoperante** (schema drift em `workCenterId`/nomes de campo — não só falta de transação). Corrigido por completo, testado ao vivo end-to-end |
+| 1.6 | Corrigir atomicidade de `purchase-receipt.service.ts` (`cancel()`, `updateProductCosts()`) | 1 dia | ✅ Feito, com o mesmo tipo de achado adicional do item 1.5: o módulo de recebimentos também estava **totalmente inoperante** (drift `purchaseOrderId`/`orderId`, `quantityReceived`/`acceptedQty`, `req.user.id` inexistente). Corrigido por completo, testado ao vivo end-to-end (criar recebimento → saldo/custo → status do pedido → cancelar → estorno → reversão de status) |
 
-**Entregável:** operações de estoque e produção consistentes sob concorrência; schema íntegro e alinhado às migrations.
+**Entregável:** operações de estoque e produção consistentes sob concorrência; schema íntegro e alinhado às migrations. **Fase 1 concluída em 01/09/2026.**
+
+### Achados novos desta fase, não corrigidos (candidatos a itens futuros do cronograma)
+
+- **Geração de número sequencial insegura**: `purchase-receipt.service.ts` gera `receiptNumber` via `purchaseReceipt.count() + 1` — não é atômico sob concorrência (duas criações simultâneas podem colidir) e reaproveita números após um cancelamento (confirmado ao vivo). O mesmo padrão (`count() + 1` para número de documento) provavelmente se repete em outros services de numeração sequencial (ex: `orderNumber` de `production-order.service.ts`/`purchase-order.service.ts`) — vale uma varredura dedicada em vez de corrigir arquivo por arquivo.
+- **Dois módulos sem nenhuma cobertura de frontend**: apontamentos de produção e recebimentos de compra têm backend funcional agora, mas nenhuma tela consome essas APIs. Fica como pendência de produto, não técnica.
 
 ---
 
 ## Fase 2 — RBAC, validação e autenticação completas (Semanas 4-5, 29/09 a 10/10/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 2.1 | Estender `requirePermission` aos ~20 módulos restantes (stock, production-order, mrp, reports, bom, routing, product, supplier, customer, work-center, dashboard, etc.) | 2 dias |
-| 2.2 | Ampliar `validators/` para os endpoints hoje sem schema (stock, counting, purchase-receipt, mrp, warehouse) | 2-3 dias |
-| 2.3 | Refresh tokens persistidos (tabela com `jti`, hash, expiração, `revokedAt`), rotação no refresh, revogação real no logout | 3 dias |
-| 2.4 | Rate limit em `/auth/refresh`; senha mínima 12 chars com complexidade; lockout de conta | 1-2 dias |
-| 2.5 | Auditoria cobrindo login/logout/falha de auth; `app.set('trust proxy', 1)`; restringir/remover `DELETE /audit-logs/clean` | 1 dia |
-| 2.6 | CORS via variável de ambiente (remover hardcode de localhost) | 2h |
-| 2.7 | Teste de integração/lint customizado que falha o CI se uma rota mutante não tiver `requirePermission` (evita regressão dos itens 0.1/2.1) | 1 dia |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 2.1 | Estender `requirePermission` aos ~20 módulos restantes (stock, production-order, mrp, reports, bom, routing, product, supplier, customer, work-center, dashboard, etc.) | 2 dias | ✅ Feito — 18 arquivos de rotas, testado com admin (200) e usuário sem perfil (403) |
+| 2.2 | Ampliar `validators/` para os endpoints hoje sem schema (stock, counting, purchase-receipt, mrp, warehouse) | 2-3 dias | 🟡 Parcial — stock, purchase-receipt, warehouse/warehouse-structure/storage-position feitos. `counting.routes.ts` (28 endpoints) e `mrp.routes.ts` ficaram de fora por escopo |
+| 2.3 | Refresh tokens persistidos (tabela com `jti`, hash, expiração, `revokedAt`), rotação no refresh, revogação real no logout | 3 dias | ✅ Feito — testado ao vivo: rotação, reuso rejeitado, logout revoga |
+| 2.4 | Rate limit em `/auth/refresh`; senha mínima 12 chars com complexidade; lockout de conta | 1-2 dias | ✅ Feito — testado ao vivo: bloqueio após 5 tentativas (423), senha fraca rejeitada (400) |
+| 2.5 | Auditoria cobrindo login/logout/falha de auth; IP não mais forjável; restringir leitura/exclusão de `audit-logs` | 1 dia | ✅ Feito — `trust proxy` deliberadamente **não** habilitado (ver nota abaixo); `getIpAddress` trocado para `req.ip` em vez de headers forjáveis |
+| 2.6 | CORS via variável de ambiente (remover hardcode de localhost) | 2h | ✅ Feito |
+| 2.7 | Teste de integração/lint customizado que falha o CI se uma rota mutante não tiver `requirePermission` | 1 dia | ⏸️ Adiado — depende da Fase 3 (fundação de testes ainda não existe) |
 
-**Entregável:** toda escrita da API exige a permissão correta; sessão de usuário auditável e revogável.
+**Entregável:** toda escrita da API exige a permissão correta; sessão de usuário auditável e revogável. **Fase 2 concluída em 01/09/2026** (itens 2.2 parcial e 2.7 adiado, ver acima).
+
+**Nota sobre `trust proxy`:** a recomendação original era `app.set('trust proxy', 1)`. Na implementação, avaliamos a topologia atual (`docker-compose.yml` — backend exposto direto, sem reverse proxy na frente) e concluímos que habilitar isso SEM um proxy real na frente tornaria o IP mais fácil de forjar, não mais difícil. Optamos por usar `req.ip`/`req.socket.remoteAddress` sem confiar em `X-Forwarded-For`, e deixamos documentado no código para habilitar `trust proxy` se um reverse proxy real for adicionado em produção.
 
 ---
 
 ## Fase 3 — Fundação de testes automatizados (Semanas 6-7, 13/10 a 24/10/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 3.1 | `backend/jest.config.ts` + `docker-compose.test.yml` (MySQL real) + script `test:integration` | 1,5 dia |
-| 3.2 | Testes de concorrência (2 requisições paralelas) em `stock.service.ts` (`registerMovement`/`reserveForOrder`) | 3 dias |
-| 3.3 | Testes de concorrência em `counting-item.service.ts` (`count`/`recount`) | 2 dias |
-| 3.4 | Suíte unitária `auth.service.ts`/`permission.service.ts` (login, JWT, RBAC) | 1,5 dia |
-| 3.5 | Testes de integração via `supertest`: login, movimentação de estoque concorrente, contagem concorrente, recebimento parcial de compra, execução de MRP | 2-3 dias |
-| 3.6 | CI: rodar `build` + `type-check` (backend e frontend) + suíte de testes em todo PR | 1 dia |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 3.1 | `backend/jest.config.js` + `docker-compose.test.yml` (MySQL real) + script `test:integration` | 1,5 dia | ✅ Feito |
+| 3.2 | Testes de concorrência (2 requisições paralelas) em `stock.service.ts` (`registerMovement`/`reserveForOrder`) | 3 dias | ✅ Feito |
+| 3.3 | Testes de concorrência em `counting-item.service.ts` (`count`/`recount`) | 2 dias | ✅ Feito — **achou e corrigiu um bug real** (ver nota abaixo) |
+| 3.4 | Suíte unitária `auth.service.ts`/`permission.service.ts` (login, JWT, RBAC) | 1,5 dia | ✅ Feito — a checagem de permissão de fato vive em `permission.middleware.ts`, não em `permission.service.ts` (CRUD puro); testes cobrem os dois |
+| 3.5 | Testes de integração via `supertest`: login/RBAC de ponta a ponta, concorrência de estoque via HTTP | 2-3 dias | ✅ Feito (escopo ajustado: contagem/recebimento/MRP concorrentes ficaram para uma leva futura) |
+| 3.6 | CI: rodar `build` + `type-check` (backend e frontend) + suíte de testes em todo PR | 1 dia | ✅ Feito |
 
-**Entregável:** rede de segurança mínima nos serviços de maior risco financeiro/operacional, rodando em CI.
+**Entregável:** rede de segurança mínima nos serviços de maior risco financeiro/operacional, rodando em CI. **Fase 3 concluída em 01/09/2026 — 44 testes automatizados em 8 arquivos, todos passando, rodando em CI a cada push/PR.**
+
+**Achado importante do item 3.3:** o teste de concorrência escrito para `counting-item.service.ts::count()` provou que a correção anterior (um comentário "✅ CORREÇÃO RACE CONDITION" já existente no código, cobrindo só a escrita) era incompleta — duas chamadas `count()` simultâneas no mesmo item conseguiam as duas ter sucesso, a segunda sobrescrevendo a primeira silenciosamente. Mesma classe de bug do `registerMovement()` da Fase 1. Corrigido movendo a leitura+checagem de status para dentro da transação, com `SELECT ... FOR UPDATE`. Isso reforça a lição da Fase 1: comentários "✅ CORREÇÃO" no código não são garantia sem um teste de concorrência real cobrindo.
 
 ---
 
 ## Fase 4 — Qualidade de dados e performance (Semanas 8-9, 27/10 a 07/11/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 4.1 | Migrar `Float` → `Decimal` em quantidades e custos, por domínio, começando por estoque e compras | 1 semana |
-| 4.2 | Adicionar `version Int` (lock otimista) em `ProductionOrder`, `ProductionOrderOperation`, `CountingItem`, `CountingSession`, `PurchaseOrderItem` | 1 semana |
-| 4.3 | Índices compostos faltantes (`stock_movements`, `audit_logs`, `production_pointings`, `production_orders`) + constraints únicas faltantes (`CountingItem`, `BOMItem`, `RoutingOperation`, `Supplier.document`, `Customer.document`) | 2-3 dias |
-| 4.4 | Padronizar tratamento de erros: `AppError` em todos os services, remover `try/catch` locais nos controllers em favor de `next(err)`/`asyncHandler` | 2-3 dias |
-| 4.5 | FKs de auditoria: `createdBy`/`approvedBy`/`receivedBy` apontando para `users` | 1 dia |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 4.1 | Migrar `Float` → `Decimal` em quantidades e custos, por domínio, começando por estoque e compras | 1 semana | ⏸️ Adiado deliberadamente — ver nota abaixo |
+| 4.2 | Adicionar `version Int` (lock otimista) em `ProductionOrder`, `ProductionOrderOperation`, `CountingItem`, `CountingSession`, `PurchaseOrderItem` | 1 semana | 🟡 Parcial — coluna em todos os 5 models; checagem de fato (compare-and-swap) só ligada em `production-order.service.ts::update()` por enquanto |
+| 4.3 | Índices compostos faltantes (`stock_movements`, `audit_logs`, `production_pointings`, `production_orders`) + constraints únicas faltantes (`CountingItem`, `BOMItem`, `RoutingOperation`, `Supplier.document`, `Customer.document`) | 2-3 dias | ✅ Feito |
+| 4.4 | Padronizar tratamento de erros: `AppError` em todos os services, remover `try/catch` locais nos controllers em favor de `next(err)`/`asyncHandler` | 2-3 dias | ✅ Feito — 18 services + 7 controllers, confirmado ao vivo (`Estoque insuficiente` agora 400, não mais 500) |
+| 4.5 | FKs de auditoria: `createdBy`/`approvedBy`/`receivedBy` apontando para `users` | 1 dia | ✅ Feito |
 
-**Entregável:** dados financeiros/de estoque com precisão correta, sem writes concorrentes perdidos, API com contrato de erro único.
+**Entregável:** dados financeiros/de estoque com precisão correta, sem writes concorrentes perdidos, API com contrato de erro único. **Fase 4 concluída em 01/09/2026** (exceto 4.1, adiado deliberadamente, e 4.2 parcial — ambos com justificativa acima).
+
+**Nota sobre o item 4.1 (adiado):** é o item de maior risco de todo o cronograma até aqui. Trocar `Float` por `Decimal` não é só uma migration de schema - exige reescrever a aritmética em todo lugar que lê/escreve esses campos (Prisma `Decimal` não aceita `+`/`-`/`*` direto como `number`, precisa de `.plus()`/`.minus()`/conversão explícita), e a serialização JSON de `Decimal` é uma STRING por padrão, não um número - qualquer frontend que hoje espera um `number` desses campos (ex: `ProductsView.vue`, exibição de custos) quebraria silenciosamente sem uma revisão cuidadosa de cada consumidor. Diferente dos outros itens desta fase, isso não é seguro de fazer em escopo reduzido "só para testar" - fazer errado é pior do que não fazer. Recomendação: tratar como uma fase própria, focada, com tempo para revisar cada consumidor (frontend e services) por domínio, começando por `Product.standardCost/lastCost/averageCost` e os campos de `PurchaseOrder`/`PurchaseOrderItem`.
 
 ---
 

@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateWarehouseDto {
   code: string;
@@ -62,7 +63,7 @@ export class WarehouseService {
 
   async toggleActive(id: string) {
     const warehouse = await this.getById(id);
-    if (!warehouse) throw new Error('Armazém não encontrado');
+    if (!warehouse) throw new AppError(404, 'Armazém não encontrado');
 
     return await prisma.warehouse.update({
       where: { id },

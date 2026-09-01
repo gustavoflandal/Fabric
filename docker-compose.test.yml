@@ -1,0 +1,26 @@
+# Fase 3 do cronograma (docs/fase-2026-09-modernizacao/02_CRONOGRAMA_IMPLEMENTACOES.md,
+# item 3.1): banco MySQL real e efêmero para os testes de integração/concorrência.
+# Deliberadamente NÃO usa SQLite in-memory nem mocks do Prisma: os testes mais
+# importantes (stock.service.ts, counting-item.service.ts) validam
+# comportamento de transação/lock que só existe no banco real (ver
+# ANALISE_FALHAS_SISTEMA.md e a Fase 1 do cronograma).
+services:
+  mysql-test:
+    image: mysql:8.0
+    container_name: fabric-mysql-test
+    environment:
+      MYSQL_ROOT_PASSWORD: test_root_only_ephemeral
+      MYSQL_DATABASE: fabric_test
+      MYSQL_USER: fabric_test
+      MYSQL_PASSWORD: test_password_only_ephemeral
+    ports:
+      - "3307:3306"
+    tmpfs:
+      # Dados em memória - banco de teste não precisa (nem deve) persistir
+      # entre execuções.
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

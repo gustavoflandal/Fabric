@@ -1,11 +1,16 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import materialConsumptionService from './material-consumption.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
+import { AppError } from '../middleware/error.middleware';
+
+type TransactionClient = Prisma.TransactionClient;
 
 export interface CreateProductionPointingDto {
   productionOrderId: string;
   operationId: string;
+  workCenterId: string;
   startTime: string;
   endTime: string;
   goodQuantity: number;
@@ -31,91 +36,98 @@ export interface FinishPointingDto {
 
 export class ProductionPointingService {
   async create(data: CreateProductionPointingDto, userId: string) {
-    // Verificar se a ordem existe
-    const order = await prisma.productionOrder.findUnique({
-      where: { id: data.productionOrderId },
+    // ✅ CORREÇÃO RACE CONDITION (Fase 1, item 1.5): criação do apontamento +
+    // validação de quantidade + status da operação/OP agora são atômicos.
+    // Antes, a validação "não pode exceder a OP" lia getTotalPointed() fora de
+    // transação - dois apontamentos concorrentes na mesma OP podiam ambos
+    // passar na validação e só depois de escritos, juntos, ultrapassar a
+    // quantidade da OP. O consumo de materiais continua fora da transação de
+    // propósito: é best-effort por design (ver comentário abaixo), travar a
+    // criação do apontamento a ele mudaria esse comportamento deliberado.
+    const { pointing, statusEvent, orderCompletedId } = await prisma.$transaction(async (tx) => {
+      const order = await tx.productionOrder.findUnique({
+        where: { id: data.productionOrderId },
+      });
+
+      if (!order) {
+        throw new AppError(404, 'Ordem de produção não encontrada');
+      }
+
+      const operation = await tx.productionOrderOperation.findUnique({
+        where: { id: data.operationId },
+      });
+
+      if (!operation) {
+        throw new AppError(404, 'Operação não encontrada');
+      }
+
+      // VALIDAÇÃO 1: Quantidade não pode exceder OP
+      const totalPointed = await this.getTotalPointed(data.productionOrderId, tx);
+      if (totalPointed + data.goodQuantity > order.quantity) {
+        throw new AppError(
+          400,
+          `Quantidade apontada (${totalPointed + data.goodQuantity}) excede quantidade da OP (${order.quantity})`
+        );
+      }
+
+      const pointing = await tx.productionPointing.create({
+        data: {
+          productionOrderId: data.productionOrderId,
+          operationId: data.operationId,
+          workCenterId: data.workCenterId,
+          userId,
+          startTime: new Date(data.startTime),
+          endTime: new Date(data.endTime),
+          quantityGood: data.goodQuantity || 0,
+          quantityScrap: data.scrapQuantity || 0,
+          setupTime: data.setupTime || 0,
+          runTime: data.runTime,
+          notes: data.notes,
+        },
+        include: {
+          productionOrder: {
+            select: {
+              id: true,
+              orderNumber: true,
+              product: { select: { code: true, name: true } },
+            },
+          },
+          operation: {
+            select: {
+              id: true,
+              sequence: true,
+              description: true,
+            },
+          },
+          workCenter: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      const statusEvent = await this.updateOperationStatus(data.operationId, tx);
+      const orderCompletedId = await this.checkOrderCompletion(data.productionOrderId, tx);
+
+      return { pointing, statusEvent, orderCompletedId };
     });
 
-    if (!order) {
-      throw new Error('Ordem de produção não encontrada');
-    }
-
-    // Verificar se a operação existe
-    const operation = await prisma.productionOrderOperation.findUnique({
-      where: { id: data.operationId },
-    });
-
-    if (!operation) {
-      throw new Error('Operação não encontrada');
-    }
-
-    // VALIDAÇÃO 1: Quantidade não pode exceder OP
-    const totalPointed = await this.getTotalPointed(data.productionOrderId);
-    if (totalPointed + data.goodQuantity > order.quantity) {
-      throw new Error(
-        `Quantidade apontada (${totalPointed + data.goodQuantity}) excede quantidade da OP (${order.quantity})`
-      );
-    }
-
-    // VALIDAÇÃO 2: Verificar refugo alto
+    // VALIDAÇÃO 2: Verificar refugo alto (não depende de estado concorrente)
     const scrapRate = data.scrapQuantity ? (data.scrapQuantity / data.goodQuantity) * 100 : 0;
     const hasHighScrap = scrapRate > 10;
 
-    // Calcular tempo decorrido se endTime foi fornecido
-    let elapsedTime = 0;
-    if (data.endTime) {
-      const start = new Date(data.startTime);
-      const end = new Date(data.endTime);
-      elapsedTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
-    }
-
-    // Criar apontamento
-    const pointing = await prisma.productionPointing.create({
-      data: {
-        productionOrderId: data.productionOrderId,
-        operationId: data.operationId,
-        userId,
-        startTime: new Date(data.startTime),
-        endTime: new Date(data.endTime),
-        quantityGood: data.goodQuantity || 0,
-        quantityScrap: data.scrapQuantity || 0,
-        setupTime: data.setupTime || 0,
-        runTime: data.runTime,
-        notes: data.notes,
-      },
-      include: {
-        productionOrder: {
-          select: {
-            id: true,
-            orderNumber: true,
-            product: { select: { code: true, name: true } },
-          },
-        },
-        operation: {
-          select: {
-            id: true,
-            sequence: true,
-            description: true,
-          },
-        },
-        workCenter: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    // ✅ INTEGRAÇÃO: Consumir materiais automaticamente
+    // ✅ INTEGRAÇÃO: Consumir materiais automaticamente (best-effort,
+    // deliberadamente fora da transação acima - ver comentário no início do método)
     try {
       await materialConsumptionService.consumeMaterials(pointing.id, userId);
       console.log(`[ProductionPointing] Materiais consumidos para apontamento ${pointing.id}`);
@@ -143,11 +155,26 @@ export class ProductionPointingService {
       });
     }
 
-    // ✅ INTEGRAÇÃO: Atualizar status da operação
-    await this.updateOperationStatus(data.operationId);
+    // Eventos de status da operação/OP, emitidos após o commit da transação
+    if (statusEvent?.event === 'COMPLETED') {
+      await eventBus.emit(SystemEvents.PRODUCTION_OPERATION_COMPLETED, {
+        operationId: statusEvent.operationId,
+        productionOrderId: statusEvent.productionOrderId,
+        actualQuantity: statusEvent.actualQuantity,
+      });
+    } else if (statusEvent?.event === 'STARTED') {
+      await eventBus.emit(SystemEvents.PRODUCTION_OPERATION_STARTED, {
+        operationId: statusEvent.operationId,
+        productionOrderId: statusEvent.productionOrderId,
+      });
+    }
 
-    // ✅ INTEGRAÇÃO: Verificar conclusão da OP
-    await this.checkOrderCompletion(data.productionOrderId);
+    if (orderCompletedId) {
+      await eventBus.emit(SystemEvents.PRODUCTION_ORDER_COMPLETED, {
+        productionOrderId: orderCompletedId,
+      });
+      console.log(`[ProductionPointing] OP ${orderCompletedId} concluída!`);
+    }
 
     // ✅ EVENT: Emitir evento de apontamento criado
     await eventBus.emit(SystemEvents.PRODUCTION_POINTING_CREATED, {
@@ -311,147 +338,162 @@ export class ProductionPointingService {
   }
 
   async update(id: string, data: UpdateProductionPointingDto) {
-    const pointing = await prisma.productionPointing.findUnique({
-      where: { id },
+    // ✅ CORREÇÃO RACE CONDITION (Fase 1, item 1.5): atualização do apontamento
+    // + recálculo de progresso da operação/OP na mesma transação.
+    return await prisma.$transaction(async (tx) => {
+      const pointing = await tx.productionPointing.findUnique({
+        where: { id },
+      });
+
+      if (!pointing) {
+        throw new AppError(404, 'Apontamento não encontrado');
+      }
+
+      // Calcular tempo decorrido se endTime foi fornecido. ProductionPointing
+      // não tem um campo "elapsedTime" separado (drift antigo tentava gravar
+      // um que nunca existiu) - runTime já representa o tempo do apontamento,
+      // então recalculamos e gravamos nele.
+      let runTime = pointing.runTime;
+      if (data.endTime) {
+        const start = pointing.startTime;
+        const end = new Date(data.endTime);
+        runTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
+      }
+
+      const updated = await tx.productionPointing.update({
+        where: { id },
+        data: {
+          endTime: data.endTime ? new Date(data.endTime) : undefined,
+          quantityGood: data.goodQuantity,
+          quantityScrap: data.scrapQuantity,
+          runTime,
+          notes: data.notes,
+        },
+        include: {
+          productionOrder: {
+            select: {
+              id: true,
+              orderNumber: true,
+              product: { select: { code: true, name: true } },
+            },
+          },
+          operation: {
+            select: {
+              id: true,
+              sequence: true,
+              description: true,
+            },
+          },
+          workCenter: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Se o apontamento foi finalizado, atualizar a operação
+      if (data.endTime && !pointing.endTime) {
+        await this.updateOperationProgress(pointing.operationId, tx);
+      }
+
+      return updated;
     });
-
-    if (!pointing) {
-      throw new Error('Apontamento não encontrado');
-    }
-
-    // Calcular tempo decorrido se endTime foi fornecido
-    let elapsedTime = pointing.elapsedTime;
-    if (data.endTime) {
-      const start = pointing.startTime;
-      const end = new Date(data.endTime);
-      elapsedTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
-    }
-
-    const updated = await prisma.productionPointing.update({
-      where: { id },
-      data: {
-        endTime: data.endTime ? new Date(data.endTime) : undefined,
-        goodQty: data.goodQuantity,
-        scrapQty: data.scrapQuantity,
-        elapsedTime,
-        notes: data.notes,
-      },
-      include: {
-        productionOrder: {
-          select: {
-            id: true,
-            orderNumber: true,
-            product: { select: { code: true, name: true } },
-          },
-        },
-        operation: {
-          select: {
-            id: true,
-            sequence: true,
-            description: true,
-          },
-        },
-        workCenter: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-
-    // Se o apontamento foi finalizado, atualizar a operação
-    if (data.endTime && !pointing.endTime) {
-      await this.updateOperationProgress(pointing.operationId);
-    }
-
-    return updated;
   }
 
   async finish(id: string, data: FinishPointingDto) {
-    const pointing = await prisma.productionPointing.findUnique({
-      where: { id },
+    // ✅ CORREÇÃO RACE CONDITION (Fase 1, item 1.5): finalização do apontamento
+    // + recálculo de progresso na mesma transação.
+    return await prisma.$transaction(async (tx) => {
+      const pointing = await tx.productionPointing.findUnique({
+        where: { id },
+      });
+
+      if (!pointing) {
+        throw new AppError(404, 'Apontamento não encontrado');
+      }
+
+      if (pointing.endTime) {
+        throw new AppError(409, 'Apontamento já foi finalizado');
+      }
+
+      // Calcular tempo decorrido e gravar em runTime (ver comentário em update())
+      const start = pointing.startTime;
+      const end = new Date(data.endTime);
+      const runTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
+
+      const updated = await tx.productionPointing.update({
+        where: { id },
+        data: {
+          endTime: new Date(data.endTime),
+          quantityGood: data.goodQuantity,
+          quantityScrap: data.scrapQuantity || 0,
+          runTime,
+          notes: data.notes,
+        },
+        include: {
+          productionOrder: {
+            select: {
+              id: true,
+              orderNumber: true,
+              product: { select: { code: true, name: true } },
+            },
+          },
+          operation: {
+            select: {
+              id: true,
+              sequence: true,
+              description: true,
+            },
+          },
+          workCenter: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      // Atualizar progresso da operação
+      await this.updateOperationProgress(pointing.operationId, tx);
+
+      return updated;
     });
-
-    if (!pointing) {
-      throw new Error('Apontamento não encontrado');
-    }
-
-    if (pointing.endTime) {
-      throw new Error('Apontamento já foi finalizado');
-    }
-
-    // Calcular tempo decorrido
-    const start = pointing.startTime;
-    const end = new Date(data.endTime);
-    const elapsedTime = (end.getTime() - start.getTime()) / 1000 / 60; // em minutos
-
-    const updated = await prisma.productionPointing.update({
-      where: { id },
-      data: {
-        endTime: new Date(data.endTime),
-        goodQty: data.goodQuantity,
-        scrapQty: data.scrapQuantity || 0,
-        elapsedTime,
-        notes: data.notes,
-      },
-      include: {
-        productionOrder: {
-          select: {
-            id: true,
-            orderNumber: true,
-            product: { select: { code: true, name: true } },
-          },
-        },
-        operation: {
-          select: {
-            id: true,
-            sequence: true,
-            description: true,
-          },
-        },
-        workCenter: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-        user: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
-
-    // Atualizar progresso da operação
-    await this.updateOperationProgress(pointing.operationId);
-
-    return updated;
   }
 
   async delete(id: string) {
-    const pointing = await prisma.productionPointing.findUnique({
-      where: { id },
+    // ✅ CORREÇÃO RACE CONDITION (Fase 1, item 1.5): exclusão do apontamento
+    // + recálculo de progresso na mesma transação.
+    await prisma.$transaction(async (tx) => {
+      const pointing = await tx.productionPointing.findUnique({
+        where: { id },
+      });
+
+      if (!pointing) {
+        throw new AppError(404, 'Apontamento não encontrado');
+      }
+
+      await tx.productionPointing.delete({ where: { id } });
+
+      // Atualizar progresso da operação
+      await this.updateOperationProgress(pointing.operationId, tx);
     });
-
-    if (!pointing) {
-      throw new Error('Apontamento não encontrado');
-    }
-
-    await prisma.productionPointing.delete({ where: { id } });
-
-    // Atualizar progresso da operação
-    await this.updateOperationProgress(pointing.operationId);
   }
 
   async getByOrder(orderId: string) {
@@ -526,18 +568,35 @@ export class ProductionPointingService {
     });
   }
 
-  private async updateOperationProgress(operationId: string) {
+  // ✅ CORREÇÃO RACE CONDITION (Fase 1, item 1.5 do cronograma): as quatro
+  // funções abaixo (updateOperationProgress/updateOrderProgress usadas por
+  // update/finish/delete, updateOperationStatus/checkOrderCompletion usadas
+  // por create) agora recebem opcionalmente o `tx` da transação do chamador,
+  // em vez de escrever direto com o client `prisma` singleton fora de
+  // qualquer transação. Isso serializa leitura+escrita do progresso da
+  // operação/OP por linha travada (o UPDATE do Prisma já bloqueia a linha até
+  // o commit), evitando que dois apontamentos concorrentes na mesma operação
+  // leiam o mesmo progresso desatualizado. Chamadas fora de uma transação
+  // (nenhuma neste arquivo, mas a assinatura permite) continuam funcionando
+  // com o client padrão.
+  //
+  // As duas que emitem evento (updateOperationStatus, checkOrderCompletion)
+  // retornam os dados do evento em vez de emitir na hora: emitir dentro da
+  // transação arriscaria um listener ler estado ainda não commitado (ou
+  // travar esperando a mesma linha). Quem chama emite depois do commit.
+
+  private async updateOperationProgress(operationId: string, tx: TransactionClient = prisma) {
     // Somar todas as quantidades apontadas para a operação
-    const pointings = await prisma.productionPointing.findMany({
+    const pointings = await tx.productionPointing.findMany({
       where: { operationId },
     });
 
-    const completedQty = pointings.reduce((sum, p) => sum + p.goodQty, 0);
-    const scrapQty = pointings.reduce((sum, p) => sum + p.scrapQty, 0);
-    const actualTime = pointings.reduce((sum, p) => sum + p.elapsedTime, 0);
+    const completedQty = pointings.reduce((sum, p) => sum + p.quantityGood, 0);
+    const scrapQty = pointings.reduce((sum, p) => sum + p.quantityScrap, 0);
+    const actualTime = pointings.reduce((sum, p) => sum + p.runTime, 0);
 
     // Atualizar operação
-    const operation = await prisma.productionOrderOperation.update({
+    const operation = await tx.productionOrderOperation.update({
       where: { id: operationId },
       data: {
         completedQty,
@@ -548,24 +607,24 @@ export class ProductionPointingService {
 
     // Se a operação foi concluída, verificar se deve mudar o status
     if (completedQty >= operation.plannedQty && operation.status !== 'COMPLETED') {
-      await prisma.productionOrderOperation.update({
+      await tx.productionOrderOperation.update({
         where: { id: operationId },
         data: { status: 'COMPLETED' },
       });
     } else if (completedQty > 0 && operation.status === 'PENDING') {
-      await prisma.productionOrderOperation.update({
+      await tx.productionOrderOperation.update({
         where: { id: operationId },
         data: { status: 'IN_PROGRESS' },
       });
     }
 
     // Atualizar progresso da ordem de produção
-    await this.updateOrderProgress(operation.productionOrderId);
+    await this.updateOrderProgress(operation.productionOrderId, tx);
   }
 
-  private async updateOrderProgress(orderId: string) {
+  private async updateOrderProgress(orderId: string, tx: TransactionClient = prisma) {
     // Somar todas as quantidades das operações
-    const operations = await prisma.productionOrderOperation.findMany({
+    const operations = await tx.productionOrderOperation.findMany({
       where: { productionOrderId: orderId },
     });
 
@@ -573,7 +632,7 @@ export class ProductionPointingService {
     const producedQty = Math.min(...operations.map(op => op.completedQty));
     const scrapQty = operations.reduce((sum, op) => sum + op.scrapQty, 0);
 
-    await prisma.productionOrder.update({
+    await tx.productionOrder.update({
       where: { id: orderId },
       data: {
         producedQty,
@@ -585,8 +644,8 @@ export class ProductionPointingService {
   /**
    * Calcula total já apontado para uma OP
    */
-  private async getTotalPointed(productionOrderId: string): Promise<number> {
-    const pointings = await prisma.productionPointing.findMany({
+  private async getTotalPointed(productionOrderId: string, tx: TransactionClient = prisma): Promise<number> {
+    const pointings = await tx.productionPointing.findMany({
       where: { productionOrderId },
     });
 
@@ -594,17 +653,22 @@ export class ProductionPointingService {
   }
 
   /**
-   * Atualiza status da operação baseado nos apontamentos
+   * Atualiza status da operação baseado nos apontamentos.
+   * Retorna os dados do evento a emitir (ou null), para o chamador emitir
+   * depois do commit da transação.
    */
-  private async updateOperationStatus(operationId: string): Promise<void> {
-    const operation = await prisma.productionOrderOperation.findUnique({
+  private async updateOperationStatus(
+    operationId: string,
+    tx: TransactionClient = prisma
+  ): Promise<{ event: 'COMPLETED' | 'STARTED'; operationId: string; productionOrderId: string; actualQuantity: number } | null> {
+    const operation = await tx.productionOrderOperation.findUnique({
       where: { id: operationId },
       include: { productionOrder: true },
     });
 
-    if (!operation) return;
+    if (!operation) return null;
 
-    const totalPointed = await prisma.productionPointing.aggregate({
+    const totalPointed = await tx.productionPointing.aggregate({
       where: { operationId },
       _sum: { quantityGood: true },
     });
@@ -619,41 +683,40 @@ export class ProductionPointingService {
       status = 'IN_PROGRESS';
     }
 
-    await prisma.productionOrderOperation.update({
+    // ✅ Fase 1 item 1.5: escrevia em `actualQuantity`, campo que nunca
+    // existiu em ProductionOrderOperation (o campo real, ja usado
+    // corretamente por updateOperationProgress/updateOrderProgress abaixo,
+    // e completedQty) - toda chamada falhava no Prisma.
+    await tx.productionOrderOperation.update({
       where: { id: operationId },
       data: {
         status,
-        actualQuantity: pointed,
+        completedQty: pointed,
       },
     });
 
-    // Emitir evento se operação foi concluída
     if (status === 'COMPLETED') {
-      await eventBus.emit(SystemEvents.PRODUCTION_OPERATION_COMPLETED, {
-        operationId: operation.id,
-        productionOrderId: operation.productionOrderId,
-        actualQuantity: pointed,
-      });
+      return { event: 'COMPLETED', operationId: operation.id, productionOrderId: operation.productionOrderId, actualQuantity: pointed };
     } else if (status === 'IN_PROGRESS') {
-      await eventBus.emit(SystemEvents.PRODUCTION_OPERATION_STARTED, {
-        operationId: operation.id,
-        productionOrderId: operation.productionOrderId,
-      });
+      return { event: 'STARTED', operationId: operation.id, productionOrderId: operation.productionOrderId, actualQuantity: pointed };
     }
+    return null;
   }
 
   /**
-   * Verifica se a OP foi concluída
+   * Verifica se a OP foi concluída. Retorna o productionOrderId se a OP
+   * acabou de ser concluída (para o chamador emitir o evento depois do
+   * commit), ou null.
    */
-  private async checkOrderCompletion(productionOrderId: string): Promise<void> {
-    const operations = await prisma.productionOrderOperation.findMany({
+  private async checkOrderCompletion(productionOrderId: string, tx: TransactionClient = prisma): Promise<string | null> {
+    const operations = await tx.productionOrderOperation.findMany({
       where: { productionOrderId },
     });
 
     const allCompleted = operations.every(op => op.status === 'COMPLETED');
 
     if (allCompleted) {
-      await prisma.productionOrder.update({
+      await tx.productionOrder.update({
         where: { id: productionOrderId },
         data: {
           status: 'COMPLETED',
@@ -661,13 +724,9 @@ export class ProductionPointingService {
         },
       });
 
-      // Emitir evento de OP concluída
-      await eventBus.emit(SystemEvents.PRODUCTION_ORDER_COMPLETED, {
-        productionOrderId,
-      });
-
-      console.log(`[ProductionPointing] OP ${productionOrderId} concluída!`);
+      return productionOrderId;
     }
+    return null;
   }
 }
 

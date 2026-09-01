@@ -204,12 +204,17 @@ export class AuditLogService {
 
   // Helper para extrair IP do request
   getIpAddress(req: Request): string {
-    return (
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0] ||
-      (req.headers['x-real-ip'] as string) ||
-      req.socket.remoteAddress ||
-      'unknown'
-    );
+    // ✅ Fase 2 item 2.5 do cronograma: antes lia X-Forwarded-For/X-Real-IP
+    // direto dos headers, que o cliente controla e pode forjar livremente -
+    // qualquer requisição podia gravar um IP falso na trilha de auditoria.
+    // req.ip já respeita app.set('trust proxy', ...) quando configurado;
+    // nesta topologia (ver docker-compose.yml - sem reverse proxy na
+    // frente do backend) trust proxy fica desligado de propósito, então
+    // req.ip cai no IP real do socket, que o cliente não controla. Se um
+    // reverse proxy for adicionado na frente em produção, habilitar
+    // app.set('trust proxy', N) em app.ts (N = número de proxies) volta a
+    // tornar X-Forwarded-For confiável via req.ip.
+    return req.ip || req.socket.remoteAddress || 'unknown';
   }
 
   // Helper para criar log de uma requisição

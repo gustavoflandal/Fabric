@@ -1,0 +1,3065 @@
+{
+  "timestamp": "2026-09-01T13:48:30.890Z",
+  "version": "1.0.0",
+  "data": {
+    "users": [
+      {
+        "id": "19b110f1-b13d-4c83-8859-33362dfbc86a",
+        "email": "admin2@fabric.com",
+        "password": "$2a$10$ZOEEfDZ5MX.ndu4ktEJQA.PTCTl36A8nAkKj14PdmODZtYrh8CPiq",
+        "name": "Administrador 2",
+        "active": true,
+        "lastLogin": "2026-09-01T12:45:38.542Z",
+        "createdAt": "2026-09-01T12:04:54.648Z",
+        "updatedAt": "2026-09-01T12:45:38.543Z",
+        "roles": [
+          {
+            "userId": "19b110f1-b13d-4c83-8859-33362dfbc86a",
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "assignedAt": "2026-09-01T12:04:54.664Z"
+          }
+        ]
+      },
+      {
+        "id": "535e447a-ceb5-4e43-88f2-8be2e8625a57",
+        "email": "operador2@fabric.com",
+        "password": "$2a$10$J.w.kV10JM2ddbwULYUBfee1ClotDvdC1xTQRBA0veBpYnq0022k.",
+        "name": "Pedro Operador",
+        "active": true,
+        "lastLogin": null,
+        "createdAt": "2026-09-01T12:04:38.211Z",
+        "updatedAt": "2026-09-01T12:04:38.211Z",
+        "roles": [
+          {
+            "userId": "535e447a-ceb5-4e43-88f2-8be2e8625a57",
+            "roleId": "7caaed5c-bb1b-40ff-a79b-4f73ddd2fa29",
+            "assignedAt": "2026-09-01T12:04:38.211Z"
+          }
+        ]
+      },
+      {
+        "id": "5ae8e576-b544-470b-ab19-7cbdcda2091c",
+        "email": "gerente@fabric.com",
+        "password": "$2a$10$uje9ojg6Npnhg/IsTQfXw.7T95ibE69EOC4kWBaA9PcY1IvKZcxqG",
+        "name": "João Gerente",
+        "active": true,
+        "lastLogin": null,
+        "createdAt": "2026-09-01T12:04:38.185Z",
+        "updatedAt": "2026-09-01T12:04:38.185Z",
+        "roles": [
+          {
+            "userId": "5ae8e576-b544-470b-ab19-7cbdcda2091c",
+            "roleId": "0dd17dd5-f33a-4d40-81de-07bfa9485e50",
+            "assignedAt": "2026-09-01T12:04:38.185Z"
+          }
+        ]
+      },
+      {
+        "id": "c22b1478-bc02-4fbd-a354-0a97ec12cf15",
+        "email": "operador1@fabric.com",
+        "password": "$2a$10$J.w.kV10JM2ddbwULYUBfee1ClotDvdC1xTQRBA0veBpYnq0022k.",
+        "name": "Maria Operadora",
+        "active": true,
+        "lastLogin": null,
+        "createdAt": "2026-09-01T12:04:38.199Z",
+        "updatedAt": "2026-09-01T12:04:38.199Z",
+        "roles": [
+          {
+            "userId": "c22b1478-bc02-4fbd-a354-0a97ec12cf15",
+            "roleId": "7caaed5c-bb1b-40ff-a79b-4f73ddd2fa29",
+            "assignedAt": "2026-09-01T12:04:38.199Z"
+          }
+        ]
+      },
+      {
+        "id": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "email": "admin@fabric.com",
+        "password": "$2a$10$OqY2NlQQuT5bFR9ulgZTEe0hU9qjAmQllZZfQqAt/3LIGnAMUxQNK",
+        "name": "Administrador",
+        "active": true,
+        "lastLogin": "2026-09-01T13:47:43.294Z",
+        "createdAt": "2026-09-01T12:04:37.314Z",
+        "updatedAt": "2026-09-01T13:47:43.296Z",
+        "roles": [
+          {
+            "userId": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "assignedAt": "2026-09-01T12:04:37.314Z"
+          }
+        ]
+      }
+    ],
+    "roles": [
+      {
+        "id": "0dd17dd5-f33a-4d40-81de-07bfa9485e50",
+        "code": "MANAGER",
+        "name": "Gerente",
+        "description": "Gerente de produção com acesso a relatórios",
+        "active": true,
+        "permissions": []
+      },
+      {
+        "id": "603720cc-5c93-4a28-bd11-e61c820810fa",
+        "code": "ADMIN",
+        "name": "Administrador",
+        "description": "Acesso total ao sistema",
+        "active": true,
+        "permissions": [
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "05edf12b-ae08-40be-bafa-12c31dff979b"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "078fe961-b071-412e-9026-364bd2198b87"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "0868c3c4-2529-4096-9105-05d3b871912e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "0aa63a46-4bcf-486b-9938-24b62c27aedd"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "0afb05ec-eda1-4508-80c8-ae239df02ce0"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "10b8e547-d713-4060-80bd-b5963f689c42"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "1223ecdc-1b2f-4924-a2f7-73bed5c808ef"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "158c59d4-c8cd-41ea-85df-319f74c95784"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "1a498033-0c10-4881-8c5e-56be9a5139ba"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "1ac44b96-98d1-41cd-8feb-ef9931bd4f03"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "1badd463-3752-4233-91ef-e8d28f1f5ca3"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "2203c199-fa34-401d-84d2-1c43bed0c89c"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "2650484e-9507-4089-a93f-c982e8ac029a"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "2740c465-c429-4caf-85d2-83107f266cc5"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "35a2c98a-789d-4b6c-a632-d6869e3f46a4"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "38d608c8-46f1-468c-8783-a2a9f64094a8"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "38d8e5f8-a9c3-48b5-9a53-9823889a1935"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "395331b4-ba61-4178-b93d-964227e35686"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "43e8488c-fca8-4e56-b0cf-495c44f0d308"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "43f07b90-d540-4cb2-ae1d-1eb7816f3ad0"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "454e1352-1156-4baf-95cb-1eabadb7ab31"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "4565ff6b-6f9a-4b12-a46e-960b3673542a"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "46b0d615-aab1-4ea2-9624-2a14bb6abab1"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "4827af3f-9de4-48e3-bb3a-1acd6223fb64"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "4d594e86-3715-404f-abee-c1c3d7f4e036"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "4e876933-d8e2-4109-8488-571efa5da446"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "54454eac-a1a1-4b61-b5b0-0689dd00cf66"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "54ae1c8a-36ed-4d12-b3c0-ef32fe0282d7"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "55024646-4d5c-44e6-93e3-aa51585a694e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "581dd335-153e-449a-b144-9772b2d3a1e6"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "5878899e-9f59-4479-8737-486050934b97"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "58f09a09-305b-4b49-9bb8-542ec6656d07"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "5bb5f583-a4e6-4cc9-99a1-c47dee77e858"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "66431001-52e9-4929-b96d-81ad04695796"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "669bb278-b4ee-4e3a-aa87-a222560ceaf3"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "680e42e9-8ac7-47c8-8733-d202e3df9b7b"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "6a5e6dea-3691-439b-987b-876a9c85a3ca"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "6dfa7c3e-c55f-4b5c-a092-865fb59ed9e7"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "706d3a03-f777-420a-a78f-1fdb1ab9f2ae"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "718fee77-ad8d-45ae-b52c-fa159ac3cc54"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "7582c509-3256-4a91-91e1-f6eb21238536"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "767dd7af-b1d8-4453-a98c-5809b3c4a985"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "7bc51aa0-7f5d-440b-af3f-362c2ec09f30"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "7be45027-1b3b-492e-9559-2ffe6adad4d5"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "7c8a7568-39e6-4b2b-9d2e-6e053e65cd57"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "7f7ee19d-f6be-4f3e-9755-542fab950c00"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "820db64d-7701-48e1-9c0d-20d74786c9a4"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "85eb578a-d95e-4a9b-b124-0a00cd76e1e7"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "886cd80f-297d-4481-bbb1-0fd850792242"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "896c3c78-0a51-46db-8d22-7d23619d364e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "8b5749f1-a91a-4279-ac93-de1d15f39a98"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "8db9bb4d-46cd-4ce7-b57b-09780c7fa042"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "90e7ae2f-f190-4159-b584-5ac62b94ddea"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "93a959c8-12aa-4d79-932b-4cc5b5b0eb16"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "94ea93c3-0337-486a-a9cd-2fe1fd27ad76"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "9647164f-1026-4a93-b284-08f4e32de87f"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "96d01165-046a-4591-aacb-0f6b0c412cca"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "98087bc0-aee4-465a-b214-50aba367faf7"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "9e36078e-1633-4c73-a7b5-c56c9e0cd490"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "a001038a-f913-4021-9128-36fa1d0601e9"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "a0439646-28b0-4562-97a9-d27ace174e38"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "a17b858a-ccb3-46d2-aa59-31362ff77595"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "a1dae142-0b03-4654-b53f-1732ef19e01c"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "a9266e81-f0b7-4946-96b8-6525ed27064d"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "ab9b4987-7e56-4170-bdfb-e619da31ce49"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "af0fe7c9-d999-4b1d-86ad-97e060a02925"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "b5bd7114-afcd-40d7-88be-4655a649e751"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "b8dffdfe-c1bb-4dbd-a6ff-cff47c32b6c1"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "beb096d1-554d-4064-80eb-ea9b00281a56"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "c09c636d-fe26-48d8-8da9-0d60e3de1b0b"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "c25a0eda-4644-419b-b02f-152359745b13"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "c3706e53-dbf4-4e9e-a1c1-798d34ad87dd"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "c4da310a-f6b9-4c02-818a-e50dcd406442"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "c686ef02-602c-48f9-8cee-dabcd08ee1b4"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "ca5a409f-aae0-44af-af1d-9fc6bdc0ba40"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "cc9839c1-c880-45a9-994b-a9c5fc6231c8"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "ce0d8dfc-9dc7-42f2-898c-2e1825800168"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "cec43448-94e2-48f4-b340-9c4b13d56724"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "cfa13b6d-8edf-4fa3-af1f-d01d44793567"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "d05fc25c-80c8-49b1-aa41-bfb00495ec5a"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "d1a73aad-9c63-4f0d-bc91-e8fbf038803d"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "d2643f66-14e7-43b2-b5be-ec472c35355e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "d4302627-e07e-4115-a466-f77203e43587"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "d5965581-db9f-4a2c-89cc-9f91ddaf97e3"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "dcd03d13-7186-402d-833e-0cf2a2af3344"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "de68bc9e-1600-4c4e-80d8-53e6188e8688"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "dfa35079-b5c9-4aa8-9dce-5aac9228da94"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "e0cc0d5d-cdb1-4480-8797-0be95b30710e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "e584beb6-e953-4ef6-9e00-261bcbf28f3e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "e828c9d8-0b7a-4985-ac08-5de2401d295d"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "f0c73b98-91cd-47c9-ae0b-26710c5282cb"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "f4a4f737-32b6-4332-85bd-a5e11e61735e"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "f53b9179-e046-4a21-9f58-832ffa1e1168"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "fb0257f3-c296-431e-9fdb-48b5daf92cd2"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "fcc7ac03-df3a-4162-8778-43b111913f0d"
+          },
+          {
+            "roleId": "603720cc-5c93-4a28-bd11-e61c820810fa",
+            "permissionId": "fda0562d-e6ee-450a-800f-e8240138914e"
+          }
+        ]
+      },
+      {
+        "id": "7caaed5c-bb1b-40ff-a79b-4f73ddd2fa29",
+        "code": "OPERATOR",
+        "name": "Operador",
+        "description": "Operador de produção",
+        "active": true,
+        "permissions": []
+      }
+    ],
+    "permissions": [
+      {
+        "id": "05edf12b-ae08-40be-bafa-12c31dff979b",
+        "resource": "users",
+        "action": "create",
+        "description": "Criar usuários"
+      },
+      {
+        "id": "078fe961-b071-412e-9026-364bd2198b87",
+        "resource": "stock",
+        "action": "update",
+        "description": "Movimentar estoque"
+      },
+      {
+        "id": "0868c3c4-2529-4096-9105-05d3b871912e",
+        "resource": "production_orders",
+        "action": "read",
+        "description": "Visualizar ordens de produção"
+      },
+      {
+        "id": "0aa63a46-4bcf-486b-9938-24b62c27aedd",
+        "resource": "production_pointings",
+        "action": "update",
+        "description": "Editar apontamentos"
+      },
+      {
+        "id": "0afb05ec-eda1-4508-80c8-ae239df02ce0",
+        "resource": "suppliers",
+        "action": "update",
+        "description": "Editar fornecedores"
+      },
+      {
+        "id": "10b8e547-d713-4060-80bd-b5963f689c42",
+        "resource": "roles",
+        "action": "update",
+        "description": "Editar perfis"
+      },
+      {
+        "id": "1223ecdc-1b2f-4924-a2f7-73bed5c808ef",
+        "resource": "pedidos_compra",
+        "action": "cancelar",
+        "description": "Cancelar pedidos de compra"
+      },
+      {
+        "id": "158c59d4-c8cd-41ea-85df-319f74c95784",
+        "resource": "contagem",
+        "action": "aprovar_divergencia",
+        "description": "Aprovar divergências de contagem"
+      },
+      {
+        "id": "1a498033-0c10-4881-8c5e-56be9a5139ba",
+        "resource": "reports",
+        "action": "production",
+        "description": "Relatório de produção"
+      },
+      {
+        "id": "1ac44b96-98d1-41cd-8feb-ef9931bd4f03",
+        "resource": "work_centers",
+        "action": "read",
+        "description": "Visualizar centros de trabalho"
+      },
+      {
+        "id": "1badd463-3752-4233-91ef-e8d28f1f5ca3",
+        "resource": "customers",
+        "action": "create",
+        "description": "Criar clientes"
+      },
+      {
+        "id": "2203c199-fa34-401d-84d2-1c43bed0c89c",
+        "resource": "relatorios_contagem",
+        "action": "exportar",
+        "description": "Exportar relatórios de contagem"
+      },
+      {
+        "id": "2650484e-9507-4089-a93f-c982e8ac029a",
+        "resource": "mrp",
+        "action": "read",
+        "description": "Visualizar MRP"
+      },
+      {
+        "id": "2740c465-c429-4caf-85d2-83107f266cc5",
+        "resource": "audit_logs",
+        "action": "read",
+        "description": "Visualizar logs de auditoria"
+      },
+      {
+        "id": "35a2c98a-789d-4b6c-a632-d6869e3f46a4",
+        "resource": "users",
+        "action": "delete",
+        "description": "Excluir usuários"
+      },
+      {
+        "id": "38d608c8-46f1-468c-8783-a2a9f64094a8",
+        "resource": "roles",
+        "action": "read",
+        "description": "Visualizar perfis"
+      },
+      {
+        "id": "38d8e5f8-a9c3-48b5-9a53-9823889a1935",
+        "resource": "work_centers",
+        "action": "delete",
+        "description": "Excluir centros de trabalho"
+      },
+      {
+        "id": "395331b4-ba61-4178-b93d-964227e35686",
+        "resource": "orcamentos_compra",
+        "action": "editar",
+        "description": "Editar orçamentos de compra"
+      },
+      {
+        "id": "43e8488c-fca8-4e56-b0cf-495c44f0d308",
+        "resource": "stock",
+        "action": "adjustment",
+        "description": "Ajustar estoque"
+      },
+      {
+        "id": "43f07b90-d540-4cb2-ae1d-1eb7816f3ad0",
+        "resource": "products",
+        "action": "read",
+        "description": "Visualizar produtos"
+      },
+      {
+        "id": "454e1352-1156-4baf-95cb-1eabadb7ab31",
+        "resource": "planos_contagem",
+        "action": "pausar",
+        "description": "Pausar planos de contagem"
+      },
+      {
+        "id": "4565ff6b-6f9a-4b12-a46e-960b3673542a",
+        "resource": "recebimentos_compra",
+        "action": "visualizar",
+        "description": "Visualizar recebimentos de compra"
+      },
+      {
+        "id": "46b0d615-aab1-4ea2-9624-2a14bb6abab1",
+        "resource": "routings",
+        "action": "read",
+        "description": "Visualizar roteiros"
+      },
+      {
+        "id": "4827af3f-9de4-48e3-bb3a-1acd6223fb64",
+        "resource": "recebimentos_compra",
+        "action": "criar",
+        "description": "Criar recebimentos de compra"
+      },
+      {
+        "id": "4d594e86-3715-404f-abee-c1c3d7f4e036",
+        "resource": "customers",
+        "action": "read",
+        "description": "Visualizar clientes"
+      },
+      {
+        "id": "4e876933-d8e2-4109-8488-571efa5da446",
+        "resource": "mrp",
+        "action": "consolidate",
+        "description": "Consolidar necessidades"
+      },
+      {
+        "id": "54454eac-a1a1-4b61-b5b0-0689dd00cf66",
+        "resource": "planos_contagem",
+        "action": "ativar",
+        "description": "Ativar planos de contagem"
+      },
+      {
+        "id": "54ae1c8a-36ed-4d12-b3c0-ef32fe0282d7",
+        "resource": "contagem",
+        "action": "recontar",
+        "description": "Recontar itens"
+      },
+      {
+        "id": "55024646-4d5c-44e6-93e3-aa51585a694e",
+        "resource": "work_centers",
+        "action": "create",
+        "description": "Criar centros de trabalho"
+      },
+      {
+        "id": "581dd335-153e-449a-b144-9772b2d3a1e6",
+        "resource": "suppliers",
+        "action": "delete",
+        "description": "Excluir fornecedores"
+      },
+      {
+        "id": "5878899e-9f59-4479-8737-486050934b97",
+        "resource": "reports",
+        "action": "efficiency",
+        "description": "Relatório de eficiência"
+      },
+      {
+        "id": "58f09a09-305b-4b49-9bb8-542ec6656d07",
+        "resource": "pedidos_compra",
+        "action": "visualizar",
+        "description": "Visualizar pedidos de compra"
+      },
+      {
+        "id": "5bb5f583-a4e6-4cc9-99a1-c47dee77e858",
+        "resource": "roles",
+        "action": "delete",
+        "description": "Excluir perfis"
+      },
+      {
+        "id": "66431001-52e9-4929-b96d-81ad04695796",
+        "resource": "production_pointings",
+        "action": "create",
+        "description": "Criar apontamentos"
+      },
+      {
+        "id": "669bb278-b4ee-4e3a-aa87-a222560ceaf3",
+        "resource": "modules",
+        "action": "view_pcp",
+        "description": "Acessar módulo PCP"
+      },
+      {
+        "id": "680e42e9-8ac7-47c8-8733-d202e3df9b7b",
+        "resource": "recebimentos_compra",
+        "action": "excluir",
+        "description": "Excluir recebimentos de compra"
+      },
+      {
+        "id": "6a5e6dea-3691-439b-987b-876a9c85a3ca",
+        "resource": "audit_logs",
+        "action": "delete",
+        "description": "Excluir logs de auditoria"
+      },
+      {
+        "id": "6dfa7c3e-c55f-4b5c-a092-865fb59ed9e7",
+        "resource": "products",
+        "action": "create",
+        "description": "Criar produtos"
+      },
+      {
+        "id": "706d3a03-f777-420a-a78f-1fdb1ab9f2ae",
+        "resource": "stock",
+        "action": "read",
+        "description": "Visualizar estoque"
+      },
+      {
+        "id": "718fee77-ad8d-45ae-b52c-fa159ac3cc54",
+        "resource": "sessoes_contagem",
+        "action": "iniciar",
+        "description": "Iniciar sessões de contagem"
+      },
+      {
+        "id": "7582c509-3256-4a91-91e1-f6eb21238536",
+        "resource": "products",
+        "action": "update",
+        "description": "Editar produtos"
+      },
+      {
+        "id": "767dd7af-b1d8-4453-a98c-5809b3c4a985",
+        "resource": "customers",
+        "action": "delete",
+        "description": "Excluir clientes"
+      },
+      {
+        "id": "7bc51aa0-7f5d-440b-af3f-362c2ec09f30",
+        "resource": "pedidos_compra",
+        "action": "receber",
+        "description": "Receber pedidos de compra"
+      },
+      {
+        "id": "7be45027-1b3b-492e-9559-2ffe6adad4d5",
+        "resource": "production_orders",
+        "action": "execute",
+        "description": "Executar ordens de produção"
+      },
+      {
+        "id": "7c8a7568-39e6-4b2b-9d2e-6e053e65cd57",
+        "resource": "stock",
+        "action": "exit",
+        "description": "Registrar saída de estoque"
+      },
+      {
+        "id": "7f7ee19d-f6be-4f3e-9755-542fab950c00",
+        "resource": "counting",
+        "action": "plans.print",
+        "description": "Imprimir plano de contagem"
+      },
+      {
+        "id": "820db64d-7701-48e1-9c0d-20d74786c9a4",
+        "resource": "boms",
+        "action": "delete",
+        "description": "Excluir BOMs"
+      },
+      {
+        "id": "85eb578a-d95e-4a9b-b124-0a00cd76e1e7",
+        "resource": "sessoes_contagem",
+        "action": "completar",
+        "description": "Completar sessões de contagem"
+      },
+      {
+        "id": "886cd80f-297d-4481-bbb1-0fd850792242",
+        "resource": "boms",
+        "action": "update",
+        "description": "Editar BOMs"
+      },
+      {
+        "id": "896c3c78-0a51-46db-8d22-7d23619d364e",
+        "resource": "sessoes_contagem",
+        "action": "visualizar",
+        "description": "Visualizar sessões de contagem"
+      },
+      {
+        "id": "8b5749f1-a91a-4279-ac93-de1d15f39a98",
+        "resource": "production_pointings",
+        "action": "read",
+        "description": "Visualizar apontamentos"
+      },
+      {
+        "id": "8db9bb4d-46cd-4ce7-b57b-09780c7fa042",
+        "resource": "contagem",
+        "action": "executar",
+        "description": "Executar contagem de estoque"
+      },
+      {
+        "id": "90e7ae2f-f190-4159-b584-5ac62b94ddea",
+        "resource": "modules",
+        "action": "view_general",
+        "description": "Acessar módulo geral"
+      },
+      {
+        "id": "93a959c8-12aa-4d79-932b-4cc5b5b0eb16",
+        "resource": "pedidos_compra",
+        "action": "criar",
+        "description": "Criar pedidos de compra"
+      },
+      {
+        "id": "94ea93c3-0337-486a-a9cd-2fe1fd27ad76",
+        "resource": "planos_contagem",
+        "action": "editar",
+        "description": "Editar planos de contagem"
+      },
+      {
+        "id": "9647164f-1026-4a93-b284-08f4e32de87f",
+        "resource": "users",
+        "action": "read",
+        "description": "Visualizar usuários"
+      },
+      {
+        "id": "96d01165-046a-4591-aacb-0f6b0c412cca",
+        "resource": "planos_contagem",
+        "action": "visualizar",
+        "description": "Visualizar planos de contagem"
+      },
+      {
+        "id": "98087bc0-aee4-465a-b214-50aba367faf7",
+        "resource": "orcamentos_compra",
+        "action": "aprovar",
+        "description": "Aprovar orçamentos de compra"
+      },
+      {
+        "id": "9e36078e-1633-4c73-a7b5-c56c9e0cd490",
+        "resource": "stock",
+        "action": "entry",
+        "description": "Registrar entrada de estoque"
+      },
+      {
+        "id": "a001038a-f913-4021-9128-36fa1d0601e9",
+        "resource": "reports",
+        "action": "read",
+        "description": "Visualizar relatórios"
+      },
+      {
+        "id": "a0439646-28b0-4562-97a9-d27ace174e38",
+        "resource": "products",
+        "action": "delete",
+        "description": "Excluir produtos"
+      },
+      {
+        "id": "a17b858a-ccb3-46d2-aa59-31362ff77595",
+        "resource": "planos_contagem",
+        "action": "excluir",
+        "description": "Excluir planos de contagem"
+      },
+      {
+        "id": "a1dae142-0b03-4654-b53f-1732ef19e01c",
+        "resource": "orcamentos_compra",
+        "action": "criar",
+        "description": "Criar orçamentos de compra"
+      },
+      {
+        "id": "a9266e81-f0b7-4946-96b8-6525ed27064d",
+        "resource": "modules",
+        "action": "view_wms",
+        "description": "Acessar módulo WMS"
+      },
+      {
+        "id": "ab9b4987-7e56-4170-bdfb-e619da31ce49",
+        "resource": "mrp",
+        "action": "execute",
+        "description": "Executar MRP"
+      },
+      {
+        "id": "af0fe7c9-d999-4b1d-86ad-97e060a02925",
+        "resource": "sessoes_contagem",
+        "action": "cancelar",
+        "description": "Cancelar sessões de contagem"
+      },
+      {
+        "id": "b5bd7114-afcd-40d7-88be-4655a649e751",
+        "resource": "production_orders",
+        "action": "delete",
+        "description": "Excluir ordens de produção"
+      },
+      {
+        "id": "b8dffdfe-c1bb-4dbd-a6ff-cff47c32b6c1",
+        "resource": "reports",
+        "action": "export",
+        "description": "Exportar relatórios"
+      },
+      {
+        "id": "beb096d1-554d-4064-80eb-ea9b00281a56",
+        "resource": "pedidos_compra",
+        "action": "editar",
+        "description": "Editar pedidos de compra"
+      },
+      {
+        "id": "c09c636d-fe26-48d8-8da9-0d60e3de1b0b",
+        "resource": "recebimentos_compra",
+        "action": "editar",
+        "description": "Editar recebimentos de compra"
+      },
+      {
+        "id": "c25a0eda-4644-419b-b02f-152359745b13",
+        "resource": "pcp",
+        "action": "dashboard.view",
+        "description": "Visualizar dashboard do PCP"
+      },
+      {
+        "id": "c3706e53-dbf4-4e9e-a1c1-798d34ad87dd",
+        "resource": "suppliers",
+        "action": "create",
+        "description": "Criar fornecedores"
+      },
+      {
+        "id": "c4da310a-f6b9-4c02-818a-e50dcd406442",
+        "resource": "boms",
+        "action": "create",
+        "description": "Criar BOMs"
+      },
+      {
+        "id": "c686ef02-602c-48f9-8cee-dabcd08ee1b4",
+        "resource": "sessoes_contagem",
+        "action": "criar",
+        "description": "Criar sessões de contagem"
+      },
+      {
+        "id": "ca5a409f-aae0-44af-af1d-9fc6bdc0ba40",
+        "resource": "orcamentos_compra",
+        "action": "rejeitar",
+        "description": "Rejeitar orçamentos de compra"
+      },
+      {
+        "id": "cc9839c1-c880-45a9-994b-a9c5fc6231c8",
+        "resource": "orcamentos_compra",
+        "action": "excluir",
+        "description": "Excluir orçamentos de compra"
+      },
+      {
+        "id": "ce0d8dfc-9dc7-42f2-898c-2e1825800168",
+        "resource": "production_pointings",
+        "action": "delete",
+        "description": "Excluir apontamentos"
+      },
+      {
+        "id": "cec43448-94e2-48f4-b340-9c4b13d56724",
+        "resource": "pedidos_compra",
+        "action": "aprovar",
+        "description": "Aprovar pedidos de compra"
+      },
+      {
+        "id": "cfa13b6d-8edf-4fa3-af1f-d01d44793567",
+        "resource": "roles",
+        "action": "create",
+        "description": "Criar perfis"
+      },
+      {
+        "id": "d05fc25c-80c8-49b1-aa41-bfb00495ec5a",
+        "resource": "relatorios_contagem",
+        "action": "visualizar",
+        "description": "Visualizar relatórios de contagem"
+      },
+      {
+        "id": "d1a73aad-9c63-4f0d-bc91-e8fbf038803d",
+        "resource": "routings",
+        "action": "delete",
+        "description": "Excluir roteiros"
+      },
+      {
+        "id": "d2643f66-14e7-43b2-b5be-ec472c35355e",
+        "resource": "suppliers",
+        "action": "read",
+        "description": "Visualizar fornecedores"
+      },
+      {
+        "id": "d4302627-e07e-4115-a466-f77203e43587",
+        "resource": "production_orders",
+        "action": "update",
+        "description": "Editar ordens de produção"
+      },
+      {
+        "id": "d5965581-db9f-4a2c-89cc-9f91ddaf97e3",
+        "resource": "orcamentos_compra",
+        "action": "visualizar",
+        "description": "Visualizar orçamentos de compra"
+      },
+      {
+        "id": "dcd03d13-7186-402d-833e-0cf2a2af3344",
+        "resource": "routings",
+        "action": "update",
+        "description": "Editar roteiros"
+      },
+      {
+        "id": "de68bc9e-1600-4c4e-80d8-53e6188e8688",
+        "resource": "modules",
+        "action": "view_yms",
+        "description": "Acessar módulo YMS"
+      },
+      {
+        "id": "dfa35079-b5c9-4aa8-9dce-5aac9228da94",
+        "resource": "boms",
+        "action": "read",
+        "description": "Visualizar BOMs"
+      },
+      {
+        "id": "e0cc0d5d-cdb1-4480-8797-0be95b30710e",
+        "resource": "routings",
+        "action": "create",
+        "description": "Criar roteiros"
+      },
+      {
+        "id": "e584beb6-e953-4ef6-9e00-261bcbf28f3e",
+        "resource": "customers",
+        "action": "update",
+        "description": "Editar clientes"
+      },
+      {
+        "id": "e828c9d8-0b7a-4985-ac08-5de2401d295d",
+        "resource": "production_orders",
+        "action": "create",
+        "description": "Criar ordens de produção"
+      },
+      {
+        "id": "f0c73b98-91cd-47c9-ae0b-26710c5282cb",
+        "resource": "users",
+        "action": "update",
+        "description": "Editar usuários"
+      },
+      {
+        "id": "f4a4f737-32b6-4332-85bd-a5e11e61735e",
+        "resource": "planos_contagem",
+        "action": "criar",
+        "description": "Criar planos de contagem"
+      },
+      {
+        "id": "f53b9179-e046-4a21-9f58-832ffa1e1168",
+        "resource": "pedidos_compra",
+        "action": "confirmar",
+        "description": "Confirmar pedidos de compra"
+      },
+      {
+        "id": "fb0257f3-c296-431e-9fdb-48b5daf92cd2",
+        "resource": "pedidos_compra",
+        "action": "excluir",
+        "description": "Excluir pedidos de compra"
+      },
+      {
+        "id": "fcc7ac03-df3a-4162-8778-43b111913f0d",
+        "resource": "reports",
+        "action": "quality",
+        "description": "Relatório de qualidade"
+      },
+      {
+        "id": "fda0562d-e6ee-450a-800f-e8240138914e",
+        "resource": "work_centers",
+        "action": "update",
+        "description": "Editar centros de trabalho"
+      }
+    ],
+    "unitsOfMeasure": [
+      {
+        "id": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "code": "UN",
+        "name": "Unidade",
+        "type": "quantity",
+        "symbol": "un",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.334Z",
+        "updatedAt": "2026-09-01T12:04:37.334Z"
+      },
+      {
+        "id": "467b5ae4-3597-4d1f-bf4d-5c44f3c8738b",
+        "code": "M",
+        "name": "Metro",
+        "type": "length",
+        "symbol": "m",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.391Z",
+        "updatedAt": "2026-09-01T12:04:37.391Z"
+      },
+      {
+        "id": "486b4d55-b7a5-4eb7-abc5-8fdd82abb2a7",
+        "code": "G",
+        "name": "Grama",
+        "type": "weight",
+        "symbol": "g",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.360Z",
+        "updatedAt": "2026-09-01T12:04:37.360Z"
+      },
+      {
+        "id": "55d85c41-e29d-4d05-8efa-6db26b3eb596",
+        "code": "KG",
+        "name": "Quilograma",
+        "type": "weight",
+        "symbol": "kg",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.349Z",
+        "updatedAt": "2026-09-01T12:04:37.349Z"
+      },
+      {
+        "id": "ab889dce-b7d8-4f78-8eef-968b2ce1a473",
+        "code": "CM",
+        "name": "Centímetro",
+        "type": "length",
+        "symbol": "cm",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.405Z",
+        "updatedAt": "2026-09-01T12:04:37.405Z"
+      },
+      {
+        "id": "b1eb8006-76e6-40eb-9bf5-fa9fea478b23",
+        "code": "L",
+        "name": "Litro",
+        "type": "volume",
+        "symbol": "L",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.370Z",
+        "updatedAt": "2026-09-01T12:04:37.370Z"
+      },
+      {
+        "id": "b8b25497-aa90-4031-a140-57fdc5caa2fd",
+        "code": "CX",
+        "name": "Caixa",
+        "type": "quantity",
+        "symbol": "cx",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.420Z",
+        "updatedAt": "2026-09-01T12:04:37.420Z"
+      },
+      {
+        "id": "bb4ec257-53c8-4c38-b220-dfd01f2315b1",
+        "code": "ML",
+        "name": "Mililitro",
+        "type": "volume",
+        "symbol": "mL",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.381Z",
+        "updatedAt": "2026-09-01T12:04:37.381Z"
+      },
+      {
+        "id": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+        "code": "PC",
+        "name": "Peça",
+        "type": "quantity",
+        "symbol": "pc",
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.432Z",
+        "updatedAt": "2026-09-01T12:04:37.432Z"
+      }
+    ],
+    "productCategories": [
+      {
+        "id": "3aeaea82-8705-4be7-b3a8-da81e93e681a",
+        "code": "PLAST",
+        "name": "Plásticos",
+        "description": "Componentes plásticos",
+        "parentId": null
+      },
+      {
+        "id": "5d457098-fa73-4af3-a18a-eb770e678e68",
+        "code": "METAL",
+        "name": "Metálicos",
+        "description": "Componentes metálicos",
+        "parentId": null
+      },
+      {
+        "id": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "code": "ELETRO",
+        "name": "Eletrônicos",
+        "description": "Produtos eletrônicos",
+        "parentId": null
+      },
+      {
+        "id": "8fec7224-1a4e-4478-8844-f60b20e429bd",
+        "code": "EMB",
+        "name": "Embalagens",
+        "description": "Materiais de embalagem",
+        "parentId": null
+      },
+      {
+        "id": "cd65936c-911d-455f-87dc-d50dec323479",
+        "code": "QUIM",
+        "name": "Químicos",
+        "description": "Produtos químicos e reagentes",
+        "parentId": null
+      }
+    ],
+    "suppliers": [
+      {
+        "id": "3129b887-55d6-4efc-b823-dd30e34c0393",
+        "code": "FOR-001",
+        "name": "TechComponents Ltda",
+        "legalName": "TechComponents Componentes Eletrônicos Ltda",
+        "document": "12.345.678/0001-90",
+        "email": "vendas@techcomponents.com.br",
+        "phone": "(11) 3456-7890",
+        "address": "Rua dos Componentes, 123",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": "01234-567",
+        "country": "BR",
+        "paymentTerms": "30/60 dias",
+        "leadTime": 15,
+        "rating": 4.5,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.901Z",
+        "updatedAt": "2026-09-01T12:04:37.901Z"
+      },
+      {
+        "id": "38aa0278-2030-4485-985a-4ff5cb773cfd",
+        "code": "FOR-003",
+        "name": "EmbalaFácil",
+        "legalName": "EmbalaFácil Embalagens ME",
+        "document": "34.567.890/0001-12",
+        "email": "atendimento@embalafacil.com.br",
+        "phone": "(11) 4567-8901",
+        "address": "Rua das Caixas, 789",
+        "city": "Osasco",
+        "state": "SP",
+        "zipCode": "06234-567",
+        "country": "BR",
+        "paymentTerms": "30 dias",
+        "leadTime": 7,
+        "rating": 4.8,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.931Z",
+        "updatedAt": "2026-09-01T12:04:37.931Z"
+      },
+      {
+        "id": "ea45e83f-f167-42f5-8327-9d3cfc76ec5f",
+        "code": "FOR-002",
+        "name": "PlastiPro Indústria",
+        "legalName": "PlastiPro Indústria de Plásticos S.A.",
+        "document": "23.456.789/0001-01",
+        "email": "comercial@plastipro.com.br",
+        "phone": "(11) 2345-6789",
+        "address": "Av. Industrial, 456",
+        "city": "Guarulhos",
+        "state": "SP",
+        "zipCode": "07012-345",
+        "country": "BR",
+        "paymentTerms": "45 dias",
+        "leadTime": 20,
+        "rating": 4.2,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.916Z",
+        "updatedAt": "2026-09-01T12:04:37.916Z"
+      }
+    ],
+    "customers": [
+      {
+        "id": "33fad7dc-b788-452c-b5f8-897f949aec06",
+        "code": "CLI-001",
+        "name": "TechStore Varejo",
+        "legalName": "TechStore Comércio de Eletrônicos Ltda",
+        "document": "45.678.901/0001-23",
+        "email": "compras@techstore.com.br",
+        "phone": "(11) 5678-9012",
+        "address": "Av. Paulista, 1000",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": "01310-100",
+        "country": "BR",
+        "paymentTerms": "30/60/90 dias",
+        "creditLimit": 500000,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.942Z",
+        "updatedAt": "2026-09-01T12:04:37.942Z"
+      },
+      {
+        "id": "7e2862a9-3421-459b-adbc-1c70b418186a",
+        "code": "CLI-002",
+        "name": "MegaEletro Distribuidora",
+        "legalName": "MegaEletro Distribuidora de Eletrônicos S.A.",
+        "document": "56.789.012/0001-34",
+        "email": "pedidos@megaeletro.com.br",
+        "phone": "(21) 6789-0123",
+        "address": "Rua do Comércio, 500",
+        "city": "Rio de Janeiro",
+        "state": "RJ",
+        "zipCode": "20040-020",
+        "country": "BR",
+        "paymentTerms": "45/60 dias",
+        "creditLimit": 1000000,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.956Z",
+        "updatedAt": "2026-09-01T12:04:37.956Z"
+      },
+      {
+        "id": "f885651b-52b4-4058-952e-1a9dab97f3a9",
+        "code": "CLI-003",
+        "name": "InfoShop Online",
+        "legalName": "InfoShop Comércio Eletrônico Ltda",
+        "document": "67.890.123/0001-45",
+        "email": "fornecedores@infoshop.com.br",
+        "phone": "(11) 7890-1234",
+        "address": "Rua Virtual, 100",
+        "city": "São Paulo",
+        "state": "SP",
+        "zipCode": "04567-890",
+        "country": "BR",
+        "paymentTerms": "30 dias",
+        "creditLimit": 300000,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.967Z",
+        "updatedAt": "2026-09-01T12:04:37.967Z"
+      }
+    ],
+    "workCenters": [
+      {
+        "id": "227de02e-033e-4c5c-8987-6511494411b0",
+        "code": "CT-005",
+        "name": "Controle de Qualidade",
+        "description": "Inspeção e testes de qualidade",
+        "type": "quality",
+        "capacity": 120,
+        "efficiency": 1,
+        "costPerHour": 80,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.882Z",
+        "updatedAt": "2026-09-01T12:04:37.882Z"
+      },
+      {
+        "id": "437ebe24-aad1-4033-8740-526656ba8b98",
+        "code": "CT-001",
+        "name": "Linha de Montagem 1",
+        "description": "Linha principal de montagem de produtos eletrônicos",
+        "type": "assembly",
+        "capacity": 100,
+        "efficiency": 0.95,
+        "costPerHour": 150,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.830Z",
+        "updatedAt": "2026-09-01T12:04:37.830Z"
+      },
+      {
+        "id": "62da4f98-8691-4696-bd21-fef9ab893eb1",
+        "code": "CT-003",
+        "name": "Injeção de Plásticos",
+        "description": "Máquinas injetoras de plástico",
+        "type": "manufacturing",
+        "capacity": 50,
+        "efficiency": 0.85,
+        "costPerHour": 200,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.861Z",
+        "updatedAt": "2026-09-01T12:04:37.861Z"
+      },
+      {
+        "id": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+        "code": "CT-006",
+        "name": "Embalagem",
+        "description": "Setor de embalagem final",
+        "type": "packaging",
+        "capacity": 150,
+        "efficiency": 0.98,
+        "costPerHour": 60,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.891Z",
+        "updatedAt": "2026-09-01T12:04:37.891Z"
+      },
+      {
+        "id": "b0a6dffb-31f5-471a-b76c-ee74fe45087e",
+        "code": "CT-004",
+        "name": "Pintura e Acabamento",
+        "description": "Cabine de pintura e acabamento superficial",
+        "type": "finishing",
+        "capacity": 60,
+        "efficiency": 0.88,
+        "costPerHour": 100,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.871Z",
+        "updatedAt": "2026-09-01T12:04:37.871Z"
+      },
+      {
+        "id": "c749e78f-137e-4762-be7f-060ccdc1130f",
+        "code": "CT-002",
+        "name": "Linha de Montagem 2",
+        "description": "Linha secundária de montagem",
+        "type": "assembly",
+        "capacity": 80,
+        "efficiency": 0.9,
+        "costPerHour": 120,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.848Z",
+        "updatedAt": "2026-09-01T12:04:37.848Z"
+      }
+    ],
+    "products": [
+      {
+        "id": "014f2cee-a47d-4af8-b9ac-188c13c5468a",
+        "code": "MP-004",
+        "name": "Parafuso M2x5mm",
+        "description": "Parafuso de fixação",
+        "type": "raw_material",
+        "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+        "categoryId": "5d457098-fa73-4af3-a18a-eb770e678e68",
+        "leadTime": 5,
+        "lotSize": null,
+        "minStock": 5000,
+        "maxStock": null,
+        "safetyStock": 2000,
+        "reorderPoint": null,
+        "standardCost": 0.05,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.623Z",
+        "updatedAt": "2026-09-01T12:04:37.623Z"
+      },
+      {
+        "id": "0f525851-96e6-4127-a309-ae18749822dd",
+        "code": "EMB-002",
+        "name": "Manual do Usuário",
+        "description": "Manual impresso",
+        "type": "packaging",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8fec7224-1a4e-4478-8844-f60b20e429bd",
+        "leadTime": 5,
+        "lotSize": null,
+        "minStock": 1000,
+        "maxStock": null,
+        "safetyStock": 500,
+        "reorderPoint": null,
+        "standardCost": 1.2,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.683Z",
+        "updatedAt": "2026-09-01T12:04:37.683Z"
+      },
+      {
+        "id": "23163f67-387a-41a6-95b9-dbdf23c68ede",
+        "code": "MP-003",
+        "name": "Bateria Li-Ion 4000mAh",
+        "description": "Bateria de lítio recarregável",
+        "type": "raw_material",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 12,
+        "lotSize": null,
+        "minStock": 150,
+        "maxStock": null,
+        "safetyStock": 75,
+        "reorderPoint": null,
+        "standardCost": 80,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.611Z",
+        "updatedAt": "2026-09-01T12:04:37.611Z"
+      },
+      {
+        "id": "400e5ce8-572c-4df2-bf01-5e2274cf4849",
+        "code": "PA-002",
+        "name": "Notebook Ultra",
+        "description": "Notebook profissional",
+        "type": "finished",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 7,
+        "lotSize": null,
+        "minStock": 5,
+        "maxStock": null,
+        "safetyStock": 3,
+        "reorderPoint": null,
+        "standardCost": 3500,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.539Z",
+        "updatedAt": "2026-09-01T12:04:37.539Z"
+      },
+      {
+        "id": "5d3a3f96-ad91-41f0-aefc-8698f9f6eeb3",
+        "code": "SA-002",
+        "name": "Display LCD Montado",
+        "description": "Display com touch screen",
+        "type": "semi_finished",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 2,
+        "lotSize": null,
+        "minStock": 30,
+        "maxStock": null,
+        "safetyStock": 15,
+        "reorderPoint": null,
+        "standardCost": 300,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.564Z",
+        "updatedAt": "2026-09-01T12:04:37.564Z"
+      },
+      {
+        "id": "7fba5cc0-0919-466c-b0af-0463437cfc41",
+        "code": "PA-001",
+        "name": "Smartphone XPro",
+        "description": "Smartphone de última geração",
+        "type": "finished",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 5,
+        "lotSize": null,
+        "minStock": 10,
+        "maxStock": null,
+        "safetyStock": 5,
+        "reorderPoint": null,
+        "standardCost": 1500,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.523Z",
+        "updatedAt": "2026-09-01T12:04:37.523Z"
+      },
+      {
+        "id": "96340a83-b1b4-4b6e-a1d0-86569964cf6f",
+        "code": "EMB-001",
+        "name": "Caixa Papelão 30x20x10",
+        "description": "Caixa para produto acabado",
+        "type": "packaging",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8fec7224-1a4e-4478-8844-f60b20e429bd",
+        "leadTime": 3,
+        "lotSize": null,
+        "minStock": 500,
+        "maxStock": null,
+        "safetyStock": 200,
+        "reorderPoint": null,
+        "standardCost": 3.5,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.669Z",
+        "updatedAt": "2026-09-01T12:04:37.669Z"
+      },
+      {
+        "id": "a30883ba-6f43-4c88-9015-4e80c66b1a43",
+        "code": "MP-006",
+        "name": "Tinta Spray Preta",
+        "description": "Tinta para acabamento",
+        "type": "raw_material",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "cd65936c-911d-455f-87dc-d50dec323479",
+        "leadTime": 7,
+        "lotSize": null,
+        "minStock": 50,
+        "maxStock": null,
+        "safetyStock": 20,
+        "reorderPoint": null,
+        "standardCost": 25,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.644Z",
+        "updatedAt": "2026-09-01T12:04:37.644Z"
+      },
+      {
+        "id": "abd27d74-781c-47c1-98bb-430883bb0196",
+        "code": "MP-002",
+        "name": "Memória RAM 8GB",
+        "description": "Módulo de memória DDR4",
+        "type": "raw_material",
+        "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 10,
+        "lotSize": null,
+        "minStock": 200,
+        "maxStock": null,
+        "safetyStock": 100,
+        "reorderPoint": null,
+        "standardCost": 120,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.599Z",
+        "updatedAt": "2026-09-01T12:04:37.599Z"
+      },
+      {
+        "id": "ba98cdf6-3ff7-4daf-9ea7-c20f5f31e50c",
+        "code": "SA-003",
+        "name": "Carcaça Plástica",
+        "description": "Carcaça injetada e pintada",
+        "type": "semi_finished",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "3aeaea82-8705-4be7-b3a8-da81e93e681a",
+        "leadTime": 2,
+        "lotSize": null,
+        "minStock": 50,
+        "maxStock": null,
+        "safetyStock": 20,
+        "reorderPoint": null,
+        "standardCost": 50,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.574Z",
+        "updatedAt": "2026-09-01T12:04:37.574Z"
+      },
+      {
+        "id": "cdeac6be-69eb-4258-920b-90e6e4d38316",
+        "code": "MP-007",
+        "name": "Cabo USB-C",
+        "description": "Cabo de dados e carregamento",
+        "type": "raw_material",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 8,
+        "lotSize": null,
+        "minStock": 200,
+        "maxStock": null,
+        "safetyStock": 100,
+        "reorderPoint": null,
+        "standardCost": 12,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.656Z",
+        "updatedAt": "2026-09-01T12:04:37.656Z"
+      },
+      {
+        "id": "fb90d1ed-786a-40af-9399-8c547c87373b",
+        "code": "MP-005",
+        "name": "Resina ABS Natural",
+        "description": "Resina plástica para injeção",
+        "type": "raw_material",
+        "unitId": "55d85c41-e29d-4d05-8efa-6db26b3eb596",
+        "categoryId": "cd65936c-911d-455f-87dc-d50dec323479",
+        "leadTime": 20,
+        "lotSize": null,
+        "minStock": 500,
+        "maxStock": null,
+        "safetyStock": 200,
+        "reorderPoint": null,
+        "standardCost": 15,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.633Z",
+        "updatedAt": "2026-09-01T12:04:37.633Z"
+      },
+      {
+        "id": "fef04c8e-b15c-4ffd-b3e4-2c669200fd5a",
+        "code": "MP-001",
+        "name": "Chip Processador A15",
+        "description": "Processador de alta performance",
+        "type": "raw_material",
+        "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 15,
+        "lotSize": null,
+        "minStock": 100,
+        "maxStock": null,
+        "safetyStock": 50,
+        "reorderPoint": null,
+        "standardCost": 250,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.586Z",
+        "updatedAt": "2026-09-01T12:04:37.586Z"
+      },
+      {
+        "id": "ffc3a48d-d63e-4d30-9423-16a7f409652c",
+        "code": "SA-001",
+        "name": "Placa Mãe Montada",
+        "description": "Placa mãe com componentes soldados",
+        "type": "semi_finished",
+        "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+        "categoryId": "8afd76b9-466b-4fd0-b91e-5907f9811ba0",
+        "leadTime": 3,
+        "lotSize": null,
+        "minStock": 20,
+        "maxStock": null,
+        "safetyStock": 10,
+        "reorderPoint": null,
+        "standardCost": 800,
+        "lastCost": null,
+        "averageCost": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.553Z",
+        "updatedAt": "2026-09-01T12:04:37.553Z"
+      }
+    ],
+    "boms": [
+      {
+        "id": "29c24427-ba5b-433e-8030-bbdc9456d790",
+        "productId": "7fba5cc0-0919-466c-b0af-0463437cfc41",
+        "version": 1,
+        "description": "BOM do Smartphone XPro",
+        "validFrom": "2026-09-01T12:04:37.791Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.791Z",
+        "updatedAt": "2026-09-01T12:04:37.791Z",
+        "items": [
+          {
+            "id": "3fd54c32-d826-4b60-b8df-2f77c1552e24",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "23163f67-387a-41a6-95b9-dbdf23c68ede",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 40,
+            "notes": "Bateria recarregável"
+          },
+          {
+            "id": "4df2c2c6-2bfa-4c03-86d1-baf0f58b86a3",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "5d3a3f96-ad91-41f0-aefc-8698f9f6eeb3",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.02,
+            "sequence": 20,
+            "notes": "Display touch screen"
+          },
+          {
+            "id": "5c8badde-26e4-4b2b-85fe-afceb1d69487",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "ba98cdf6-3ff7-4daf-9ea7-c20f5f31e50c",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 30,
+            "notes": "Carcaça externa"
+          },
+          {
+            "id": "6c6d61f2-8215-4510-ae06-97038a42c929",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "ffc3a48d-d63e-4d30-9423-16a7f409652c",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 10,
+            "notes": "Placa principal montada"
+          },
+          {
+            "id": "aa672bec-2bdb-4c45-83b1-4a30990805b1",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "014f2cee-a47d-4af8-b9ac-188c13c5468a",
+            "quantity": 8,
+            "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+            "scrapFactor": 0.1,
+            "sequence": 60,
+            "notes": "Fixação da carcaça"
+          },
+          {
+            "id": "b855c865-57a2-4b71-8e5a-ed6631612195",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "96340a83-b1b4-4b6e-a1d0-86569964cf6f",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.02,
+            "sequence": 70,
+            "notes": "Embalagem do produto"
+          },
+          {
+            "id": "dbe9c24f-341b-41c8-8102-61179062ff66",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "cdeac6be-69eb-4258-920b-90e6e4d38316",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 50,
+            "notes": "Cabo de carregamento"
+          },
+          {
+            "id": "f08ea3d7-a487-40c8-a600-ce6162fc3642",
+            "bomId": "29c24427-ba5b-433e-8030-bbdc9456d790",
+            "componentId": "0f525851-96e6-4127-a309-ae18749822dd",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 80,
+            "notes": "Manual de instruções"
+          }
+        ]
+      },
+      {
+        "id": "896e5c03-0086-4397-a3ce-726e76d1cc67",
+        "productId": "ba98cdf6-3ff7-4daf-9ea7-c20f5f31e50c",
+        "version": 1,
+        "description": "BOM da Carcaça Plástica",
+        "validFrom": "2026-09-01T12:04:37.762Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.762Z",
+        "updatedAt": "2026-09-01T12:04:37.762Z",
+        "items": [
+          {
+            "id": "5b6b0f1e-1644-47aa-8435-685e3569ecfb",
+            "bomId": "896e5c03-0086-4397-a3ce-726e76d1cc67",
+            "componentId": "fb90d1ed-786a-40af-9399-8c547c87373b",
+            "quantity": 0.2,
+            "unitId": "55d85c41-e29d-4d05-8efa-6db26b3eb596",
+            "scrapFactor": 0.1,
+            "sequence": 10,
+            "notes": "Matéria-prima para injeção"
+          },
+          {
+            "id": "78595da6-8a0f-476c-8819-4efe192cf305",
+            "bomId": "896e5c03-0086-4397-a3ce-726e76d1cc67",
+            "componentId": "a30883ba-6f43-4c88-9015-4e80c66b1a43",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.05,
+            "sequence": 20,
+            "notes": "Acabamento superficial"
+          }
+        ]
+      },
+      {
+        "id": "96a9d6aa-2a05-4fb7-b58e-13bc2121cb97",
+        "productId": "ffc3a48d-d63e-4d30-9423-16a7f409652c",
+        "version": 1,
+        "description": "BOM da Placa Mãe Montada",
+        "validFrom": "2026-09-01T12:04:37.736Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.736Z",
+        "updatedAt": "2026-09-01T12:04:37.736Z",
+        "items": [
+          {
+            "id": "4c1a1c38-6312-420c-85fc-07f2d5e0a475",
+            "bomId": "96a9d6aa-2a05-4fb7-b58e-13bc2121cb97",
+            "componentId": "fef04c8e-b15c-4ffd-b3e4-2c669200fd5a",
+            "quantity": 1,
+            "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+            "scrapFactor": 0.02,
+            "sequence": 10,
+            "notes": "Processador principal"
+          },
+          {
+            "id": "6f944071-3d7a-4ca9-aa63-f3eca9f0b8a2",
+            "bomId": "96a9d6aa-2a05-4fb7-b58e-13bc2121cb97",
+            "componentId": "014f2cee-a47d-4af8-b9ac-188c13c5468a",
+            "quantity": 4,
+            "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+            "scrapFactor": 0.05,
+            "sequence": 30,
+            "notes": "Fixação dos componentes"
+          },
+          {
+            "id": "92dbf63e-6624-41ff-9aa5-e6039f422980",
+            "bomId": "96a9d6aa-2a05-4fb7-b58e-13bc2121cb97",
+            "componentId": "abd27d74-781c-47c1-98bb-430883bb0196",
+            "quantity": 2,
+            "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+            "scrapFactor": 0.01,
+            "sequence": 20,
+            "notes": "Módulos de memória"
+          }
+        ]
+      },
+      {
+        "id": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+        "productId": "400e5ce8-572c-4df2-bf01-5e2274cf4849",
+        "version": 1,
+        "description": "BOM do Notebook Ultra",
+        "validFrom": "2026-09-01T12:04:37.810Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:37.810Z",
+        "updatedAt": "2026-09-01T12:04:37.810Z",
+        "items": [
+          {
+            "id": "1df15ad8-7daf-4c81-b5fe-20092413c365",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "23163f67-387a-41a6-95b9-dbdf23c68ede",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 40,
+            "notes": "Bateria de longa duração"
+          },
+          {
+            "id": "754ba6a6-89ce-4504-a9f1-3a395e8b0ad8",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "5d3a3f96-ad91-41f0-aefc-8698f9f6eeb3",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.02,
+            "sequence": 20,
+            "notes": "Display LCD 15.6\""
+          },
+          {
+            "id": "8187f658-0c4c-48dd-9160-b3fed529e071",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "014f2cee-a47d-4af8-b9ac-188c13c5468a",
+            "quantity": 16,
+            "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+            "scrapFactor": 0.1,
+            "sequence": 60,
+            "notes": "Fixação do gabinete"
+          },
+          {
+            "id": "a17f7084-a98b-4dde-9cf1-d81c7cbf85db",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "0f525851-96e6-4127-a309-ae18749822dd",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 80,
+            "notes": "Manual de instruções"
+          },
+          {
+            "id": "a6d3515f-5506-49e2-9a82-c7a910e6a747",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "ffc3a48d-d63e-4d30-9423-16a7f409652c",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 10,
+            "notes": "Placa mãe principal"
+          },
+          {
+            "id": "aaf87b4b-d290-4d20-8e08-0af273e9d740",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "abd27d74-781c-47c1-98bb-430883bb0196",
+            "quantity": 2,
+            "unitId": "c91cf4c1-5dad-4bd9-87d9-8b67184e74f3",
+            "scrapFactor": 0.01,
+            "sequence": 30,
+            "notes": "Memória RAM adicional"
+          },
+          {
+            "id": "ab1ce62c-dd1d-44e3-a559-bc47d1fe1495",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "96340a83-b1b4-4b6e-a1d0-86569964cf6f",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.02,
+            "sequence": 70,
+            "notes": "Embalagem do produto"
+          },
+          {
+            "id": "e7e82677-14aa-4801-8ec1-977b5be8fef4",
+            "bomId": "baa754c7-7ed5-4227-86c3-922ed917cfc8",
+            "componentId": "cdeac6be-69eb-4258-920b-90e6e4d38316",
+            "quantity": 1,
+            "unitId": "1e5e9b47-33fa-4ee2-b214-126c19bebc50",
+            "scrapFactor": 0.01,
+            "sequence": 50,
+            "notes": "Cabo de alimentação"
+          }
+        ]
+      }
+    ],
+    "routings": [
+      {
+        "id": "18b650f8-02f1-4c02-a8d2-789cd5513972",
+        "productId": "ba98cdf6-3ff7-4daf-9ea7-c20f5f31e50c",
+        "version": 1,
+        "description": "Processo de fabricação da carcaça",
+        "validFrom": "2026-09-01T12:04:38.264Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:38.264Z",
+        "updatedAt": "2026-09-01T12:04:38.264Z",
+        "operations": [
+          {
+            "id": "3acbf2a0-38e7-4f5b-91d6-55db13ebd2fd",
+            "routingId": "18b650f8-02f1-4c02-a8d2-789cd5513972",
+            "sequence": 20,
+            "workCenterId": "b0a6dffb-31f5-471a-b76c-ee74fe45087e",
+            "description": "Pintura e acabamento",
+            "setupTime": 20,
+            "runTime": 10,
+            "queueTime": 15,
+            "moveTime": 3,
+            "notes": "Aplicar 2 camadas de tinta"
+          },
+          {
+            "id": "70f33ccf-d91c-4b0e-8c7a-0e4825e83aac",
+            "routingId": "18b650f8-02f1-4c02-a8d2-789cd5513972",
+            "sequence": 30,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Inspeção de qualidade",
+            "setupTime": 5,
+            "runTime": 2,
+            "queueTime": 2,
+            "moveTime": 1,
+            "notes": "Verificar acabamento e dimensões"
+          },
+          {
+            "id": "a45ba88b-395b-45bf-aa7a-1090cbf24e5a",
+            "routingId": "18b650f8-02f1-4c02-a8d2-789cd5513972",
+            "sequence": 10,
+            "workCenterId": "62da4f98-8691-4696-bd21-fef9ab893eb1",
+            "description": "Injeção do plástico",
+            "setupTime": 30,
+            "runTime": 5,
+            "queueTime": 10,
+            "moveTime": 2,
+            "notes": "Temperatura: 200°C"
+          }
+        ]
+      },
+      {
+        "id": "3a4eec90-5feb-478e-8f9e-fd2e1f2d503d",
+        "productId": "ffc3a48d-d63e-4d30-9423-16a7f409652c",
+        "version": 1,
+        "description": "Processo de montagem da placa mãe",
+        "validFrom": "2026-09-01T12:04:38.249Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:38.249Z",
+        "updatedAt": "2026-09-01T12:04:38.249Z",
+        "operations": [
+          {
+            "id": "89c6c2fe-53aa-42f7-8358-0205c54448b8",
+            "routingId": "3a4eec90-5feb-478e-8f9e-fd2e1f2d503d",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem de componentes na placa",
+            "setupTime": 15,
+            "runTime": 8,
+            "queueTime": 5,
+            "moveTime": 2,
+            "notes": "Inserir processador e memórias"
+          },
+          {
+            "id": "933ba50b-9646-496a-ae98-ce7bd64a36db",
+            "routingId": "3a4eec90-5feb-478e-8f9e-fd2e1f2d503d",
+            "sequence": 20,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste de funcionamento",
+            "setupTime": 5,
+            "runTime": 3,
+            "queueTime": 2,
+            "moveTime": 1,
+            "notes": "Verificar POST e funcionamento básico"
+          }
+        ]
+      },
+      {
+        "id": "bd6292a8-0b9d-4392-9a11-93361b3be513",
+        "productId": "7fba5cc0-0919-466c-b0af-0463437cfc41",
+        "version": 1,
+        "description": "Linha de montagem completa do smartphone",
+        "validFrom": "2026-09-01T12:04:38.280Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:38.280Z",
+        "updatedAt": "2026-09-01T12:04:38.280Z",
+        "operations": [
+          {
+            "id": "3d1d0477-b68b-46c3-a38e-d3318e4ece63",
+            "routingId": "bd6292a8-0b9d-4392-9a11-93361b3be513",
+            "sequence": 30,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Fechamento e fixação",
+            "setupTime": 5,
+            "runTime": 8,
+            "queueTime": 2,
+            "moveTime": 1,
+            "notes": "Aparafusar e selar"
+          },
+          {
+            "id": "517ccc51-b408-4a38-a9e8-3b1808aaddf4",
+            "routingId": "bd6292a8-0b9d-4392-9a11-93361b3be513",
+            "sequence": 40,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste funcional completo",
+            "setupTime": 10,
+            "runTime": 10,
+            "queueTime": 5,
+            "moveTime": 2,
+            "notes": "Testar todas as funções"
+          },
+          {
+            "id": "62671fd0-4a08-4f47-bd6a-68497df6dfed",
+            "routingId": "bd6292a8-0b9d-4392-9a11-93361b3be513",
+            "sequence": 50,
+            "workCenterId": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+            "description": "Embalagem final",
+            "setupTime": 5,
+            "runTime": 5,
+            "queueTime": 2,
+            "moveTime": 1,
+            "notes": "Embalar com acessórios"
+          },
+          {
+            "id": "6ca2b711-71e9-4ff7-9d90-901aaff1d629",
+            "routingId": "bd6292a8-0b9d-4392-9a11-93361b3be513",
+            "sequence": 20,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Instalação de display e bateria",
+            "setupTime": 10,
+            "runTime": 12,
+            "queueTime": 3,
+            "moveTime": 1,
+            "notes": "Conectar flat cables"
+          },
+          {
+            "id": "70671355-66cf-43ba-99b9-273f1a6b8042",
+            "routingId": "bd6292a8-0b9d-4392-9a11-93361b3be513",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem da estrutura principal",
+            "setupTime": 20,
+            "runTime": 15,
+            "queueTime": 5,
+            "moveTime": 2,
+            "notes": "Fixar placa mãe na carcaça"
+          }
+        ]
+      },
+      {
+        "id": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+        "productId": "400e5ce8-572c-4df2-bf01-5e2274cf4849",
+        "version": 1,
+        "description": "Linha de montagem completa do notebook",
+        "validFrom": "2026-09-01T12:04:38.294Z",
+        "validTo": null,
+        "active": true,
+        "createdAt": "2026-09-01T12:04:38.294Z",
+        "updatedAt": "2026-09-01T12:04:38.294Z",
+        "operations": [
+          {
+            "id": "050a3d02-5256-46a9-98bb-ad74ca85949b",
+            "routingId": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+            "sequence": 60,
+            "workCenterId": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+            "description": "Embalagem e etiquetagem",
+            "setupTime": 5,
+            "runTime": 8,
+            "queueTime": 2,
+            "moveTime": 1,
+            "notes": "Embalar com acessórios e manual"
+          },
+          {
+            "id": "1c20d680-b544-41f6-964a-b4c2b08a36fe",
+            "routingId": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+            "sequence": 30,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Montagem do display",
+            "setupTime": 15,
+            "runTime": 15,
+            "queueTime": 5,
+            "moveTime": 2,
+            "notes": "Conectar e fixar tela LCD"
+          },
+          {
+            "id": "21b50b00-1f6d-468b-b79b-e871747fa3b8",
+            "routingId": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+            "sequence": 20,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Instalação de memórias e bateria",
+            "setupTime": 10,
+            "runTime": 10,
+            "queueTime": 3,
+            "moveTime": 1,
+            "notes": "Instalar módulos RAM adicionais"
+          },
+          {
+            "id": "54f12dbb-e1b3-4497-98a4-012b9715e494",
+            "routingId": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+            "sequence": 50,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste funcional e burn-in",
+            "setupTime": 15,
+            "runTime": 30,
+            "queueTime": 10,
+            "moveTime": 2,
+            "notes": "Teste completo de 30 minutos"
+          },
+          {
+            "id": "74c6fb60-92cb-41fd-8024-f4a598e96e75",
+            "routingId": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem da base e placa mãe",
+            "setupTime": 25,
+            "runTime": 20,
+            "queueTime": 5,
+            "moveTime": 2,
+            "notes": "Fixar placa e componentes na base"
+          },
+          {
+            "id": "9ed2bf39-e36b-4642-8a88-3631173830e5",
+            "routingId": "fe50610c-6c69-4dde-902c-a31bb66e86d3",
+            "sequence": 40,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Montagem do teclado e touchpad",
+            "setupTime": 10,
+            "runTime": 12,
+            "queueTime": 3,
+            "moveTime": 1,
+            "notes": "Conectar flat cables"
+          }
+        ]
+      }
+    ],
+    "productionOrders": [
+      {
+        "id": "52bcd778-2936-4ac2-8f93-53c9b9a30aec",
+        "orderNumber": "OP-2025-001",
+        "productId": "7fba5cc0-0919-466c-b0af-0463437cfc41",
+        "quantity": 50,
+        "producedQty": 0,
+        "scrapQty": 0,
+        "priority": 7,
+        "status": "PLANNED",
+        "scheduledStart": "2025-01-15T11:00:00.000Z",
+        "scheduledEnd": "2025-01-20T21:00:00.000Z",
+        "actualStart": null,
+        "actualEnd": null,
+        "plannedCost": null,
+        "actualCost": null,
+        "notes": "Ordem para atender pedido da TechStore",
+        "createdAt": "2026-09-01T12:04:38.323Z",
+        "updatedAt": "2026-09-01T12:04:38.323Z",
+        "createdBy": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "operations": [
+          {
+            "id": "1e9b9fc0-0612-449b-be79-f795c009ee23",
+            "productionOrderId": "52bcd778-2936-4ac2-8f93-53c9b9a30aec",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem da estrutura principal",
+            "plannedQty": 50,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 20,
+            "runTime": 15,
+            "totalPlannedTime": 770,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "562a843b-1cac-430f-aacf-c0b75b2d6193",
+            "productionOrderId": "52bcd778-2936-4ac2-8f93-53c9b9a30aec",
+            "sequence": 30,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Fechamento e fixação",
+            "plannedQty": 50,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 5,
+            "runTime": 8,
+            "totalPlannedTime": 405,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "5fd69f7c-15e8-4dc3-bf01-9993cec935fc",
+            "productionOrderId": "52bcd778-2936-4ac2-8f93-53c9b9a30aec",
+            "sequence": 50,
+            "workCenterId": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+            "description": "Embalagem final",
+            "plannedQty": 50,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 5,
+            "runTime": 5,
+            "totalPlannedTime": 255,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "824f6c22-e2ab-47fd-a69f-0365bcb7499f",
+            "productionOrderId": "52bcd778-2936-4ac2-8f93-53c9b9a30aec",
+            "sequence": 20,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Instalação de display e bateria",
+            "plannedQty": 50,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 12,
+            "totalPlannedTime": 610,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "c2c66653-6947-4c5f-8471-da0c1acc2a24",
+            "productionOrderId": "52bcd778-2936-4ac2-8f93-53c9b9a30aec",
+            "sequence": 40,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste funcional completo",
+            "plannedQty": 50,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 10,
+            "totalPlannedTime": 510,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          }
+        ],
+        "pointings": []
+      },
+      {
+        "id": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+        "orderNumber": "OP-2025-002",
+        "productId": "400e5ce8-572c-4df2-bf01-5e2274cf4849",
+        "quantity": 20,
+        "producedQty": 0,
+        "scrapQty": 0,
+        "priority": 5,
+        "status": "RELEASED",
+        "scheduledStart": "2025-01-10T11:00:00.000Z",
+        "scheduledEnd": "2025-01-18T21:00:00.000Z",
+        "actualStart": null,
+        "actualEnd": null,
+        "plannedCost": null,
+        "actualCost": null,
+        "notes": "Ordem para MegaEletro Distribuidora",
+        "createdAt": "2026-09-01T12:04:38.403Z",
+        "updatedAt": "2026-09-01T12:04:38.403Z",
+        "createdBy": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "operations": [
+          {
+            "id": "05d9de49-b7d3-46cb-9abb-c3fbd5a22843",
+            "productionOrderId": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem da base e placa mãe",
+            "plannedQty": 20,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 25,
+            "runTime": 20,
+            "totalPlannedTime": 425,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "7dffb85f-0ad3-4636-b03d-8e1b68349df5",
+            "productionOrderId": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+            "sequence": 60,
+            "workCenterId": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+            "description": "Embalagem e etiquetagem",
+            "plannedQty": 20,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 5,
+            "runTime": 8,
+            "totalPlannedTime": 165,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "aa126946-c6a6-4074-a84b-7ce60595d4e6",
+            "productionOrderId": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+            "sequence": 50,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste funcional e burn-in",
+            "plannedQty": 20,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 15,
+            "runTime": 30,
+            "totalPlannedTime": 615,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "af73040e-a4ef-4fe3-9bf2-d3594208a596",
+            "productionOrderId": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+            "sequence": 40,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Montagem do teclado e touchpad",
+            "plannedQty": 20,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 12,
+            "totalPlannedTime": 250,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "e2edecb9-dba2-427b-b2c1-52f66b1ccb40",
+            "productionOrderId": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+            "sequence": 20,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Instalação de memórias e bateria",
+            "plannedQty": 20,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 10,
+            "totalPlannedTime": 210,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "ef21286a-41cf-40c8-ba4c-12340cde2f95",
+            "productionOrderId": "adfcb2c4-5892-48c2-9c25-c632e2e10883",
+            "sequence": 30,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Montagem do display",
+            "plannedQty": 20,
+            "completedQty": 0,
+            "scrapQty": 0,
+            "setupTime": 15,
+            "runTime": 15,
+            "totalPlannedTime": 315,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          }
+        ],
+        "pointings": []
+      },
+      {
+        "id": "cddc3a2a-5300-4b33-ab57-a7ad30c0ef66",
+        "orderNumber": "OP-2025-003",
+        "productId": "7fba5cc0-0919-466c-b0af-0463437cfc41",
+        "quantity": 100,
+        "producedQty": 45,
+        "scrapQty": 3,
+        "priority": 10,
+        "status": "IN_PROGRESS",
+        "scheduledStart": "2025-01-05T11:00:00.000Z",
+        "scheduledEnd": "2025-01-12T21:00:00.000Z",
+        "actualStart": "2025-01-05T11:15:00.000Z",
+        "actualEnd": null,
+        "plannedCost": null,
+        "actualCost": null,
+        "notes": "Ordem urgente - Cliente InfoShop",
+        "createdAt": "2026-09-01T12:04:38.482Z",
+        "updatedAt": "2026-09-01T12:04:38.482Z",
+        "createdBy": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "operations": [
+          {
+            "id": "18558206-4925-467f-be66-fe1230993dae",
+            "productionOrderId": "cddc3a2a-5300-4b33-ab57-a7ad30c0ef66",
+            "sequence": 50,
+            "workCenterId": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+            "description": "Embalagem final",
+            "plannedQty": 100,
+            "completedQty": 45,
+            "scrapQty": 0,
+            "setupTime": 5,
+            "runTime": 5,
+            "totalPlannedTime": 505,
+            "actualTime": 0,
+            "status": "PENDING",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "2c236e6a-e29e-4ddd-9552-97c571d00f3e",
+            "productionOrderId": "cddc3a2a-5300-4b33-ab57-a7ad30c0ef66",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem da estrutura principal",
+            "plannedQty": 100,
+            "completedQty": 100,
+            "scrapQty": 0,
+            "setupTime": 20,
+            "runTime": 15,
+            "totalPlannedTime": 1520,
+            "actualTime": 1520,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "8df1c8cd-f014-4712-8976-f0e663d44116",
+            "productionOrderId": "cddc3a2a-5300-4b33-ab57-a7ad30c0ef66",
+            "sequence": 40,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste funcional completo",
+            "plannedQty": 100,
+            "completedQty": 45,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 10,
+            "totalPlannedTime": 1010,
+            "actualTime": 0,
+            "status": "IN_PROGRESS",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "c26f6cc2-77cd-48a9-a1b9-6956d0032f0b",
+            "productionOrderId": "cddc3a2a-5300-4b33-ab57-a7ad30c0ef66",
+            "sequence": 30,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Fechamento e fixação",
+            "plannedQty": 100,
+            "completedQty": 100,
+            "scrapQty": 0,
+            "setupTime": 5,
+            "runTime": 8,
+            "totalPlannedTime": 805,
+            "actualTime": 805,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "d950901b-5bc9-4c2a-ad18-f75c642ac880",
+            "productionOrderId": "cddc3a2a-5300-4b33-ab57-a7ad30c0ef66",
+            "sequence": 20,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Instalação de display e bateria",
+            "plannedQty": 100,
+            "completedQty": 100,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 12,
+            "totalPlannedTime": 1210,
+            "actualTime": 1210,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          }
+        ],
+        "pointings": []
+      },
+      {
+        "id": "ddfe8535-8fc3-4cf2-9f9f-caa265ade1b4",
+        "orderNumber": "OP-2024-095",
+        "productId": "7fba5cc0-0919-466c-b0af-0463437cfc41",
+        "quantity": 25,
+        "producedQty": 0,
+        "scrapQty": 0,
+        "priority": 3,
+        "status": "CANCELLED",
+        "scheduledStart": "2024-12-15T11:00:00.000Z",
+        "scheduledEnd": "2024-12-20T21:00:00.000Z",
+        "actualStart": null,
+        "actualEnd": null,
+        "plannedCost": null,
+        "actualCost": null,
+        "notes": "Ordem cancelada - Cliente cancelou pedido",
+        "createdAt": "2026-09-01T12:04:38.632Z",
+        "updatedAt": "2026-09-01T12:04:38.632Z",
+        "createdBy": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "operations": [],
+        "pointings": []
+      },
+      {
+        "id": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+        "orderNumber": "OP-2024-099",
+        "productId": "400e5ce8-572c-4df2-bf01-5e2274cf4849",
+        "quantity": 30,
+        "producedQty": 30,
+        "scrapQty": 2,
+        "priority": 5,
+        "status": "COMPLETED",
+        "scheduledStart": "2024-12-20T11:00:00.000Z",
+        "scheduledEnd": "2024-12-28T21:00:00.000Z",
+        "actualStart": "2024-12-20T11:00:00.000Z",
+        "actualEnd": "2024-12-27T19:30:00.000Z",
+        "plannedCost": null,
+        "actualCost": null,
+        "notes": "Ordem concluída com sucesso",
+        "createdAt": "2026-09-01T12:04:38.552Z",
+        "updatedAt": "2026-09-01T12:04:38.552Z",
+        "createdBy": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "operations": [
+          {
+            "id": "02120939-5a73-4dd3-aaee-fdd1994da86b",
+            "productionOrderId": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+            "sequence": 20,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Instalação de memórias e bateria",
+            "plannedQty": 30,
+            "completedQty": 30,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 10,
+            "totalPlannedTime": 310,
+            "actualTime": 325,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "14754bda-657f-4d1b-880c-0cb3c1f68ba9",
+            "productionOrderId": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+            "sequence": 40,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Montagem do teclado e touchpad",
+            "plannedQty": 30,
+            "completedQty": 30,
+            "scrapQty": 0,
+            "setupTime": 10,
+            "runTime": 12,
+            "totalPlannedTime": 370,
+            "actualTime": 388,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "51ddf834-1d84-4661-947e-d883fd6a21e0",
+            "productionOrderId": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+            "sequence": 50,
+            "workCenterId": "227de02e-033e-4c5c-8987-6511494411b0",
+            "description": "Teste funcional e burn-in",
+            "plannedQty": 30,
+            "completedQty": 30,
+            "scrapQty": 0,
+            "setupTime": 15,
+            "runTime": 30,
+            "totalPlannedTime": 915,
+            "actualTime": 960,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "80a8d46e-3884-4ff8-922e-4be3fdee68d4",
+            "productionOrderId": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+            "sequence": 60,
+            "workCenterId": "63889c4e-fc9c-45b3-a7e7-f2f04ee4d6ac",
+            "description": "Embalagem e etiquetagem",
+            "plannedQty": 30,
+            "completedQty": 30,
+            "scrapQty": 0,
+            "setupTime": 5,
+            "runTime": 8,
+            "totalPlannedTime": 245,
+            "actualTime": 257,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "a0a04c4b-e1d6-483c-9146-4802825fb9d8",
+            "productionOrderId": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+            "sequence": 30,
+            "workCenterId": "c749e78f-137e-4762-be7f-060ccdc1130f",
+            "description": "Montagem do display",
+            "plannedQty": 30,
+            "completedQty": 30,
+            "scrapQty": 0,
+            "setupTime": 15,
+            "runTime": 15,
+            "totalPlannedTime": 465,
+            "actualTime": 487.5,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          },
+          {
+            "id": "ea71910a-304b-4c04-8c93-4d9947ba5955",
+            "productionOrderId": "fef0ec1a-bf74-4102-a119-7bbc0ec52f4e",
+            "sequence": 10,
+            "workCenterId": "437ebe24-aad1-4033-8740-526656ba8b98",
+            "description": "Montagem da base e placa mãe",
+            "plannedQty": 30,
+            "completedQty": 30,
+            "scrapQty": 0,
+            "setupTime": 25,
+            "runTime": 20,
+            "totalPlannedTime": 625,
+            "actualTime": 655,
+            "status": "COMPLETED",
+            "scheduledStart": null,
+            "scheduledEnd": null,
+            "actualStart": null,
+            "actualEnd": null
+          }
+        ],
+        "pointings": []
+      }
+    ],
+    "purchaseQuotations": [],
+    "purchaseOrders": [],
+    "purchaseReceipts": [],
+    "stockMovements": [],
+    "auditLogs": [
+      {
+        "id": "0909690b-9183-491f-8571-fd5efc1a6d53",
+        "userId": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "action": "read",
+        "resource": "warehouses",
+        "resourceId": null,
+        "description": "GET /api/v1/warehouses",
+        "ipAddress": "::ffff:172.25.0.1",
+        "userAgent": "curl/8.18.0",
+        "method": "GET",
+        "endpoint": "/api/v1/warehouses",
+        "statusCode": 403,
+        "requestBody": {},
+        "responseBody": {
+          "status": "error",
+          "message": "Permissão negada: armazens:visualizar necessária"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 11,
+        "createdAt": "2026-09-01T13:47:43.609Z"
+      },
+      {
+        "id": "02a2c061-49de-4d46-a2e8-7ababaf2ba5d",
+        "userId": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "action": "read",
+        "resource": "warehouses",
+        "resourceId": null,
+        "description": "GET /api/v1/warehouses",
+        "ipAddress": "::ffff:172.25.0.1",
+        "userAgent": "curl/8.18.0",
+        "method": "GET",
+        "endpoint": "/api/v1/warehouses",
+        "statusCode": 403,
+        "requestBody": {},
+        "responseBody": {
+          "status": "error",
+          "message": "Permissão negada: armazens:visualizar necessária"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 13,
+        "createdAt": "2026-09-01T13:47:43.530Z"
+      },
+      {
+        "id": "9f8695d7-892c-4e75-9509-ba7d794a2183",
+        "userId": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "action": "read",
+        "resource": "plans",
+        "resourceId": null,
+        "description": "GET /plans",
+        "ipAddress": "::ffff:172.25.0.1",
+        "userAgent": "curl/8.18.0",
+        "method": "GET",
+        "endpoint": "/api/v1/counting/plans",
+        "statusCode": 500,
+        "requestBody": {},
+        "responseBody": {
+          "error": "\nInvalid `prisma.countingPlan.findMany()` invocation in\n/app/src/services/counting-plan.service.ts:70:38\n\n  67   ];\n  68 }\n  69 \n→ 70 return await prisma.countingPlan.findMany(\nThe column `fabric.counting_plans.priority` does not exist in the current database."
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 36,
+        "createdAt": "2026-09-01T13:47:43.440Z"
+      },
+      {
+        "id": "d02a7a9f-0003-48cf-bc67-c45f03e3f5c4",
+        "userId": null,
+        "action": "create",
+        "resource": "login",
+        "resourceId": null,
+        "description": "POST /login",
+        "ipAddress": "::ffff:172.25.0.1",
+        "userAgent": "curl/8.18.0",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/login",
+        "statusCode": 200,
+        "requestBody": {
+          "email": "admin@fabric.com",
+          "password": "***REDACTED***"
+        },
+        "responseBody": {
+          "data": {
+            "user": {
+              "id": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+              "name": "Administrador",
+              "email": "admin@fabric.com"
+            },
+            "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYzRlYWVkOS0wMGQ3LTRmZmItOWQyNy0xMGUxMmRlNjFhOTIiLCJlbWFpbCI6ImFkbWluQGZhYnJpYy5jb20iLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImlhdCI6MTc4ODI3MDQ2MywiZXhwIjoxNzg4MzU2ODYzfQ.SfEoxbzZj6x0MDysL-Gzt0LhNt9oN-viErsMijZxB-M",
+            "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYzRlYWVkOS0wMGQ3LTRmZmItOWQyNy0xMGUxMmRlNjFhOTIiLCJlbWFpbCI6ImFkbWluQGZhYnJpYy5jb20iLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImlhdCI6MTc4ODI3MDQ2MywiZXhwIjoxNzg4ODc1MjYzfQ.4sDgtoILKJVSQ1xDhPqnk_yMRWNgJy9drGKc_APTYrM"
+          },
+          "status": "success"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 123,
+        "createdAt": "2026-09-01T13:47:43.314Z"
+      },
+      {
+        "id": "b458110c-8115-4251-922e-606b0302c45b",
+        "userId": null,
+        "action": "create",
+        "resource": "login",
+        "resourceId": null,
+        "description": "POST /login",
+        "ipAddress": "::ffff:172.25.0.1",
+        "userAgent": "curl/8.18.0",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/login",
+        "statusCode": 200,
+        "requestBody": {
+          "email": "admin@fabric.com",
+          "password": "***REDACTED***"
+        },
+        "responseBody": {
+          "data": {
+            "user": {
+              "id": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+              "name": "Administrador",
+              "email": "admin@fabric.com"
+            },
+            "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYzRlYWVkOS0wMGQ3LTRmZmItOWQyNy0xMGUxMmRlNjFhOTIiLCJlbWFpbCI6ImFkbWluQGZhYnJpYy5jb20iLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImlhdCI6MTc4ODI2OTkwMywiZXhwIjoxNzg4MzU2MzAzfQ.f3b_69X_QrmcgPWWw5GtRS5V5WzUvHGPVDDNu1QCYxk",
+            "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYzRlYWVkOS0wMGQ3LTRmZmItOWQyNy0xMGUxMmRlNjFhOTIiLCJlbWFpbCI6ImFkbWluQGZhYnJpYy5jb20iLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImlhdCI6MTc4ODI2OTkwMywiZXhwIjoxNzg4ODc0NzAzfQ.mOP_QBgKnwEUsfqSm7yG4M2ah57bABtYYiyk6JCdJZE"
+          },
+          "status": "success"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 153,
+        "createdAt": "2026-09-01T13:38:23.105Z"
+      },
+      {
+        "id": "91893232-2ad7-4c11-bf37-df5a3321068a",
+        "userId": null,
+        "action": "read",
+        "resource": "users",
+        "resourceId": null,
+        "description": "GET /api/v1/users",
+        "ipAddress": "::ffff:172.25.0.1",
+        "userAgent": "curl/8.18.0",
+        "method": "GET",
+        "endpoint": "/api/v1/users",
+        "statusCode": 401,
+        "requestBody": {},
+        "responseBody": {
+          "status": "error",
+          "message": "Token não fornecido"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 4,
+        "createdAt": "2026-09-01T13:38:13.161Z"
+      },
+      {
+        "id": "4a2696b7-4585-40e7-b34f-e5580e301927",
+        "userId": null,
+        "action": "create",
+        "resource": "login",
+        "resourceId": null,
+        "description": "POST /login",
+        "ipAddress": "::ffff:172.25.0.4",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/login",
+        "statusCode": 200,
+        "requestBody": {
+          "email": "admin2@fabric.com",
+          "password": "***REDACTED***"
+        },
+        "responseBody": {
+          "data": {
+            "user": {
+              "id": "19b110f1-b13d-4c83-8859-33362dfbc86a",
+              "name": "Administrador 2",
+              "email": "admin2@fabric.com"
+            },
+            "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxOWIxMTBmMS1iMTNkLTRjODMtODg1OS0zMzM2MmRmYmM4NmEiLCJlbWFpbCI6ImFkbWluMkBmYWJyaWMuY29tIiwibmFtZSI6IkFkbWluaXN0cmFkb3IgMiIsImlhdCI6MTc4ODI2NjczOCwiZXhwIjoxNzg4MzUzMTM4fQ.ibvovW6DJO3RObjNMH7tCj3TY24UXZ7PO5Gf-XQsauc",
+            "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxOWIxMTBmMS1iMTNkLTRjODMtODg1OS0zMzM2MmRmYmM4NmEiLCJlbWFpbCI6ImFkbWluMkBmYWJyaWMuY29tIiwibmFtZSI6IkFkbWluaXN0cmFkb3IgMiIsImlhdCI6MTc4ODI2NjczOCwiZXhwIjoxNzg4ODcxNTM4fQ.fymL_fhIO2AheKJtHnrUQ1JrO7I4pw7SEIyieAJXJts"
+          },
+          "status": "success"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 120,
+        "createdAt": "2026-09-01T12:45:38.560Z"
+      },
+      {
+        "id": "30a7c12c-3589-4e24-9642-7299bada291e",
+        "userId": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+        "action": "create",
+        "resource": "logout",
+        "resourceId": null,
+        "description": "POST /logout",
+        "ipAddress": "::ffff:172.25.0.4",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/logout",
+        "statusCode": 200,
+        "requestBody": {},
+        "responseBody": {
+          "status": "success",
+          "message": "Logout realizado com sucesso"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 3,
+        "createdAt": "2026-09-01T12:45:08.290Z"
+      },
+      {
+        "id": "7d3b0422-a0c9-43a1-aa68-0fbd0c792402",
+        "userId": null,
+        "action": "create",
+        "resource": "login",
+        "resourceId": null,
+        "description": "POST /login",
+        "ipAddress": "::ffff:172.25.0.4",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/login",
+        "statusCode": 200,
+        "requestBody": {
+          "email": "admin@fabric.com",
+          "password": "***REDACTED***"
+        },
+        "responseBody": {
+          "data": {
+            "user": {
+              "id": "ec4eaed9-00d7-4ffb-9d27-10e12de61a92",
+              "name": "Administrador",
+              "email": "admin@fabric.com"
+            },
+            "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYzRlYWVkOS0wMGQ3LTRmZmItOWQyNy0xMGUxMmRlNjFhOTIiLCJlbWFpbCI6ImFkbWluQGZhYnJpYy5jb20iLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImlhdCI6MTc4ODI2NjU5OSwiZXhwIjoxNzg4MzUyOTk5fQ.TlG9eJWwb12pHZ9U1_YAI2ZzAH2mMdO7ALHzlAynYl8",
+            "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJlYzRlYWVkOS0wMGQ3LTRmZmItOWQyNy0xMGUxMmRlNjFhOTIiLCJlbWFpbCI6ImFkbWluQGZhYnJpYy5jb20iLCJuYW1lIjoiQWRtaW5pc3RyYWRvciIsImlhdCI6MTc4ODI2NjU5OSwiZXhwIjoxNzg4ODcxMzk5fQ.lOfxmg__YJzCbyjB0WenCW2HgeeBJAewhFkrVBOHTPk"
+          },
+          "status": "success"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 120,
+        "createdAt": "2026-09-01T12:43:19.508Z"
+      },
+      {
+        "id": "17808136-ac1d-49eb-8e7f-adf96cfb41d8",
+        "userId": "19b110f1-b13d-4c83-8859-33362dfbc86a",
+        "action": "create",
+        "resource": "logout",
+        "resourceId": null,
+        "description": "POST /logout",
+        "ipAddress": "::ffff:172.25.0.4",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/logout",
+        "statusCode": 200,
+        "requestBody": {},
+        "responseBody": {
+          "status": "success",
+          "message": "Logout realizado com sucesso"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 3,
+        "createdAt": "2026-09-01T12:43:04.445Z"
+      },
+      {
+        "id": "1d116282-55e9-4229-a141-908b22479a64",
+        "userId": null,
+        "action": "create",
+        "resource": "login",
+        "resourceId": null,
+        "description": "POST /login",
+        "ipAddress": "::ffff:172.25.0.4",
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+        "method": "POST",
+        "endpoint": "/api/v1/auth/login",
+        "statusCode": 200,
+        "requestBody": {
+          "email": "admin2@fabric.com",
+          "password": "***REDACTED***"
+        },
+        "responseBody": {
+          "data": {
+            "user": {
+              "id": "19b110f1-b13d-4c83-8859-33362dfbc86a",
+              "name": "Administrador 2",
+              "email": "admin2@fabric.com"
+            },
+            "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxOWIxMTBmMS1iMTNkLTRjODMtODg1OS0zMzM2MmRmYmM4NmEiLCJlbWFpbCI6ImFkbWluMkBmYWJyaWMuY29tIiwibmFtZSI6IkFkbWluaXN0cmFkb3IgMiIsImlhdCI6MTc4ODI2NjU2OSwiZXhwIjoxNzg4MzUyOTY5fQ.L1TIzt11ucp3O_0TaLNQXO9lhUAm8kZZs5tkrNg2CYQ",
+            "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIxOWIxMTBmMS1iMTNkLTRjODMtODg1OS0zMzM2MmRmYmM4NmEiLCJlbWFpbCI6ImFkbWluMkBmYWJyaWMuY29tIiwibmFtZSI6IkFkbWluaXN0cmFkb3IgMiIsImlhdCI6MTc4ODI2NjU2OSwiZXhwIjoxNzg4ODcxMzY5fQ.6TlVQndKOaP4W-lXJjruzCSUKr_H2tcqrdsaiv_KeTk"
+          },
+          "status": "success"
+        },
+        "oldValues": null,
+        "newValues": null,
+        "errorMessage": null,
+        "durationMs": 180,
+        "createdAt": "2026-09-01T12:42:49.864Z"
+      }
+    ]
+  }
+}

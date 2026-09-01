@@ -21,9 +21,13 @@ model User {
   name          String
   active        Boolean   @default(true)
   lastLogin     DateTime?
+  // ✅ Fase 2 item 2.4 do cronograma: bloqueio de conta por tentativas de
+  // login falhas (nao existia nenhum controle por conta, so rate limit por IP)
+  failedLoginAttempts Int  @default(0)
+  lockedUntil   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
+
   roles         UserRole[]
   auditLogs     AuditLog[]
   productionPointings ProductionPointing[]
@@ -31,15 +35,46 @@ model User {
   notifications Notification[]
   notificationPreferences NotificationPreference[]
   countingAssignments CountingAssignment[]
-  
+  refreshTokens RefreshToken[]
+
   // Contagem de Estoque
   countingPlansCreated CountingPlan[] @relation("CountingPlanCreator")
   sessionsAssigned CountingSession[] @relation("SessionAssignedTo")
   sessionsCompleted CountingSession[] @relation("SessionCompletedBy")
   itemsCounted CountingItem[] @relation("ItemCountedBy")
   itemsRecounted CountingItem[] @relation("ItemRecountedBy")
-  
+
+  // ✅ Fase 4 item 4.5 do cronograma: FKs de auditoria (antes eram String
+  // solta, sem integridade referencial nenhuma)
+  productionOrdersCreated ProductionOrder[] @relation("ProductionOrderCreator")
+  purchaseQuotationsCreated PurchaseQuotation[] @relation("PurchaseQuotationCreator")
+  purchaseQuotationsApproved PurchaseQuotation[] @relation("PurchaseQuotationApprover")
+  purchaseOrdersCreated PurchaseOrder[] @relation("PurchaseOrderCreator")
+  purchaseOrdersApproved PurchaseOrder[] @relation("PurchaseOrderApprover")
+  purchaseReceiptsReceived PurchaseReceipt[] @relation("PurchaseReceiptReceiver")
+
   @@map("users")
+}
+
+// ✅ Fase 2 item 2.3 do cronograma: refresh tokens persistidos para permitir
+// revogacao/rotacao real. Antes o refresh token era puramente stateless (so
+// a assinatura JWT era checada) - logout nao invalidava nada, e um token
+// roubado continuava valido pelos 7 dias inteiros inteiros. So o `jti` e
+// guardado (nao o token inteiro): ele e um identificador aleatorio sem valor
+// sozinho, quem prova posse e a assinatura JWT que so o servidor sabe validar.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  jti       String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
 
 model Role {
@@ -119,7 +154,10 @@ model AuditLog {
   user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   
   @@index([userId])
+  @@index([userId, createdAt])
   @@index([resource])
+  @@index([resourceId])
+  @@index([resource, resourceId, createdAt])
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
@@ -144,7 +182,8 @@ model WorkCenter {
   
   operations    RoutingOperation[]
   productionOperations ProductionOrderOperation[]
-  
+  productionPointings ProductionPointing[]
+
   @@map("work_centers")
 }
 
@@ -169,7 +208,7 @@ model Supplier {
   code          String    @unique
   name          String
   legalName     String?
-  document      String?
+  document      String?   @unique
   email         String?
   phone         String?
   address       String?
@@ -195,7 +234,7 @@ model Customer {
   code          String    @unique
   name          String
   legalName     String?
-  document      String?
+  document      String?   @unique
   email         String?
   phone         String?
   address       String?
@@ -254,10 +293,29 @@ model Product {
   receiptItems  PurchaseReceiptItem[]
   countingItems CountingItem[]
   countingPlanProducts CountingPlanProduct[]
-  
+  stockBalance  StockBalance?
+
   @@index([type])
   @@index([active])
   @@map("products")
+}
+
+// Saldo de estoque persistido por produto. Antes, o saldo era somado em memoria
+// a partir de todo o historico de stock_movements a cada consulta - alem de
+// caro, nao existia uma linha para travar (SELECT ... FOR UPDATE) e evitar que
+// duas movimentacoes concorrentes do mesmo produto lessem o mesmo saldo "fantasma"
+// e ambas decidissem que havia estoque suficiente. Ver Fase 1 do cronograma
+// (docs/fase-2026-09-modernizacao/02_CRONOGRAMA_IMPLEMENTACOES.md, itens 1.1/1.2).
+model StockBalance {
+  id        String   @id @default(uuid())
+  productId String   @unique
+  quantity  Float    @default(0)
+  version   Int      @default(0) // lock otimista para leituras fora de transacao
+  updatedAt DateTime @updatedAt
+
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@map("stock_balances")
 }
 
 model ProductCategory {
@@ -308,6 +366,8 @@ model BOMItem {
   unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
   
   @@index([bomId])
+  @@unique([bomId, componentId])
+  @@unique([bomId, sequence])
   @@map("bom_items")
 }
 
@@ -346,6 +406,7 @@ model RoutingOperation {
   workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
   
   @@index([routingId])
+  @@unique([routingId, sequence])
   @@map("routing_operations")
 }
 
@@ -362,6 +423,12 @@ model ProductionOrder {
   scrapQty      Float     @default(0)
   priority      Int       @default(5)
   status        String    @default("PLANNED")
+  // ✅ Fase 4 item 4.2 do cronograma: lock otimista (evita "lost update" quando
+  // dois usuarios editam a mesma ordem em telas abertas ao mesmo tempo -
+  // diferente dos locks pessimistas ja adicionados nas Fases 1/3 para as
+  // race conditions especificas ja encontradas, este cobre o caso geral de
+  // edicao concorrente via formulario)
+  version       Int       @default(0)
   
   scheduledStart DateTime
   scheduledEnd  DateTime
@@ -375,14 +442,17 @@ model ProductionOrder {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   createdBy     String
-  
+
   product       Product   @relation(fields: [productId], references: [id])
+  creator       User      @relation("ProductionOrderCreator", fields: [createdBy], references: [id])
   operations    ProductionOrderOperation[]
   pointings     ProductionPointing[]
-  
+
   @@index([status])
   @@index([scheduledStart])
+  @@index([status, scheduledStart])
   @@index([productId])
+  @@index([createdBy])
   @@map("production_orders")
 }
 
@@ -392,7 +462,9 @@ model ProductionOrderOperation {
   sequence      Int
   workCenterId  String
   description   String
-  
+  // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder)
+  version       Int       @default(0)
+
   plannedQty    Float
   completedQty  Float     @default(0)
   scrapQty      Float     @default(0)
@@ -422,28 +494,33 @@ model ProductionPointing {
   id            String    @id @default(uuid())
   productionOrderId String
   operationId   String
+  workCenterId  String
   userId        String
-  
+
   quantityGood  Float
   quantityScrap Float     @default(0)
-  
+
   setupTime     Float     @default(0)
   runTime       Float
-  
+
   startTime     DateTime
   endTime       DateTime
-  
+
   notes         String?
   createdAt     DateTime  @default(now())
-  
+
   productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
   operation     ProductionOrderOperation @relation(fields: [operationId], references: [id])
+  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
   user          User      @relation(fields: [userId], references: [id])
-  
+
   @@index([productionOrderId])
   @@index([operationId])
+  @@index([workCenterId])
   @@index([userId])
   @@index([startTime])
+  @@index([operationId, startTime])
+  @@index([userId, startTime])
   @@map("production_pointings")
 }
 
@@ -457,20 +534,23 @@ model StockMovement {
   type          String    // IN, OUT, ADJUSTMENT
   quantity      Float
   reason        String
-  reference     String?   // ID da OP, Pedido, etc
-  referenceType String?   // PRODUCTION, PURCHASE, ADJUSTMENT
+  reference     String?   // ID da OP, Pedido, etc (sem FK - campo polimorfico, ver referenceType)
+  referenceType String?   // PRODUCTION, PURCHASE, ADJUSTMENT, MANUAL, COUNTING
+  countingSessionId String? // FK dedicada, preenchida apenas quando referenceType = COUNTING
   userId        String
   notes         String?
   createdAt     DateTime  @default(now())
-  
+
   product       Product   @relation(fields: [productId], references: [id])
   user          User      @relation(fields: [userId], references: [id])
-  countingSession CountingSession? @relation("CountingAdjustments", fields: [reference], references: [id])
+  countingSession CountingSession? @relation("CountingAdjustments", fields: [countingSessionId], references: [id])
   
   @@index([productId])
+  @@index([productId, createdAt])
   @@index([type])
   @@index([createdAt])
   @@index([reference])
+  @@index([referenceType, reference])
   @@map("stock_movements")
 }
 
@@ -494,12 +574,15 @@ model PurchaseQuotation {
   updatedAt     DateTime  @updatedAt
   
   supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  creator       User      @relation("PurchaseQuotationCreator", fields: [createdBy], references: [id])
+  approver      User?     @relation("PurchaseQuotationApprover", fields: [approvedBy], references: [id])
   items         PurchaseQuotationItem[]
   purchaseOrders PurchaseOrder[]
-  
+
   @@index([supplierId])
   @@index([status])
   @@index([requestDate])
+  @@index([createdBy])
   @@map("purchase_quotations")
 }
 
@@ -545,13 +628,16 @@ model PurchaseOrder {
   
   supplier      Supplier  @relation(fields: [supplierId], references: [id])
   quotation     PurchaseQuotation? @relation(fields: [quotationId], references: [id])
+  creator       User      @relation("PurchaseOrderCreator", fields: [createdBy], references: [id])
+  approver      User?     @relation("PurchaseOrderApprover", fields: [approvedBy], references: [id])
   items         PurchaseOrderItem[]
   receipts      PurchaseReceipt[]
-  
+
   @@index([supplierId])
   @@index([quotationId])
   @@index([status])
   @@index([orderDate])
+  @@index([createdBy])
   @@map("purchase_orders")
 }
 
@@ -565,6 +651,11 @@ model PurchaseOrderItem {
   discount      Float     @default(0)
   totalPrice    Float
   notes         String?
+  // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder) -
+  // protege receivedQty contra "lost update" quando dois recebimentos do
+  // mesmo item de pedido são processados perto um do outro sem estarem
+  // dentro da mesma transação
+  version       Int       @default(0)
   
   order         PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product       Product   @relation(fields: [productId], references: [id])
@@ -586,10 +677,12 @@ model PurchaseReceipt {
   createdAt     DateTime  @default(now())
   
   order         PurchaseOrder @relation(fields: [orderId], references: [id])
+  receiver      User      @relation("PurchaseReceiptReceiver", fields: [receivedBy], references: [id])
   items         PurchaseReceiptItem[]
-  
+
   @@index([orderId])
   @@index([receiptDate])
+  @@index([receivedBy])
   @@map("purchase_receipts")
 }
 
@@ -776,7 +869,9 @@ model CountingSession {
   code              String              @unique
   planId            String
   status            SessionStatus       @default(SCHEDULED)
-  
+  // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder)
+  version           Int                 @default(0)
+
   // Datas
   scheduledDate     DateTime
   startedAt         DateTime?
@@ -807,6 +902,7 @@ model CountingSession {
   @@index([planId])
   @@index([status, scheduledDate])
   @@index([assignedTo])
+  @@unique([planId, scheduledDate])
   @@map("counting_sessions")
 }
 
@@ -816,7 +912,12 @@ model CountingItem {
   sessionId         String
   productId         String
   locationId        String?
-  
+  // ✅ Fase 4 item 4.2: lock otimista - camada extra alem do lock pessimista
+  // (SELECT ... FOR UPDATE) ja adicionado em count()/recount() na Fase 3;
+  // esse cobre chamadas concorrentes na MESMA requisicao logica, este cobre
+  // o cliente que ficou com dados desatualizados na tela por mais tempo
+  version           Int                 @default(0)
+
   // Quantidades
   systemQty         Decimal             @db.Decimal(10, 2)
   countedQty        Decimal?            @db.Decimal(10, 2)
@@ -859,6 +960,7 @@ model CountingItem {
   @@index([productId])
   @@index([hasDifference])
   @@index([countedBy])
+  @@unique([sessionId, productId, locationId])
   @@map("counting_items")
 }
 

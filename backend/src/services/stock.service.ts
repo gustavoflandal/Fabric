@@ -1,6 +1,10 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
+import { AppError } from '../middleware/error.middleware';
+
+type TransactionClient = Prisma.TransactionClient;
 
 export interface StockMovementDto {
   productId: string;
@@ -8,7 +12,8 @@ export interface StockMovementDto {
   quantity: number;
   reason: string;
   reference?: string;
-  referenceType?: 'PRODUCTION' | 'PURCHASE' | 'ADJUSTMENT' | 'MANUAL';
+  referenceType?: 'PRODUCTION' | 'PURCHASE' | 'ADJUSTMENT' | 'MANUAL' | 'COUNTING';
+  countingSessionId?: string;
   userId: string;
   notes?: string;
 }
@@ -26,37 +31,49 @@ export interface StockBalance {
 
 export class StockServiceRefactored {
   /**
-   * Registra uma movimentação de estoque
+   * Lê o saldo travando a linha (SELECT ... FOR UPDATE dentro da transação),
+   * cria a movimentação e atualiza o saldo - tudo atômico e serializado por
+   * produto. Compartilhado por registerMovement (própria transação) e por
+   * reserveForOrder (transação do chamador), por isso recebe o `tx`.
+   *
+   * ✅ CORREÇÃO RACE CONDITION (Fase 1, itens 1.1/1.2 do cronograma):
+   * antes, o saldo era somado em memória a partir de stock_movements a cada
+   * chamada - não existia linha para travar, então duas movimentações
+   * concorrentes do mesmo produto podiam ler o mesmo saldo "fantasma" e
+   * ambas decidirem que havia estoque suficiente.
    */
-  async registerMovement(data: StockMovementDto) {
-    // Validar produto
-    const product = await prisma.product.findUnique({
-      where: { id: data.productId },
+  /**
+   * Versão pública de applyMovement para chamadores externos que já têm uma
+   * transação própria e precisam que a movimentação de estoque seja
+   * atômica junto com outras escritas (ex: purchase-receipt.service.ts::
+   * cancel(), onde o estorno de estoque e a exclusão do recebimento
+   * precisam ser tudo ou nada).
+   */
+  async registerMovementInTransaction(tx: TransactionClient, data: StockMovementDto) {
+    return this.applyMovement(tx, data);
+  }
+
+  private async applyMovement(tx: TransactionClient, data: StockMovementDto) {
+    await tx.stockBalance.upsert({
+      where: { productId: data.productId },
+      create: { productId: data.productId, quantity: 0 },
+      update: {},
     });
 
-    if (!product) {
-      throw new Error('Produto não encontrado');
+    const locked = await tx.$queryRaw<{ quantity: number }[]>`
+      SELECT quantity FROM stock_balances WHERE productId = ${data.productId} FOR UPDATE
+    `;
+    const currentQty = Number(locked[0]?.quantity ?? 0);
+    const delta = data.type === 'OUT' ? -data.quantity : data.quantity;
+
+    if (data.type === 'OUT' && currentQty < data.quantity) {
+      throw new AppError(
+        400,
+        `Estoque insuficiente. Disponível: ${currentQty}, Solicitado: ${data.quantity}`
+      );
     }
 
-    // Validar quantidade
-    if (data.quantity <= 0) {
-      throw new Error('Quantidade deve ser maior que zero');
-    }
-
-    // Se for saída, verificar se há estoque disponível
-    if (data.type === 'OUT') {
-      const currentBalance = await this.getBalance(data.productId);
-      
-      if (currentBalance.quantity < data.quantity) {
-        throw new Error(
-          `Estoque insuficiente. Disponível: ${currentBalance.quantity}, ` +
-          `Solicitado: ${data.quantity}`
-        );
-      }
-    }
-
-    // Criar movimentação
-    const movement = await prisma.stockMovement.create({
+    const movement = await tx.stockMovement.create({
       data: {
         productId: data.productId,
         type: data.type,
@@ -64,6 +81,7 @@ export class StockServiceRefactored {
         reason: data.reason,
         reference: data.reference,
         referenceType: data.referenceType,
+        countingSessionId: data.countingSessionId,
         userId: data.userId,
         notes: data.notes,
       },
@@ -78,6 +96,34 @@ export class StockServiceRefactored {
         },
       },
     });
+
+    await tx.stockBalance.update({
+      where: { productId: data.productId },
+      data: { quantity: currentQty + delta, version: { increment: 1 } },
+    });
+
+    return movement;
+  }
+
+  /**
+   * Registra uma movimentação de estoque
+   */
+  async registerMovement(data: StockMovementDto) {
+    // Validar produto
+    const product = await prisma.product.findUnique({
+      where: { id: data.productId },
+    });
+
+    if (!product) {
+      throw new AppError(404, 'Produto não encontrado');
+    }
+
+    // Validar quantidade
+    if (data.quantity <= 0) {
+      throw new AppError(400, 'Quantidade deve ser maior que zero');
+    }
+
+    const movement = await prisma.$transaction((tx) => this.applyMovement(tx, data));
 
     // Emitir evento
     await eventBus.emit(SystemEvents.STOCK_MOVEMENT_CREATED, {
@@ -103,7 +149,8 @@ export class StockServiceRefactored {
   }
 
   /**
-   * Obtém saldo REAL de estoque de um produto
+   * Obtém saldo REAL de estoque de um produto (lido da tabela de saldo
+   * persistida, não mais recalculado somando o histórico inteiro)
    */
   async getBalance(productId: string): Promise<StockBalance> {
     const product = await prisma.product.findUnique({
@@ -115,29 +162,26 @@ export class StockServiceRefactored {
     });
 
     if (!product) {
-      throw new Error('Produto não encontrado');
+      throw new AppError(404, 'Produto não encontrado');
     }
 
-    // Calcular saldo baseado em movimentações REAIS
-    const movements = await prisma.stockMovement.findMany({
+    let balanceRow = await prisma.stockBalance.findUnique({ where: { productId } });
+    if (!balanceRow) {
+      balanceRow = await prisma.stockBalance.upsert({
+        where: { productId },
+        create: { productId, quantity: 0 },
+        update: {},
+      });
+    }
+
+    const lastMovementRow = await prisma.stockMovement.findFirst({
       where: { productId },
       orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
     });
 
-    let quantity = 0;
-    let lastMovement: Date | undefined;
-
-    for (const movement of movements) {
-      if (movement.type === 'IN' || movement.type === 'ADJUSTMENT') {
-        quantity += movement.quantity;
-      } else if (movement.type === 'OUT') {
-        quantity -= movement.quantity;
-      }
-
-      if (!lastMovement || movement.createdAt > lastMovement) {
-        lastMovement = movement.createdAt;
-      }
-    }
+    const quantity = balanceRow.quantity;
+    const lastMovement = lastMovementRow?.createdAt;
 
     const minStock = product.minStock || 0;
     const maxStock = product.maxStock || 1000;
@@ -308,7 +352,7 @@ export class StockServiceRefactored {
     const difference = newQuantity - currentBalance.quantity;
 
     if (difference === 0) {
-      throw new Error('Nova quantidade é igual à quantidade atual');
+      throw new AppError(400, 'Nova quantidade é igual à quantidade atual');
     }
 
     const type = difference > 0 ? 'IN' : 'OUT';
@@ -478,7 +522,7 @@ export class StockServiceRefactored {
     const difference = data.quantity - currentBalance.quantity;
 
     if (difference === 0) {
-      throw new Error('Nova quantidade é igual à quantidade atual');
+      throw new AppError(400, 'Nova quantidade é igual à quantidade atual');
     }
 
     const type = difference > 0 ? 'IN' : 'OUT';
@@ -509,7 +553,7 @@ export class StockServiceRefactored {
       });
 
       if (!order) {
-        throw new Error('Ordem de produção não encontrada');
+        throw new AppError(404, 'Ordem de produção não encontrada');
       }
 
       // Buscar BOM ativa do produto
@@ -528,10 +572,13 @@ export class StockServiceRefactored {
       });
 
       if (!activeBom) {
-        throw new Error('BOM ativa não encontrada para o produto');
+        throw new AppError(404, 'BOM ativa não encontrada para o produto');
       }
 
-      // ✅ FASE 1: Validar TODOS os estoques antes de reservar qualquer um (fail-fast)
+      // ✅ FASE 1: Validar TODOS os estoques antes de reservar qualquer um (fail-fast).
+      // Trava cada linha de saldo aqui mesmo (a mesma transação/conexão reutiliza o
+      // lock em FASE 2) para que nenhuma outra reserva concorrente consiga ler um
+      // saldo desatualizado entre a validação e a escrita.
       const requiredItems = activeBom.items.map(bomItem => ({
         componentId: bomItem.componentId,
         componentCode: bomItem.component.code,
@@ -539,36 +586,34 @@ export class StockServiceRefactored {
       }));
 
       for (const item of requiredItems) {
-        const movements = await tx.stockMovement.findMany({
+        await tx.stockBalance.upsert({
           where: { productId: item.componentId },
+          create: { productId: item.componentId, quantity: 0 },
+          update: {},
         });
 
-        const balance = movements.reduce((sum, mov) => {
-          return mov.type === 'IN' ? sum + mov.quantity : sum - mov.quantity;
-        }, 0);
+        const locked = await tx.$queryRaw<{ quantity: number }[]>`
+          SELECT quantity FROM stock_balances WHERE productId = ${item.componentId} FOR UPDATE
+        `;
+        const balance = Number(locked[0]?.quantity ?? 0);
 
         if (balance < item.requiredQty) {
-          throw new Error(`Estoque insuficiente para ${item.componentCode}: disponível ${balance}, necessário ${item.requiredQty}`);
+          throw new AppError(400, `Estoque insuficiente para ${item.componentCode}: disponível ${balance}, necessário ${item.requiredQty}`);
         }
       }
 
-      // ✅ FASE 2: Todos os estoques validados, agora registrar TODAS as saídas
+      // ✅ FASE 2: Todos os estoques validados e travados, agora registrar TODAS as saídas
       const reservations = [];
 
       for (const item of requiredItems) {
-        const movement = await tx.stockMovement.create({
-          data: {
-            productId: item.componentId,
-            type: 'OUT',
-            quantity: item.requiredQty,
-            reason: 'Reserva para produção',
-            reference: order.orderNumber,
-            referenceType: 'MANUAL',
-            userId,
-          },
-          include: {
-            product: true,
-          },
+        const movement = await this.applyMovement(tx, {
+          productId: item.componentId,
+          type: 'OUT',
+          quantity: item.requiredQty,
+          reason: 'Reserva para produção',
+          reference: order.orderNumber,
+          referenceType: 'MANUAL',
+          userId,
         });
 
         reservations.push(movement);

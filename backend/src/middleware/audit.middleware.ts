@@ -48,11 +48,16 @@ export const auditMiddleware = async (
       const pathParts = req.path.split('/').filter(Boolean);
       const resource = pathParts[pathParts.length - 1] || 'unknown';
 
-      // Lista de rotas que NÃO devem ser logadas
+      // Lista de rotas que NÃO devem ser logadas.
+      // ✅ Fase 2 item 2.5 do cronograma: /auth/login e /auth/register
+      // removidos daqui - login (inclusive falho) é exatamente o tipo de
+      // evento que uma trilha de auditoria precisa cobrir, e antes ficava
+      // totalmente de fora (o retorno abaixo é incondicional, nem erros
+      // eram logados). /auth/refresh continua excluído para não gerar um
+      // log a cada renovação automática de token (alto volume, baixo valor);
+      // se for preciso investigar abuso de refresh token, tratar à parte.
       const excludedPaths = [
         '/health',
-        '/auth/login',
-        '/auth/register',
         '/auth/refresh',
         '/auth/me',
         '/audit-logs',        // Não logar consultas de logs
