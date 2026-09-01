@@ -4,10 +4,10 @@ services:
     container_name: fabric-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_ROOT_PASSWORD: FIXGfLVQw9vNY4CxnCdzcz2
       MYSQL_DATABASE: fabric
       MYSQL_USER: fabric
-      MYSQL_PASSWORD: fabric123
+      MYSQL_PASSWORD: pYKz4wg7GJjwVRv7IoFEkw
     ports:
       - "3306:3306"
     volumes:
@@ -22,9 +22,9 @@ services:
     container_name: fabric-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: "mysql://fabric:fabric123@mysql:3306/fabric"
-      JWT_SECRET: "change-this-jwt-secret-at-least-32-characters-long"
-      JWT_REFRESH_SECRET: "change-this-refresh-secret-at-least-32-chars"
+      DATABASE_URL: "mysql://fabric:pYKz4wg7GJjwVRv7IoFEkw@mysql:3306/fabric"
+      JWT_SECRET: "99d18635296e305de5674beafbd502d0a23c1e2c1b39bd21a100497d3deb3064"
+      JWT_REFRESH_SECRET: "bab03802fdfbd9da8cebe1b3370b26db1281e915699eb7515bdfefacc02b310a"
       PORT: 3001
       NODE_ENV: development
     command: sh -c "npx prisma generate && npm run dev"

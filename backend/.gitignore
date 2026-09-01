@@ -11,10 +11,10 @@ coverage/
 dist/
 build/
 
-# Environment
+# Environment (qualquer .env*, exceto o template .env.example)
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # IDE
 .vscode/

@@ -6,10 +6,10 @@ services:
     container_name: fabric-mysql-dev
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_ROOT_PASSWORD: FIXGfLVQw9vNY4CxnCdzcz2
       MYSQL_DATABASE: fabric
       MYSQL_USER: fabric
-      MYSQL_PASSWORD: fabric123
+      MYSQL_PASSWORD: pYKz4wg7GJjwVRv7IoFEkw
     ports:
       - "3306:3306"
     volumes:
