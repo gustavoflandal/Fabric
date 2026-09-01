@@ -33,14 +33,14 @@ Não espera sprint planning. São correções pequenas e isoladas com risco de s
 
 O núcleo do problema: estoque sem saldo persistido e sem lock.
 
-| # | Ação | Esforço | Depende de |
+| # | Ação | Esforço | Status |
 |---|---|---|---|
-| 1.1 | Desenhar e migrar `StockBalance` (saldo por produto/posição) com campo `version` | 1 semana | — |
-| 1.2 | Reescrever `stock.service.ts::getBalance`/`registerMovement` para ler/escrever a linha de saldo dentro de transação com lock otimista | 1 semana | 1.1 |
-| 1.3 | Corrigir FK inválida `stock_movements.reference` → criar `countingSessionId` dedicado e migrar dados | 1-2 dias | — |
-| 1.4 | Reconciliar drift schema↔migrations: gerar migration para `warehouses`/`warehouse_structures`, corrigir `snake_case` de `counting_plan_products`/`counting_assignments`, remover migration vazia duplicada | 3-5 dias | — |
-| 1.5 | Envolver `production-pointing.service.ts` (apontamento + consumo de material + movimento de estoque + status da OP) em `$transaction` | 1-2 dias | 1.2 |
-| 1.6 | Corrigir atomicidade de `purchase-receipt.service.ts` (`cancel()`, `updateProductCosts()`) | 1 dia | 1.2 |
+| 1.1 | Desenhar e migrar `StockBalance` (saldo por produto/posição) com campo `version` | 1 semana | ✅ Feito |
+| 1.2 | Reescrever `stock.service.ts::getBalance`/`registerMovement` para ler/escrever a linha de saldo dentro de transação com lock otimista | 1 semana | ✅ Feito — testado ao vivo com 5 requisições concorrentes (ver commit) |
+| 1.3 | Corrigir FK inválida `stock_movements.reference` → criar `countingSessionId` dedicado e migrar dados | 1-2 dias | ✅ Feito |
+| 1.4 | Reconciliar drift schema↔migrations: gerar migration para `warehouses`/`warehouse_structures`, corrigir `snake_case` de `counting_plan_products`/`counting_assignments`, remover migration vazia duplicada | 3-5 dias | ✅ Feito — `prisma migrate diff` confirma zero drift |
+| 1.5 | Envolver `production-pointing.service.ts` (apontamento + consumo de material + movimento de estoque + status da OP) em `$transaction` | 1-2 dias | ✅ Feito, com achado adicional: o módulo estava **totalmente inoperante** (schema drift em `workCenterId`/nomes de campo — não só falta de transação). Corrigido por completo, testado ao vivo end-to-end |
+| 1.6 | Corrigir atomicidade de `purchase-receipt.service.ts` (`cancel()`, `updateProductCosts()`) | 1 dia | 🚧 Em andamento |
 
 **Entregável:** operações de estoque e produção consistentes sob concorrência; schema íntegro e alinhado às migrations.
 
