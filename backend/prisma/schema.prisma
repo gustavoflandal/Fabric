@@ -44,6 +44,15 @@ model User {
   itemsCounted CountingItem[] @relation("ItemCountedBy")
   itemsRecounted CountingItem[] @relation("ItemRecountedBy")
 
+  // ✅ Fase 4 item 4.5 do cronograma: FKs de auditoria (antes eram String
+  // solta, sem integridade referencial nenhuma)
+  productionOrdersCreated ProductionOrder[] @relation("ProductionOrderCreator")
+  purchaseQuotationsCreated PurchaseQuotation[] @relation("PurchaseQuotationCreator")
+  purchaseQuotationsApproved PurchaseQuotation[] @relation("PurchaseQuotationApprover")
+  purchaseOrdersCreated PurchaseOrder[] @relation("PurchaseOrderCreator")
+  purchaseOrdersApproved PurchaseOrder[] @relation("PurchaseOrderApprover")
+  purchaseReceiptsReceived PurchaseReceipt[] @relation("PurchaseReceiptReceiver")
+
   @@map("users")
 }
 
@@ -427,15 +436,17 @@ model ProductionOrder {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   createdBy     String
-  
+
   product       Product   @relation(fields: [productId], references: [id])
+  creator       User      @relation("ProductionOrderCreator", fields: [createdBy], references: [id])
   operations    ProductionOrderOperation[]
   pointings     ProductionPointing[]
-  
+
   @@index([status])
   @@index([scheduledStart])
   @@index([status, scheduledStart])
   @@index([productId])
+  @@index([createdBy])
   @@map("production_orders")
 }
 
@@ -555,12 +566,15 @@ model PurchaseQuotation {
   updatedAt     DateTime  @updatedAt
   
   supplier      Supplier  @relation(fields: [supplierId], references: [id])
+  creator       User      @relation("PurchaseQuotationCreator", fields: [createdBy], references: [id])
+  approver      User?     @relation("PurchaseQuotationApprover", fields: [approvedBy], references: [id])
   items         PurchaseQuotationItem[]
   purchaseOrders PurchaseOrder[]
-  
+
   @@index([supplierId])
   @@index([status])
   @@index([requestDate])
+  @@index([createdBy])
   @@map("purchase_quotations")
 }
 
@@ -606,13 +620,16 @@ model PurchaseOrder {
   
   supplier      Supplier  @relation(fields: [supplierId], references: [id])
   quotation     PurchaseQuotation? @relation(fields: [quotationId], references: [id])
+  creator       User      @relation("PurchaseOrderCreator", fields: [createdBy], references: [id])
+  approver      User?     @relation("PurchaseOrderApprover", fields: [approvedBy], references: [id])
   items         PurchaseOrderItem[]
   receipts      PurchaseReceipt[]
-  
+
   @@index([supplierId])
   @@index([quotationId])
   @@index([status])
   @@index([orderDate])
+  @@index([createdBy])
   @@map("purchase_orders")
 }
 
@@ -647,10 +664,12 @@ model PurchaseReceipt {
   createdAt     DateTime  @default(now())
   
   order         PurchaseOrder @relation(fields: [orderId], references: [id])
+  receiver      User      @relation("PurchaseReceiptReceiver", fields: [receivedBy], references: [id])
   items         PurchaseReceiptItem[]
-  
+
   @@index([orderId])
   @@index([receiptDate])
+  @@index([receivedBy])
   @@map("purchase_receipts")
 }
 
