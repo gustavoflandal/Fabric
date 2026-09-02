@@ -98,16 +98,18 @@ Campos sensíveis são automaticamente redactados:
 - `accessToken` → `***REDACTED***`
 - `refreshToken` → `***REDACTED***`
 
-### 4. Filtros e Exclusões
+### 4. Modo de Captura (configurável)
 
-**Não são logadas**:
-- Requisições de health check
-- Login/Register (para não logar senhas)
-- Requisições GET bem-sucedidas (opcional)
+Controlado pela env var `AUDIT_LOG_MODE` (ver `backend/.env`, lido em `config/env.ts`):
 
-**São sempre logadas**:
-- Todas operações de escrita (POST, PUT, DELETE)
-- Requisições com erro (status >= 400)
+| Modo | Comportamento |
+|---|---|
+| `all` | Loga tudo; leituras (GET) só entram se `AUDIT_LOG_INCLUDE_READS=true` |
+| `write_only` (padrão) | Loga apenas escritas (POST/PUT/DELETE) e qualquer requisição com erro |
+| `errors_only` | Loga apenas requisições com status de erro |
+| `none` | Não loga nada |
+
+**Sempre excluídas**, independente do modo: health check, login/register (para não capturar senhas em texto claro no corpo da requisição).
 
 ## 📡 API Endpoints
 
@@ -145,6 +147,13 @@ Retorna:
 - Logs por ação
 - Logs por recurso
 - Top 10 usuários mais ativos
+
+### Limpeza Manual por Período
+```http
+DELETE /api/v1/audit-logs/clean?startDate=2024-01-01&endDate=2024-12-31
+```
+
+Requer a permissão `audit_logs:delete`. Ver também a limpeza automática abaixo.
 
 ## 🎨 Interface Web
 
@@ -195,8 +204,8 @@ Retorna:
 
 1. **Sanitização Automática**: Dados sensíveis são redactados
 2. **Acesso Restrito**: Apenas usuários autenticados
-3. **Logs Imutáveis**: Não há endpoint de edição/exclusão
-4. **Retenção**: Definir política de retenção (ex: 90 dias)
+3. **Logs Imutáveis**: Não há endpoint de edição, apenas leitura e exclusão por período
+4. **Retenção Automática**: job diário (`log-cleanup.job.ts`, roda às 2h) remove logs mais antigos que `AUDIT_LOG_RETENTION_DAYS` (padrão 90 dias, configurável em `backend/.env`)
 
 ### Boas Práticas
 
@@ -313,7 +322,6 @@ Padrão suspeito de acessos
 - [ ] Integração com SIEM
 - [ ] Machine Learning para detecção de anomalias
 - [ ] Relatórios automáticos
-- [ ] Retenção automática de logs
 
 ### Longo Prazo
 - [ ] Blockchain para logs imutáveis
@@ -329,6 +337,6 @@ Padrão suspeito de acessos
 
 ---
 
-**Documentação atualizada em**: 19/10/2024  
-**Versão**: 1.0  
+**Documentação atualizada em**: 01/09/2026 (consolida os registros de evolução do recurso — captura configurável por modo, limpeza manual e automática — que antes viviam espalhados em 12 documentos separados de correções/melhorias pontuais)
+**Versão**: 2.0
 **Autor**: Sistema Fabric PCP
