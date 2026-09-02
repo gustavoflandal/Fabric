@@ -37,12 +37,12 @@ export class NotificationSchedulerService {
       }
     });
 
-    // Diariamente às 8h - Resumo do dia (opcional)
+    // Diariamente às 8h - Resumo do dia anterior para os gestores
     const job3 = cron.schedule('0 8 * * *', async () => {
       console.log('[NotificationScheduler] Gerando resumo diário...');
       try {
-        // Aqui você pode implementar um resumo diário se desejar
-        console.log('[NotificationScheduler] Resumo diário não implementado ainda');
+        const sent = await notificationDetector.sendDailySummary();
+        console.log(`[NotificationScheduler] Resumo diário enviado para ${sent} gestor(es)`);
       } catch (error) {
         console.error('[NotificationScheduler] Erro ao gerar resumo:', error);
       }
@@ -59,12 +59,12 @@ export class NotificationSchedulerService {
       }
     });
 
-    // A cada 2 horas - Verificar capacidade dos centros (opcional)
+    // A cada 2 horas - Centros produzindo abaixo da capacidade esperada
     const job5 = cron.schedule('0 */2 * * *', async () => {
       console.log('[NotificationScheduler] Verificando capacidade dos centros...');
       try {
-        // Implementar verificação de capacidade se necessário
-        console.log('[NotificationScheduler] Verificação de capacidade não implementada ainda');
+        const detected = await notificationDetector.detectLowCapacity();
+        console.log(`[NotificationScheduler] ${detected} centro(s) abaixo da capacidade esperada`);
       } catch (error) {
         console.error('[NotificationScheduler] Erro ao verificar capacidade:', error);
       }
@@ -75,9 +75,9 @@ export class NotificationSchedulerService {
     console.log('[NotificationScheduler] ✅ 5 agendamentos iniciados:');
     console.log('  - A cada 5 min: Ordens atrasadas e gargalos');
     console.log('  - A cada 15 min: Níveis de estoque');
-    console.log('  - Diariamente às 8h: Resumo do dia');
+    console.log('  - Diariamente às 8h: Resumo do dia anterior (gestores)');
     console.log('  - A cada 1 hora: Limpeza de notificações antigas');
-    console.log('  - A cada 2 horas: Capacidade dos centros');
+    console.log('  - A cada 2 horas: Capacidade ociosa dos centros');
   }
 
   /**
@@ -101,6 +101,7 @@ export class NotificationSchedulerService {
         notificationDetector.detectProductionDelays(),
         notificationDetector.detectBottlenecks(),
         notificationDetector.checkLowStock(),
+        notificationDetector.detectLowCapacity(),
       ]);
       
       console.log('[NotificationScheduler] ✅ Verificação manual concluída');

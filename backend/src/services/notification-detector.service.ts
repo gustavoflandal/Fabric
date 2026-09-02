@@ -1,6 +1,5 @@
 import { prisma } from '../config/database';
 import notificationService from './notification.service';
-import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
 import { isModuleEnabled } from './licensed-module.service';
 import { detectReplenishmentNeeds } from './replenishment.service';
 
@@ -153,6 +152,268 @@ export class NotificationDetectorService {
   }
 
   /**
+   * CAPACITY_LOW — centro de trabalho produzindo MUITO ABAIXO do esperado.
+   *
+   * É o oposto de `detectBottlenecks()`: lá o sintoma é fila grande, aqui é
+   * saída pequena. Até esta implementação o evento `CAPACITY_LOW` estava
+   * documentado mas não existia em lugar nenhum do código — o cron de 2h só
+   * logava "não implementado ainda".
+   *
+   * DECISÕES (todas ajustáveis nas constantes abaixo):
+   *
+   *   * JANELA DE 8 HORAS — um turno. O cron roda de 2 em 2 horas, então as
+   *     janelas se sobrepõem: uma parada real continua sendo detectada na
+   *     próxima passada, mas um buraco de 30 minutos (troca de ferramenta,
+   *     almoço) se dilui em 8h em vez de virar alarme. Janela de 2h, colada no
+   *     período do cron, alarmaria a cada intervalo normal de setup.
+   *   * LIMIAR DE 50% — só dispara em desvio grande. Capacidade cadastrada é
+   *     nominal e quase sempre otimista; alarmar em 80% ou 90% produziria
+   *     notificação constante em operação saudável, e uma notificação que toca
+   *     sempre é uma que ninguém lê.
+   *   * `capacity` NULO NÃO GERA EVENTO — sem expectativa cadastrada não há
+   *     contra o que comparar. É o default do schema (`Float?`), então centro
+   *     não parametrizado fica silencioso em vez de gerar ruído.
+   *   * SÓ CENTRO COM DEMANDA. Exige ao menos uma operação `PENDING`/
+   *     `IN_PROGRESS`. Um centro parado por não ter o que fazer não está
+   *     "abaixo da capacidade", está ocioso — e avisar o gestor de que um
+   *     centro sem trabalho não produziu nada é ruído garantido. Com fila e sem
+   *     saída é justamente o caso que interessa (quebra, falta de operador,
+   *     falta de material).
+   *   * EXPECTATIVA = `capacity × efficiency × horas`. `efficiency` (default
+   *     1.0) já existe no schema como fator de rendimento do centro; ignorá-lo
+   *     compararia a produção real contra uma meta que o próprio cadastro diz
+   *     não ser alcançável. Assume `capacity` em UNIDADES/HORA, que é como
+   *     `costPerHour`/`efficiency` tratam o centro no resto do modelo.
+   *   * DEDUPE DE 6H, o mesmo de `BOTTLENECK_DETECTED` — são o mesmo público
+   *     (gestor de produção) e a mesma natureza de problema (capacidade).
+   *
+   * Prioridade 2 (média) e categoria `CAPACITY`, como o documento do módulo já
+   * previa para este evento. Destinatários: `MANAGER`, o mesmo padrão dos
+   * outros detectores de produção.
+   */
+  async detectLowCapacity() {
+    const WINDOW_HOURS = 8;
+    const THRESHOLD_RATIO = 0.5;
+
+    const since = new Date(Date.now() - WINDOW_HOURS * 60 * 60 * 1000);
+
+    const workCenters = await prisma.workCenter.findMany({
+      where: {
+        active: true,
+        capacity: { not: null },
+        // Só centros COM demanda — ver nota acima.
+        productionOperations: {
+          some: { status: { in: ['PENDING', 'IN_PROGRESS'] } },
+        },
+      },
+      select: { id: true, name: true, capacity: true, efficiency: true },
+    });
+
+    if (workCenters.length === 0) {
+      return 0;
+    }
+
+    // Produção real do período, em UMA consulta agregada (não uma por centro).
+    // `endTime` e não `createdAt`: o que importa é o trabalho concluído dentro
+    // da janela.
+    const produced = await prisma.productionPointing.groupBy({
+      by: ['workCenterId'],
+      where: {
+        workCenterId: { in: workCenters.map((wc) => wc.id) },
+        endTime: { gte: since },
+      },
+      _sum: { quantityGood: true },
+    });
+
+    const producedByCenter = new Map(
+      produced.map((row) => [row.workCenterId, row._sum.quantityGood || 0])
+    );
+
+    let detected = 0;
+
+    for (const wc of workCenters) {
+      const expected = (wc.capacity as number) * wc.efficiency * WINDOW_HOURS;
+
+      // Capacidade cadastrada como 0 (ou negativa) não é expectativa válida —
+      // qualquer produção seria "acima", e 0 < 0 nunca dispara. Sai fora para
+      // não depender de aritmética com zero.
+      if (expected <= 0) {
+        continue;
+      }
+
+      const actual = producedByCenter.get(wc.id) || 0;
+
+      if (actual >= expected * THRESHOLD_RATIO) {
+        continue;
+      }
+
+      detected += 1;
+
+      const alreadyNotified = await notificationService.checkRecentNotification(
+        'CAPACITY_LOW',
+        wc.id,
+        6
+      );
+
+      if (alreadyNotified) {
+        continue;
+      }
+
+      const recipients = await this.getUsersByRole('MANAGER');
+
+      if (recipients.length === 0) {
+        continue;
+      }
+
+      const utilization = (actual / expected) * 100;
+
+      await notificationService.createBulk(
+        recipients.map((u) => u.id),
+        {
+          type: 'WARNING',
+          category: 'CAPACITY',
+          eventType: 'CAPACITY_LOW',
+          title: 'Capacidade Ociosa',
+          message:
+            `Centro de trabalho "${wc.name}" produziu ${actual} nas últimas ${WINDOW_HOURS}h ` +
+            `(esperado ~${expected.toFixed(0)}, ${utilization.toFixed(0)}% da capacidade) ` +
+            `mesmo com operações na fila`,
+          data: {
+            workCenterId: wc.id,
+            workCenterName: wc.name,
+            windowHours: WINDOW_HOURS,
+            capacity: wc.capacity,
+            efficiency: wc.efficiency,
+            expected,
+            actual,
+            utilizationPercent: Number(utilization.toFixed(2)),
+            thresholdPercent: THRESHOLD_RATIO * 100,
+          },
+          link: `/work-centers/${wc.id}`,
+          resourceType: 'WorkCenter',
+          resourceId: wc.id,
+          priority: 2, // Média
+        }
+      );
+    }
+
+    return detected;
+  }
+
+  /**
+   * Resumo diário (cron das 8h, que até aqui só logava "não implementado").
+   *
+   * FORMATO ESCOLHIDO: uma notificação `INFO` por gestor, com a CONTAGEM de
+   * notificações de prioridade alta (3) e crítica (4) que ele recebeu no DIA
+   * ANTERIOR (dia civil completo, 00:00–23:59) e que continuam NÃO LIDAS.
+   *
+   *   * Dia civil anterior, e não "desde o último resumo": rodando às 8h, é o
+   *     recorte que o gestor consegue interpretar sem pensar ("ontem"), e não
+   *     depende de guardar estado de quando o job rodou pela última vez.
+   *   * Só NÃO LIDAS: o objetivo é resgatar o que passou batido. Contar o que o
+   *     gestor já leu e tratou transformaria o resumo num relatório de volume,
+   *     que não é o que ele precisa às 8 da manhã.
+   *   * Só prioridade >= 3: mesmo corte de `getCriticalUnread()`, o que o resto
+   *     do módulo já trata como "merece atenção".
+   *   * SEM PENDÊNCIA, SEM NOTIFICAÇÃO. Zero crítica e zero alta não gera nada
+   *     — um resumo diário que chega todo dia dizendo "nada a relatar" treina o
+   *     usuário a ignorar a categoria inteira.
+   *   * Prioridade 1 e `INFO`: é um dígest, não um alerta; não deve competir no
+   *     topo da lista com os eventos que ele resume.
+   *   * Categoria `PRODUCTION`: o resumo não tem categoria própria e o conjunto
+   *     de categorias é fechado (`CreateNotificationDto`), consumido por
+   *     `NotificationPreference`. Inventar `SYSTEM` aqui criaria uma categoria
+   *     que nenhuma preferência, seed ou tela conhece; `PRODUCTION` é a
+   *     categoria majoritária dos eventos resumidos e a que o público-alvo
+   *     (MANAGER) já acompanha.
+   *
+   * Não é um relatório de BI — é o job deixando de ser no-op.
+   */
+  async sendDailySummary() {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+
+    const managers = await this.getUsersByRole('MANAGER');
+
+    if (managers.length === 0) {
+      return 0;
+    }
+
+    // Uma consulta agregada para todos os gestores, em vez de duas por gestor.
+    const grouped = await prisma.notification.groupBy({
+      by: ['userId', 'priority'],
+      where: {
+        userId: { in: managers.map((u) => u.id) },
+        read: false,
+        archived: false,
+        priority: { gte: 3 },
+        createdAt: { gte: startOfYesterday, lt: startOfToday },
+      },
+      _count: { _all: true },
+    });
+
+    const dateLabel = startOfYesterday.toLocaleDateString('pt-BR');
+    let sent = 0;
+
+    for (const manager of managers) {
+      const rows = grouped.filter((row) => row.userId === manager.id);
+      const critical = rows.find((r) => r.priority === 4)?._count._all || 0;
+      const high = rows.find((r) => r.priority === 3)?._count._all || 0;
+
+      if (critical === 0 && high === 0) {
+        continue;
+      }
+
+      // Dedupe por usuário: `resourceId` é o id do gestor, então um reinício do
+      // processo no mesmo dia não gera um segundo resumo para a mesma pessoa.
+      const alreadySent = await notificationService.checkRecentNotification(
+        'DAILY_SUMMARY',
+        manager.id,
+        20
+      );
+
+      if (alreadySent) {
+        continue;
+      }
+
+      const parts: string[] = [];
+      if (critical > 0) {
+        parts.push(`${critical} ${critical === 1 ? 'crítica' : 'críticas'}`);
+      }
+      if (high > 0) {
+        parts.push(`${high} de prioridade alta`);
+      }
+
+      await notificationService.create({
+        userId: manager.id,
+        type: 'INFO',
+        category: 'PRODUCTION',
+        eventType: 'DAILY_SUMMARY',
+        title: `Resumo de ${dateLabel}`,
+        message:
+          `Você tem ${parts.join(' e ')} ${critical + high === 1 ? 'notificação não lida' : 'notificações não lidas'} de ${dateLabel}.`,
+        data: {
+          date: startOfYesterday.toISOString().split('T')[0],
+          criticalUnread: critical,
+          highUnread: high,
+          totalUnread: critical + high,
+        },
+        link: '/notifications',
+        resourceType: 'User',
+        resourceId: manager.id,
+        priority: 1,
+      });
+
+      sent += 1;
+    }
+
+    return sent;
+  }
+
+  /**
    * Verificar disponibilidade de material para uma ordem
    */
   async checkMaterialAvailability(orderId: string) {
@@ -189,18 +450,30 @@ export class NotificationDetectorService {
 
     const bom = order.product.boms[0];
 
-    for (const bomItem of bom.items) {
-      // Buscar estoque atual
-      // F2.2: `TRANSFER` excluído — transferência interna não altera o saldo
-      // do produto, e o reduce abaixo a trataria como saída.
-      const stockMovements = await prisma.stockMovement.findMany({
-        where: { productId: bomItem.componentId, type: { in: AGGREGATE_MOVEMENT_TYPES } },
-        select: { quantity: true, type: true },
-      });
+    // Saldo lido de `stock_balances` (a linha por produto que
+    // `stock.service.ts::applyMovement()` mantém dentro da mesma transação da
+    // movimentação, desde a Fase 1 do cronograma de modernização) em vez de
+    // ressomar `stock_movements` do zero a cada verificação.
+    //
+    // Por que a leitura é EM LOTE e não `stockService.getBalance()` por item:
+    // `getBalance()` faz 3 consultas por produto (produto + saldo + última
+    // movimentação), monta limiares/status que este detector não usa, e ainda
+    // faz um `upsert` — ou seja, um caminho de LEITURA passaria a ESCREVER
+    // linha de saldo para todo componente de BOM que nunca movimentou. Aqui é
+    // uma consulta só para a BOM inteira.
+    //
+    // Produto sem linha em `stock_balances` é lido como 0, exatamente o que a
+    // soma anterior produzia para um produto sem nenhuma movimentação — e o
+    // mesmo default que `getAllBalances()` já adota no caminho de leitura.
+    const componentIds = bom.items.map((item) => item.componentId);
+    const balanceRows = await prisma.stockBalance.findMany({
+      where: { productId: { in: componentIds } },
+      select: { productId: true, quantity: true },
+    });
+    const balanceByProduct = new Map(balanceRows.map((row) => [row.productId, row.quantity]));
 
-      const currentStock = stockMovements.reduce((acc, mov) => {
-        return mov.type === 'IN' ? acc + mov.quantity : acc - mov.quantity;
-      }, 0);
+    for (const bomItem of bom.items) {
+      const currentStock = balanceByProduct.get(bomItem.componentId) ?? 0;
 
       const required = bomItem.quantity * order.quantity;
 
@@ -326,17 +599,19 @@ export class NotificationDetectorService {
       },
     });
 
-    for (const product of products) {
-      // Calcular estoque atual
-      // F2.2: `TRANSFER` excluído — ver a nota equivalente acima.
-      const stockMovements = await prisma.stockMovement.findMany({
-        where: { productId: product.id, type: { in: AGGREGATE_MOVEMENT_TYPES } },
-        select: { quantity: true, type: true },
-      });
+    // Mesma correção de `checkMaterialAvailability()` acima, e aqui ela pesa
+    // mais: este método roda no cron de 15 em 15 minutos e ressomava o
+    // histórico INTEIRO de `stock_movements` de CADA produto ativo — uma
+    // varredura por produto, crescendo sem limite conforme o histórico cresce.
+    // Agora é uma consulta só, independentemente do número de produtos.
+    const balanceRows = await prisma.stockBalance.findMany({
+      where: { productId: { in: products.map((p) => p.id) } },
+      select: { productId: true, quantity: true },
+    });
+    const balanceByProduct = new Map(balanceRows.map((row) => [row.productId, row.quantity]));
 
-      const currentStock = stockMovements.reduce((acc, mov) => {
-        return mov.type === 'IN' ? acc + mov.quantity : acc - mov.quantity;
-      }, 0);
+    for (const product of products) {
+      const currentStock = balanceByProduct.get(product.id) ?? 0;
 
       if (currentStock <= product.minStock) {
         const alreadyNotified = await notificationService.checkRecentNotification(

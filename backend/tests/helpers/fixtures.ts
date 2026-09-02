@@ -377,3 +377,109 @@ export async function createUserWithPermissions(permissions: { resource: string;
 
   return user;
 }
+
+// ============================================
+// Notificações: centros de trabalho, operações e apontamentos
+// ============================================
+
+let workCenterCounter = 0;
+
+/**
+ * Centro de trabalho. `capacity` é OPCIONAL de propósito: `detectLowCapacity()`
+ * ignora centro sem capacidade cadastrada, e esse é justamente um dos casos que
+ * precisa ser exercitado.
+ */
+export async function createTestWorkCenter(
+  overrides: Partial<{ capacity: number | null; efficiency: number; active: boolean }> = {}
+) {
+  workCenterCounter += 1;
+  return testPrisma.workCenter.create({
+    data: {
+      code: `WC-TEST-${workCenterCounter}`,
+      name: `Centro de Teste ${workCenterCounter}`,
+      type: 'MACHINE',
+      capacity: overrides.capacity === undefined ? null : overrides.capacity,
+      efficiency: overrides.efficiency ?? 1.0,
+      active: overrides.active ?? true,
+    },
+  });
+}
+
+/** Usuário com o perfil `MANAGER` — o destinatário real de todos os detectores. */
+export async function createTestManager() {
+  const user = await createTestUser();
+  const role = await testPrisma.role.upsert({
+    where: { code: 'MANAGER' },
+    update: {},
+    create: { code: 'MANAGER', name: 'Gerente' },
+  });
+  await testPrisma.userRole.create({ data: { userId: user.id, roleId: role.id } });
+  return user;
+}
+
+let opCounter = 0;
+
+/** Ordem de produção mínima (sem BOM) — só para pendurar operações. */
+export async function createTestProductionOrder(createdBy: string) {
+  opCounter += 1;
+  const product = await createTestProduct();
+  return testPrisma.productionOrder.create({
+    data: {
+      orderNumber: `OP-WC-TEST-${opCounter}`,
+      productId: product.id,
+      quantity: 100,
+      scheduledStart: new Date(),
+      scheduledEnd: new Date(Date.now() + 86400000),
+      createdBy,
+    },
+  });
+}
+
+/** Operação na fila de um centro — é o que caracteriza "há demanda". */
+export async function createTestOperation(
+  productionOrderId: string,
+  workCenterId: string,
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' = 'PENDING'
+) {
+  return testPrisma.productionOrderOperation.create({
+    data: {
+      productionOrderId,
+      workCenterId,
+      sequence: 1,
+      description: 'Operação de teste',
+      plannedQty: 100,
+      setupTime: 0,
+      runTime: 1,
+      totalPlannedTime: 1,
+      status,
+    },
+  });
+}
+
+/**
+ * Apontamento de produção concluído. `endTime` é o campo que
+ * `detectLowCapacity()` usa para recortar a janela — por isso é parâmetro.
+ */
+export async function createTestPointing(params: {
+  productionOrderId: string;
+  operationId: string;
+  workCenterId: string;
+  userId: string;
+  quantityGood: number;
+  endTime?: Date;
+}) {
+  const endTime = params.endTime ?? new Date();
+  return testPrisma.productionPointing.create({
+    data: {
+      productionOrderId: params.productionOrderId,
+      operationId: params.operationId,
+      workCenterId: params.workCenterId,
+      userId: params.userId,
+      quantityGood: params.quantityGood,
+      quantityScrap: 0,
+      runTime: 1,
+      startTime: new Date(endTime.getTime() - 60 * 60 * 1000),
+      endTime,
+    },
+  });
+}

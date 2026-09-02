@@ -1,5 +1,7 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import emailService from './email.service';
+import { logger } from '../config/logger';
 
 export interface CreateNotificationDto {
   userId: string;
@@ -30,6 +32,19 @@ export interface NotificationFilters {
   archived?: boolean;
   startDate?: Date;
   endDate?: Date;
+}
+
+/**
+ * Chave YYYY-MM-DD no fuso LOCAL. `toISOString()` converteria para UTC e, num
+ * fuso negativo como o do Brasil, jogaria as notificações do fim da noite para
+ * o dia seguinte — a série diária ficaria deslocada em relação ao que o usuário
+ * vê na lista.
+ */
+function toLocalDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export class NotificationService {
@@ -63,6 +78,10 @@ export class NotificationService {
       },
     });
 
+    // Canal de email: disparado DEPOIS de persistir e sem `await` — ver
+    // `dispatchEmails()`.
+    this.dispatchEmails([data.userId], data);
+
     return notification;
   }
 
@@ -87,7 +106,130 @@ export class NotificationService {
       })),
     });
 
+    this.dispatchEmails(userIds, notificationData);
+
     return notifications;
+  }
+
+  /**
+   * Dispara o canal de email para os destinatários que a regra/preferência
+   * autoriza. NÃO é aguardado por quem cria a notificação: o in-app é a entrega
+   * confiável e já está persistido neste ponto; o email é conveniência e não
+   * pode nem atrasar a resposta HTTP nem falhar a criação.
+   *
+   * Sem SMTP configurado sai imediatamente, ANTES de qualquer consulta — o modo
+   * no-op não deve custar três queries de regra/preferência por notificação.
+   */
+  private dispatchEmails(
+    userIds: string[],
+    notificationData: Omit<CreateNotificationDto, 'userId'>
+  ): void {
+    if (!emailService.isEnabled() || userIds.length === 0) {
+      return;
+    }
+
+    void this.resolveEmailRecipients(userIds, notificationData)
+      .then(async (recipients) => {
+        for (const recipient of recipients) {
+          await emailService.sendNotificationEmail(recipient.email, {
+            title: notificationData.title,
+            message: notificationData.message,
+            link: notificationData.link,
+            priority: notificationData.priority || 1,
+          });
+        }
+      })
+      .catch((error) => {
+        logger.error('Falha ao despachar notificações por email', {
+          eventType: notificationData.eventType,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
+  }
+
+  /**
+   * Decide QUEM recebe email, a partir de `NotificationRule` (por perfil) e
+   * `NotificationPreference` (por usuário/categoria).
+   *
+   * ⚠️ Este é o PRIMEIRO consumidor dessas duas tabelas em todo o backend. Elas
+   * existiam no schema e eram populadas pelo seed desde a criação do módulo,
+   * mas nenhum código as lia — não havia "lógica de decisão de quem recebe o
+   * quê" para reaproveitar, então ela é definida aqui:
+   *
+   *   1. PREFERÊNCIA DO USUÁRIO GANHA DA REGRA DO PERFIL. Se existe
+   *      `NotificationPreference` para (usuário, categoria), ela decide
+   *      sozinha: `enabled=false` ou `priority < minPriority` cortam, e o valor
+   *      de `email` é a resposta final. É uma escolha explícita de quem recebe;
+   *      o perfil não deve sobrepô-la.
+   *   2. SEM PREFERÊNCIA, VALE A REGRA DO PERFIL. Qualquer `NotificationRule`
+   *      habilitada, de qualquer perfil do usuário, para aquele `eventType`,
+   *      com `priority >= minPriority` e `email=true`, autoriza o envio (OR
+   *      entre perfis — o usuário com dois perfis recebe o superset, mesma
+   *      semântica aditiva do RBAC do projeto).
+   *   3. DEFAULT É NÃO ENVIAR. Sem preferência e sem regra, não sai email —
+   *      igual ao default `email=false` das duas colunas.
+   *
+   * O canal IN-APP não passa por aqui: continua sendo criado para todo
+   * destinatário que o detector escolher, exatamente como antes. Filtrar in-app
+   * por essas mesmas tabelas mudaria o comportamento observável de todos os
+   * detectores, o que é outra tarefa.
+   */
+  async resolveEmailRecipients(
+    userIds: string[],
+    params: { category: string; eventType: string; priority?: number }
+  ): Promise<{ id: string; email: string }[]> {
+    const priority = params.priority || 1;
+
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds }, active: true },
+      select: {
+        id: true,
+        email: true,
+        roles: { select: { roleId: true } },
+      },
+    });
+
+    if (users.length === 0) {
+      return [];
+    }
+
+    const [preferences, rules] = await Promise.all([
+      prisma.notificationPreference.findMany({
+        where: { userId: { in: users.map((u) => u.id) }, category: params.category },
+      }),
+      prisma.notificationRule.findMany({
+        where: {
+          roleId: { in: [...new Set(users.flatMap((u) => u.roles.map((r) => r.roleId)))] },
+          eventType: params.eventType,
+          enabled: true,
+        },
+      }),
+    ]);
+
+    const prefByUser = new Map(preferences.map((p) => [p.userId, p]));
+    const rulesByRole = new Map<string, typeof rules>();
+    for (const rule of rules) {
+      const list = rulesByRole.get(rule.roleId) || [];
+      list.push(rule);
+      rulesByRole.set(rule.roleId, list);
+    }
+
+    return users.filter((user) => {
+      if (!user.email) {
+        return false;
+      }
+
+      const pref = prefByUser.get(user.id);
+      if (pref) {
+        return pref.enabled && priority >= pref.minPriority && pref.email;
+      }
+
+      return user.roles.some((userRole) =>
+        (rulesByRole.get(userRole.roleId) || []).some(
+          (rule) => rule.email && priority >= rule.minPriority
+        )
+      );
+    });
   }
 
   /**
@@ -289,7 +431,13 @@ export class NotificationService {
    */
   async cleanupExpired(daysOld = 30) {
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.setDate() - daysOld);
+    // Fix: era `cutoffDate.setDate(cutoffDate.setDate() - daysOld)`.
+    // `setDate()` SEM argumento devolve NaN (e já corrompe a data), então o
+    // cálculo virava `setDate(NaN)` e `cutoffDate` era `Invalid Date` — que o
+    // Prisma rejeita ao montar o filtro. Ou seja: o cron de limpeza (de hora em
+    // hora) lançava erro em TODA execução e nunca removeu uma linha sequer. O
+    // correto é `getDate()`.
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
     // Deletar notificações lidas e arquivadas antigas
     const deleted = await prisma.notification.deleteMany({
@@ -311,6 +459,131 @@ export class NotificationService {
     });
 
     return deleted.count;
+  }
+
+  /**
+   * Dashboard de métricas agregadas do usuário logado.
+   *
+   * ⚠️ NOTA DE VERIFICAÇÃO: ao contrário do que a documentação do módulo
+   * registrava ("não verificado, tratar como não confirmado"), JÁ EXISTIA um
+   * endpoint de métricas — `GET /notifications/metrics`, servido por
+   * `getMetrics()` logo abaixo, e consumido hoje pelo
+   * `frontend/src/stores/notification.store.ts`. Este método NÃO o substitui:
+   * `getMetrics()` fica intacto para não quebrar esse consumidor.
+   *
+   * O que este acrescenta sobre `getMetrics()`:
+   *
+   *   * SEPARA AS DUAS JANELAS. Em `getMetrics()` um único `days` controlava ao
+   *     mesmo tempo o top de eventos e a série temporal. São perguntas
+   *     diferentes: "o que mais me notifica" quer histórico longo (30 dias por
+   *     padrão), "como está a semana" quer 7 dias fixos. Amarrar as duas fazia
+   *     o top de eventos ter só 7 dias de amostra.
+   *   * SÉRIE CONTÍGUA. `dailyTrend` preenche com zero os dias sem notificação,
+   *     em vez de omitir a data. Série com buraco vira gráfico que mente sobre
+   *     o intervalo entre os pontos.
+   *   * SEPARA ALTA DE CRÍTICA na tendência. `getMetrics()` rotula como
+   *     `critical` tudo que é `priority >= 3`, ou seja, alta contada como
+   *     crítica.
+   *   * SHAPE ESTÁVEL POR CATEGORIA. Toda categoria conhecida vem no objeto,
+   *     com zero quando não há nada — incluindo `WAREHOUSE` (Fase 4 do WMS).
+   *     Assim o consumidor não precisa conhecer a lista de categorias nem
+   *     tratar chave ausente.
+   *
+   * Escopado ao usuário logado (`userId`), como todo o resto do módulo — não é
+   * um dashboard administrativo global.
+   */
+  async getDashboard(userId: string, days = 30) {
+    const TREND_DAYS = 7;
+
+    const topEventsSince = new Date();
+    topEventsSince.setDate(topEventsSince.getDate() - days);
+
+    const trendStart = new Date();
+    trendStart.setHours(0, 0, 0, 0);
+    trendStart.setDate(trendStart.getDate() - (TREND_DAYS - 1));
+
+    const unreadWhere = { userId, read: false, archived: false };
+
+    const [byPriority, byCategoryRows, topEvents, trendRows, totalUnread] = await Promise.all([
+      prisma.notification.groupBy({
+        by: ['priority'],
+        where: unreadWhere,
+        _count: { _all: true },
+      }),
+      prisma.notification.groupBy({
+        by: ['category'],
+        where: unreadWhere,
+        _count: { _all: true },
+      }),
+      prisma.notification.groupBy({
+        by: ['eventType'],
+        where: { userId, createdAt: { gte: topEventsSince } },
+        _count: { eventType: true },
+        orderBy: { _count: { eventType: 'desc' } },
+        take: 5,
+      }),
+      prisma.notification.findMany({
+        where: { userId, createdAt: { gte: trendStart } },
+        select: { createdAt: true, priority: true },
+      }),
+      prisma.notification.count({ where: unreadWhere }),
+    ]);
+
+    const countForPriority = (priority: number) =>
+      byPriority.find((row) => row.priority === priority)?._count._all || 0;
+
+    // Shape estável: toda categoria conhecida presente, zero quando vazia.
+    const byCategory: Record<string, number> = {
+      PRODUCTION: 0,
+      STOCK: 0,
+      PURCHASE: 0,
+      QUALITY: 0,
+      CAPACITY: 0,
+      WAREHOUSE: 0,
+    };
+    for (const row of byCategoryRows) {
+      byCategory[row.category] = (byCategory[row.category] || 0) + row._count._all;
+    }
+
+    // Série de 7 dias sem buracos: monta as datas primeiro, depois preenche.
+    const trendMap = new Map<string, { total: number; critical: number; high: number }>();
+    for (let i = 0; i < TREND_DAYS; i += 1) {
+      const day = new Date(trendStart);
+      day.setDate(day.getDate() + i);
+      trendMap.set(toLocalDateKey(day), { total: 0, critical: 0, high: 0 });
+    }
+
+    for (const row of trendRows) {
+      const bucket = trendMap.get(toLocalDateKey(row.createdAt));
+      if (!bucket) {
+        continue;
+      }
+      bucket.total += 1;
+      if (row.priority === 4) {
+        bucket.critical += 1;
+      } else if (row.priority === 3) {
+        bucket.high += 1;
+      }
+    }
+
+    return {
+      criticalUnread: countForPriority(4),
+      highUnread: countForPriority(3),
+      totalUnread,
+      byCategory,
+      topEvents: topEvents.map((row) => ({
+        eventType: row.eventType,
+        count: row._count.eventType,
+      })),
+      dailyTrend: Array.from(trendMap.entries()).map(([date, value]) => ({
+        date,
+        ...value,
+      })),
+      period: {
+        topEventsDays: days,
+        trendDays: TREND_DAYS,
+      },
+    };
   }
 
   /**

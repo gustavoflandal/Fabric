@@ -74,6 +74,23 @@ if (jwtRefreshSecret.length < 32) {
   process.exit(1);
 }
 
+/**
+ * SMTP — canal de email das notificações.
+ *
+ * DELIBERADAMENTE NÃO usa `requireEnv()`: email é um canal OPCIONAL. Uma
+ * instalação que nunca configurou SMTP (todo ambiente de desenvolvimento e o
+ * banco de teste, por exemplo) precisa continuar subindo normalmente — o
+ * `email.service.ts` detecta a ausência de `SMTP_HOST`, loga um aviso uma única
+ * vez e opera em modo no-op. Derrubar o boot por causa de um canal secundário
+ * seria trocar "email não sai" por "sistema inteiro não sobe".
+ *
+ * `SMTP_USER`/`SMTP_PASSWORD` são opcionais mesmo com host configurado: relay
+ * interno sem autenticação é um cenário real. Só passa `auth` ao transporte
+ * quando os dois existem.
+ */
+const smtpHost = process.env.SMTP_HOST?.trim() || '';
+const smtpPort = Number(process.env.SMTP_PORT) || 587;
+
 export const config = {
   port: process.env.PORT || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -99,5 +116,19 @@ export const config = {
     // env em vez de hardcoded em log-cleanup.job.ts (o job já existia e
     // já rodava diariamente - só não era ajustável sem editar código).
     retentionDays: Number(process.env.AUDIT_LOG_RETENTION_DAYS) || 90,
+  },
+  smtp: {
+    host: smtpHost,
+    port: smtpPort,
+    // `SMTP_SECURE` true = TLS implícito desde a conexão (porta 465). Quando
+    // não informado, deriva da porta — 465 é secure, 587/25 usam STARTTLS.
+    secure: process.env.SMTP_SECURE
+      ? process.env.SMTP_SECURE === 'true'
+      : smtpPort === 465,
+    user: process.env.SMTP_USER || '',
+    password: process.env.SMTP_PASSWORD || '',
+    from: process.env.SMTP_FROM || 'Fabric PCP <nao-responda@fabric.local>',
+    /** Sem host não há como enviar: o serviço de email entra em modo no-op. */
+    enabled: smtpHost !== '',
   },
 };

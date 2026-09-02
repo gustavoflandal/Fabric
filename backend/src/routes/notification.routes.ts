@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { validateQuery } from '../middleware/validation.middleware';
 import notificationController from '../controllers/notification.controller';
+import { notificationDashboardQuerySchema } from '../validators/notification.validator';
 
 const router = Router();
 
@@ -41,6 +43,19 @@ router.get('/count/priority', notificationController.countByPriority);
  * @access  Private
  */
 router.get('/metrics', notificationController.getMetrics);
+
+/**
+ * @route   GET /api/v1/notifications/dashboard
+ * @desc    Métricas agregadas do usuário logado: não lidas por prioridade e
+ *          por categoria, top 5 eventos do período e tendência de 7 dias.
+ * @query   days - período do top de eventos (1..365, padrão 30)
+ * @access  Private
+ */
+router.get(
+  '/dashboard',
+  validateQuery(notificationDashboardQuerySchema),
+  notificationController.getDashboard
+);
 
 /**
  * @route   PATCH /api/v1/notifications/:id/read
