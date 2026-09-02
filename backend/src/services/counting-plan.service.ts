@@ -315,6 +315,45 @@ class CountingPlanService {
       where.id = { in: criteria.productIds };
     }
 
+    // F3.2 do plano do WMS — critério de plano POR RUA/ARMAZÉM, além de por
+    // produto. "Contar a rua R03 do armazém CD1" é a forma como uma contagem
+    // cíclica endereçada é realmente planejada, e sem isso o único jeito de
+    // chegar nela seria listar à mão os produtos que por acaso estão lá hoje.
+    //
+    // A estrutura de `criteria` já era extensível por desenho (`Json?` no
+    // schema, `Joi.object().unknown(true)` no validator, e este método é uma
+    // sequência de `if (criteria.X)` independentes), então bastou somar mais um
+    // `if` — nenhum redesenho do seletor foi necessário.
+    //
+    // Traduz para "produto que TEM saldo (> 0) em ALGUMA posição do recorte".
+    // Sem o `quantity > 0` o critério traria produto cuja linha de saldo
+    // sobreviveu zerada naquela posição — ou seja, que não está mais lá.
+    //
+    // Deliberadamente SEM guarda de `isModuleEnabled('WMS')`: numa instalação
+    // só-PCP nenhum plano tem esses campos no critério (não há tela que os
+    // escreva), e se tivesse, o resultado — zero produtos, porque não há
+    // `StockPositionBalance` — é honesto. Checar a licença aqui só adicionaria
+    // uma query por seleção de plano.
+    const positionFilter: any = {};
+    if (criteria.warehouseId) {
+      positionFilter.structure = { warehouseId: criteria.warehouseId };
+    }
+    if (criteria.warehouseCode) {
+      positionFilter.warehouseCode = criteria.warehouseCode;
+    }
+    if (criteria.streetCode) {
+      positionFilter.streetCode = criteria.streetCode;
+    }
+
+    if (Object.keys(positionFilter).length > 0) {
+      where.stockPositionBalances = {
+        some: {
+          quantity: { gt: 0 },
+          storagePosition: positionFilter,
+        },
+      };
+    }
+
     return await prisma.product.findMany({
       where,
       select: {

@@ -1,8 +1,14 @@
-import { PrismaClient, CountingSession, SessionStatus } from '@prisma/client';
+import { Prisma, PrismaClient, CountingSession, SessionStatus } from '@prisma/client';
 import countingPlanService from './counting-plan.service';
 import stockService from './stock.service';
+import { isModuleEnabled } from './licensed-module.service';
 import { AppError } from '../middleware/error.middleware';
 import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
+import {
+  COUNTING_POSITION_SELECT,
+  compareCountingRoute,
+  CountingRoutePosition,
+} from '../utils/counting-position.util';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +16,19 @@ export interface CreateSessionDTO {
   planId: string;
   scheduledDate: Date;
   assignedTo?: string;
+}
+
+/**
+ * F3.2 — um item de contagem antes de existir no banco. `storagePositionId`
+ * nulo é o item NÃO endereçado (caminho só-PCP, ou produto sem nenhum saldo
+ * endereçado); `route` só existe quando há endereço, e é o que a F3.3 usa para
+ * numerar `sequence`.
+ */
+interface PlannedCountingItem {
+  productId: string;
+  storagePositionId: string | null;
+  systemQty: Prisma.Decimal;
+  route: CountingRoutePosition | null;
 }
 
 export interface SessionFilters {
@@ -119,7 +138,7 @@ class CountingSessionService {
                 unitId: true,
               },
             },
-            location: true,
+            storagePosition: { select: COUNTING_POSITION_SELECT },
             counter: {
               select: {
                 id: true,
@@ -133,9 +152,10 @@ class CountingSessionService {
               },
             },
           },
-          orderBy: {
-            createdAt: 'asc',
-          },
+          // F3.3: ordem da ROTA de contagem. Itens não endereçados ficam com
+          // `sequence = 0` e caem no desempate por `createdAt` — a ordem que
+          // este método devolvia antes da Fase 3.
+          orderBy: [{ sequence: 'asc' }, { createdAt: 'asc' }],
         },
       },
     });
@@ -161,6 +181,11 @@ class CountingSessionService {
     // Selecionar produtos baseado nos critérios do plano
     const products = await countingPlanService.selectProducts(data.planId);
 
+    // F3.2/F3.3: a dimensão de endereço entra aqui. `totalItems` passa a contar
+    // ITENS, não produtos — com WMS licenciado, um produto espalhado por 3
+    // posições vira 3 itens de contagem.
+    const planned = await this.buildSessionItems(products.map((product) => product.id));
+
     // Criar sessão
     const session = await prisma.countingSession.create({
       data: {
@@ -169,21 +194,116 @@ class CountingSessionService {
         scheduledDate: data.scheduledDate,
         assignedTo: data.assignedTo,
         status: 'SCHEDULED',
-        totalItems: products.length,
+        totalItems: planned.length,
       },
     });
 
     // Criar itens de contagem
     await prisma.countingItem.createMany({
-      data: products.map((product) => ({
+      data: planned.map((item, index) => ({
         sessionId: session.id,
-        productId: product.id,
-        systemQty: 0, // Será atualizado ao iniciar a sessão
+        productId: item.productId,
+        storagePositionId: item.storagePositionId,
+        systemQty: item.systemQty,
+        // F3.3: `planned` já vem ordenado pela rota, então a sequência é o
+        // índice + 1. Item não endereçado fica com 0 (default histórico) —
+        // ver `buildSessionItems()`.
+        sequence: item.route ? index + 1 : 0,
         status: 'PENDING',
       })),
     });
 
     return session;
+  }
+
+  /**
+   * F3.2 — geração dos itens de uma sessão, ramificada por licenciamento.
+   *
+   * A ramificação é o ponto central desta fase. O plano do WMS descreve "um item
+   * de contagem por posição com saldo", mas isso só faz sentido numa instalação
+   * que tem WMS: numa instalação só-PCP não existe `StoragePosition` relevante, e
+   * a contagem precisa continuar funcionando exatamente como sempre funcionou.
+   *
+   *   WMS NÃO licenciado → um item por PRODUTO, `storagePositionId = null`,
+   *     `systemQty = 0` (placeholder recalculado em `start()`). Byte a byte o
+   *     comportamento anterior à Fase 3.
+   *
+   *   WMS licenciado → um item por (PRODUTO × POSIÇÃO com saldo > 0), com
+   *     `systemQty` vindo direto de `StockPositionBalance` — que é a razão de
+   *     `start()` não precisar mais somar `stock_movements` para esses itens.
+   *
+   * PRODUTO SEM NENHUM SALDO ENDEREÇADO (com WMS licenciado) — decisão de
+   * desenho que o plano não fixava: ele ainda gera UM item, com
+   * `storagePositionId = null`. Não gerar nada faria o produto sumir
+   * silenciosamente da contagem, que é o oposto do objetivo de um inventário —
+   * e o caso mais provável (produto que o sistema acha que tem saldo mas que
+   * nunca foi endereçado) é justamente o que mais precisa ser conferido. Esse
+   * item cai no mesmo caminho do só-PCP: `systemQty` placeholder, recalculado a
+   * partir do saldo agregado em `start()`.
+   */
+  private async buildSessionItems(productIds: string[]): Promise<PlannedCountingItem[]> {
+    const zero = new Prisma.Decimal(0);
+
+    if (productIds.length === 0) {
+      return [];
+    }
+
+    const wmsEnabled = await isModuleEnabled('WMS');
+
+    if (!wmsEnabled) {
+      return productIds.map((productId) => ({
+        productId,
+        storagePositionId: null,
+        systemQty: zero,
+        route: null,
+      }));
+    }
+
+    // UMA query para todos os produtos do plano, não uma por produto: o plano
+    // pode selecionar centenas de produtos, e o N+1 aqui seria o mesmo problema
+    // que a F0.5 corrigiu em `getAllBalances()`.
+    const balances = await prisma.stockPositionBalance.findMany({
+      where: {
+        productId: { in: productIds },
+        quantity: { gt: 0 },
+      },
+      select: {
+        productId: true,
+        storagePositionId: true,
+        quantity: true,
+        storagePosition: { select: COUNTING_POSITION_SELECT },
+      },
+    });
+
+    const addressed: PlannedCountingItem[] = balances.map((balance) => ({
+      productId: balance.productId,
+      storagePositionId: balance.storagePositionId,
+      systemQty: balance.quantity,
+      route: {
+        warehouseCode: balance.storagePosition.warehouseCode,
+        streetCode: balance.storagePosition.streetCode,
+        floor: balance.storagePosition.floor,
+        position: balance.storagePosition.position,
+      },
+    }));
+
+    // F3.3 — ordena a rota ANTES de numerar (a numeração acontece em `create()`,
+    // que já recebe esta lista ordenada).
+    addressed.sort((a, b) => compareCountingRoute(a.route!, b.route!));
+
+    const productsWithBalance = new Set(balances.map((balance) => balance.productId));
+    const unaddressed: PlannedCountingItem[] = productIds
+      .filter((productId) => !productsWithBalance.has(productId))
+      .map((productId) => ({
+        productId,
+        storagePositionId: null,
+        systemQty: zero,
+        route: null,
+      }));
+
+    // Endereçados primeiro: eles têm rota, e o contador percorre o armazém antes
+    // de resolver a lista de exceções (produtos sem endereço conhecido).
+    return [...addressed, ...unaddressed];
   }
 
   /**
@@ -199,13 +319,63 @@ class CountingSessionService {
       throw new AppError(400, 'Sessão não pode ser iniciada');
     }
 
-    // Atualizar quantidades do sistema nos itens
+    // ---- Itens ENDEREÇADOS (F3.2) ------------------------------------------
+    // `systemQty` é relido de `StockPositionBalance` no MOMENTO DA PARTIDA, e
+    // não só no `create()`: uma sessão é agendada e pode ser iniciada dias
+    // depois, com movimentação no meio. O valor gravado no `create()` é o que
+    // permite ver a sessão já dimensionada antes de começar; este re-leitura é o
+    // que garante que o contador compare contra o saldo vigente.
+    //
+    // Uma query só para a sessão inteira (não uma por item): é o mesmo N+1 que
+    // a F0.5 corrigiu em `getAllBalances()`, e aqui ele seria produto × posição.
+    const addressedItems = session.items.filter((item) => item.storagePositionId);
+
+    if (addressedItems.length > 0) {
+      const balances = await prisma.stockPositionBalance.findMany({
+        where: {
+          OR: addressedItems.map((item) => ({
+            productId: item.productId,
+            storagePositionId: item.storagePositionId as string,
+          })),
+        },
+        select: { productId: true, storagePositionId: true, quantity: true },
+      });
+
+      const balanceByKey = new Map(
+        balances.map((balance) => [
+          `${balance.productId}|${balance.storagePositionId}`,
+          balance.quantity,
+        ])
+      );
+
+      for (const item of addressedItems) {
+        // Sem linha de saldo = a posição foi esvaziada entre a criação e a
+        // partida da sessão. `0` é a leitura correta (e continua sendo contado:
+        // achar material onde o sistema diz que não há é uma divergência tão
+        // relevante quanto o contrário).
+        const quantity =
+          balanceByKey.get(`${item.productId}|${item.storagePositionId}`) ?? new Prisma.Decimal(0);
+
+        await prisma.countingItem.update({
+          where: { id: item.id },
+          data: { systemQty: quantity },
+        });
+      }
+    }
+
+    // ---- Itens NÃO endereçados ---------------------------------------------
+    // Caminho só-PCP (e o produto sem nenhum saldo endereçado, ver
+    // `buildSessionItems()`): continua derivando o saldo do histórico agregado,
+    // exatamente como antes da Fase 3.
     for (const item of session.items) {
+      if (item.storagePositionId) {
+        continue;
+      }
+
       // Buscar estoque atual do produto
       // F2.2: `TRANSFER` excluído — transferência interna não altera o saldo
       // do produto (só o endereço), e o laço abaixo a somaria como saída,
-      // fazendo a contagem nascer com `systemQty` menor que o real. A Fase 3
-      // (F3.2) troca esta soma inteira por `StockPositionBalance`.
+      // fazendo a contagem nascer com `systemQty` menor que o real.
       const movements = await prisma.stockMovement.findMany({
         where: { productId: item.productId, type: { in: AGGREGATE_MOVEMENT_TYPES } },
         select: {
@@ -334,6 +504,10 @@ class CountingSessionService {
           name: item.product.name,
           type: item.product.type,
         },
+        // F3.1/F3.2: `null` numa instalação só-PCP (e no produto sem saldo
+        // endereçado). Com WMS, é O dado que torna o relatório acionável —
+        // "faltam 3 unidades" sem dizer em qual endereço não se investiga.
+        storagePosition: item.storagePosition ?? null,
         systemQty: item.systemQty,
         countedQty: item.countedQty,
         finalQty: item.finalQty,
@@ -392,9 +566,24 @@ class CountingSessionService {
       // contagem que encontrasse MENOS estoque físico (difference negativo, quebra)
       // aumentava o saldo em vez de diminuir. difference = countedQty - systemQty,
       // então difference > 0 é sobra (IN) e difference < 0 é quebra (OUT).
+      //
+      // F3.4: o ajuste passa a ser ENDEREÇADO quando o item tem posição. O par
+      // origem/destino segue a semântica validada em
+      // `stock.service.ts::assertPositionsMatchType()`:
+      //   sobra  (difference > 0, IN)  → `toPositionId`   (entrou NAQUELE endereço)
+      //   quebra (difference < 0, OUT) → `fromPositionId` (saiu DAQUELE endereço)
+      // Item sem posição (só-PCP, ou produto sem saldo endereçado) continua
+      // chamando sem nenhuma das duas — a dimensão de endereço é aditiva.
+      //
+      // Consequência intencional: com posição, `applyMovement()` valida o saldo
+      // NA POSIÇÃO antes de debitar. Uma quebra maior que o saldo endereçado
+      // falha com AppError em vez de deixar `stock_position_balances` negativo.
+      const type = difference > 0 ? 'IN' : 'OUT';
+      const positionId = item.storagePositionId ?? undefined;
+
       const movement = await stockService.registerMovement({
         productId: item.productId,
-        type: difference > 0 ? 'IN' : 'OUT',
+        type,
         quantity: Math.abs(difference),
         reason: `Ajuste por contagem - Sessão ${session.code}`,
         reference: session.id,
@@ -402,6 +591,8 @@ class CountingSessionService {
         countingSessionId: session.id,
         userId,
         notes: item.reason || undefined,
+        fromPositionId: type === 'OUT' ? positionId : undefined,
+        toPositionId: type === 'IN' ? positionId : undefined,
       });
 
       // Marcar item como ajustado

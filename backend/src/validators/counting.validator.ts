@@ -60,6 +60,14 @@ export const createCountingPlanSchema = Joi.object({
   priority: Joi.number().integer().min(1).max(10),
   // `criteria` é Json no schema (critérios de seleção de produto do plano) -
   // objeto livre por desenho, mas ainda assim precisa SER um objeto.
+  //
+  // Chaves reconhecidas hoje por countingPlanService.selectProducts():
+  // `productTypes`, `categories`, `criticality`, `minValue`, `maxValue`,
+  // `productIds` e - novos na F3.2 do WMS - `warehouseId`, `warehouseCode` e
+  // `streetCode` (recorte por endereço: produto com saldo em alguma posição do
+  // armazém/rua). `unknown(true)` continua: chave desconhecida é ignorada pelo
+  // seletor, não rejeitada, e é assim que uma fase nova acrescenta critério sem
+  // invalidar plano já gravado.
   criteria: Joi.object().unknown(true),
   allowBlindCount: Joi.boolean(),
   requireRecount: Joi.boolean(),
