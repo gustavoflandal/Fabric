@@ -44,7 +44,7 @@
               type="text"
               placeholder="Código da rua, nome do armazém..."
               class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @input="handleFilterChange"
+              @input="debouncedFilterChange"
             />
           </div>
           <div>
@@ -446,11 +446,15 @@ import { useWarehouseStore } from '@/stores/warehouse.store';
 import { storagePositionService } from '@/services/storage-position.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const warehouseStructureStore = useWarehouseStructureStore();
 const warehouseStore = useWarehouseStore();
+const toast = useToast();
 
 const structures = ref([]);
 const warehouses = ref([]);
@@ -526,6 +530,7 @@ const handleFilterChange = () => {
   pagination.value.page = 1;
   loadStructures();
 };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 
 const openCreateModal = () => {
   editingStructure.value = null;
@@ -547,7 +552,7 @@ const openCreateModal = () => {
 
 const openEditModal = async (structure) => {
   if (structure.generatedPositionsCount > 0) {
-    alert('Não é possível editar uma estrutura com posições geradas. Exclua as posições primeiro.');
+    toast.warning('Não é possível editar uma estrutura com posições geradas. Exclua as posições primeiro.');
     return;
   }
   
@@ -578,37 +583,37 @@ const loadPositionsCount = async (structureId) => {
 const handleGeneratePositions = async () => {
   if (!editingStructure.value) return;
   
-  if (!confirm(`Deseja gerar ${formData.value.floors * formData.value.positions} posições para esta estrutura?`)) {
+  if (!(await confirmDialog(`Deseja gerar ${formData.value.floors * formData.value.positions} posições para esta estrutura?`))) {
     return;
   }
-  
+
   try {
     generatingPositions.value = true;
     const response = await storagePositionService.generatePositions(editingStructure.value.id);
-    alert(response.message);
+    toast.success(response.message);
     await loadPositionsCount(editingStructure.value.id);
     await loadStructures(); // Recarregar lista para atualizar contagem
   } catch (error) {
-    alert(error.response?.data?.message || 'Erro ao gerar posições');
+    toast.error(error.response?.data?.message || 'Erro ao gerar posições');
   } finally {
     generatingPositions.value = false;
   }
 };
 const handleDeletePositions = async () => {
   if (!editingStructure.value) return;
-  
-  if (!confirm('Deseja realmente excluir todas as posições desta estrutura? Esta ação não pode ser desfeita.')) {
+
+  if (!(await confirmDialog('Deseja realmente excluir todas as posições desta estrutura? Esta ação não pode ser desfeita.'))) {
     return;
   }
-  
+
   try {
     deletingPositions.value = true;
     const response = await storagePositionService.deletePositions(editingStructure.value.id);
-    alert(response.message);
+    toast.success(response.message);
     await loadPositionsCount(editingStructure.value.id);
     await loadStructures(); // Recarregar lista para atualizar contagem
   } catch (error) {
-    alert(error.response?.data?.message || 'Erro ao excluir posições');
+    toast.error(error.response?.data?.message || 'Erro ao excluir posições');
   } finally {
     deletingPositions.value = false;
   }
@@ -629,31 +634,31 @@ const handleSubmit = async () => {
     
     if (editingStructure.value) {
       await warehouseStructureStore.updateStructure(editingStructure.value.id, submitData);
-      alert('Estrutura atualizada com sucesso!');
+      toast.success('Estrutura atualizada com sucesso!');
     } else {
       await warehouseStructureStore.createStructure(submitData);
-      alert('Estrutura criada com sucesso!');
+      toast.success('Estrutura criada com sucesso!');
     }
     closeModal();
     await loadStructures();
   } catch (error) {
-    alert(error.response?.data?.message || 'Erro ao salvar estrutura');
+    toast.error(error.response?.data?.message || 'Erro ao salvar estrutura');
   }
 };
 
 const handleDelete = async (structure) => {
   if (structure.generatedPositionsCount > 0) {
-    alert('Não é possível excluir uma estrutura com posições geradas. Exclua as posições primeiro.');
+    toast.warning('Não é possível excluir uma estrutura com posições geradas. Exclua as posições primeiro.');
     return;
   }
-  
-  if (confirm(`Deseja realmente excluir a estrutura "${structure.streetCode}"?`)) {
+
+  if (await confirmDialog(`Deseja realmente excluir a estrutura "${structure.streetCode}"?`)) {
     try {
       await warehouseStructureStore.deleteStructure(structure.id);
-      alert('Estrutura excluída com sucesso!');
+      toast.success('Estrutura excluída com sucesso!');
       await loadStructures();
     } catch (error) {
-      alert(error.response?.data?.message || 'Erro ao excluir estrutura');
+      toast.error(error.response?.data?.message || 'Erro ao excluir estrutura');
     }
   }
 };
@@ -683,7 +688,7 @@ const loadStoragePositions = async (structureId) => {
     storagePositions.value = response.data;
   } catch (error) {
     console.error('Erro ao carregar posições:', error);
-    alert('Erro ao carregar posições');
+    toast.error('Erro ao carregar posições');
   } finally {
     loadingPositions.value = false;
   }
@@ -694,35 +699,35 @@ const toggleBlockPosition = async (position) => {
     await storagePositionService.updatePosition(position.id, {
       blocked: !position.blocked
     });
-    
+
     // Atualizar localmente
     position.blocked = !position.blocked;
-    
-    alert(`Posição ${position.blocked ? 'bloqueada' : 'desbloqueada'} com sucesso!`);
+
+    toast.success(`Posição ${position.blocked ? 'bloqueada' : 'desbloqueada'} com sucesso!`);
   } catch (error) {
     console.error('Erro ao atualizar posição:', error);
-    alert('Erro ao atualizar posição');
+    toast.error('Erro ao atualizar posição');
   }
 };
 
 const deletePosition = async (position) => {
-  if (!confirm(`Deseja realmente excluir a posição "${position.code}"?`)) {
+  if (!(await confirmDialog(`Deseja realmente excluir a posição "${position.code}"?`))) {
     return;
   }
-  
+
   try {
     await storagePositionService.deletePosition(position.id);
-    
+
     // Remover da lista local
     storagePositions.value = storagePositions.value.filter(p => p.id !== position.id);
-    
+
     // Atualizar contagem no grid principal
     await loadStructures();
-    
-    alert('Posição excluída com sucesso!');
+
+    toast.success('Posição excluída com sucesso!');
   } catch (error) {
     console.error('Erro ao excluir posição:', error);
-    alert('Erro ao excluir posição');
+    toast.error('Erro ao excluir posição');
   }
 };
 
@@ -761,25 +766,25 @@ const deleteAllPositions = async () => {
   if (!selectedStructure.value) return;
   
   const count = storagePositions.value.length;
-  
-  if (!confirm(`Deseja realmente excluir todas as ${count} posições desta estrutura?\n\nEsta ação não pode ser desfeita.`)) {
+
+  if (!(await confirmDialog(`Deseja realmente excluir todas as ${count} posições desta estrutura?\n\nEsta ação não pode ser desfeita.`))) {
     return;
   }
-  
+
   try {
     deletingAllPositions.value = true;
     const response = await storagePositionService.deletePositions(selectedStructure.value.id);
-    
+
     // Limpar lista local
     storagePositions.value = [];
-    
+
     // Atualizar contagem no grid principal
     await loadStructures();
-    
-    alert(response.message || `${count} posições excluídas com sucesso!`);
+
+    toast.success(response.message || `${count} posições excluídas com sucesso!`);
   } catch (error) {
     console.error('Erro ao excluir todas as posições:', error);
-    alert(error.response?.data?.message || 'Erro ao excluir posições');
+    toast.error(error.response?.data?.message || 'Erro ao excluir posições');
   } finally {
     deletingAllPositions.value = false;
   }

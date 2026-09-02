@@ -1,6 +1,35 @@
 /**
  * Event Listeners - Ações Automáticas
  * Registra listeners para eventos do sistema
+ *
+ * ✅ Fase 5 item 5.5 do cronograma (docs/fase-2026-09-modernizacao/
+ * 02_CRONOGRAMA_IMPLEMENTACOES.md): decisão registrada sobre esta
+ * infraestrutura, que tinha 15 listeners registrados, a maioria só
+ * `console.log`/`console.warn`/`console.error` com comentários "TODO: ações
+ * automáticas" nunca implementadas.
+ *
+ * Decisão: MANTER a infraestrutura como está (log estruturado + os 2
+ * listeners que gravam em audit_logs, agora corrigidos - ver abaixo), sem
+ * expandir os TODOs para virar notificações de verdade. Motivo: o sistema já
+ * tem um caminho de notificação real e funcionando
+ * (notification-detector.service.ts + notification.service.ts, chamados
+ * DIRETAMENTE pelos services - ex: monitorScrapRate, checkLowStock), não
+ * através deste event bus. Construir os TODOs aqui criaria um SEGUNDO
+ * caminho de notificação para os mesmos eventos, arriscando duplicação
+ * (o usuário recebendo o mesmo alerta duas vezes) sem nenhum ganho - não é
+ * proposital, não veio de nenhum pedido de negócio, só listeners que
+ * ficaram pela metade. Se um evento aqui precisar de uma ação real no
+ * futuro, o caminho recomendado é integrar com notification.service.ts
+ * (createBulk) em vez de reinventar a entrega de notificação aqui.
+ *
+ * Bug real encontrado e corrigido nesta revisão: os listeners de
+ * QUALITY_SCRAP_HIGH e SYSTEM_ERROR tentavam gravar em `prisma.auditLog`
+ * usando um campo `details` que nunca existiu no schema, e `userId: 'system'`,
+ * que violava a FK (userId só aceita um id real de users ou null) - as duas
+ * chamadas sempre falhavam silenciosamente (o try/catch engolia o erro).
+ * Corrigido para usar os campos reais (description/newValues/errorMessage)
+ * e omitir userId. Testado ao vivo: os dois agora gravam a linha
+ * corretamente.
  */
 
 import { eventBus, SystemEvents } from './event-bus';
@@ -144,19 +173,24 @@ export function initializeEventListeners() {
     // - Sugerir análise de causa raiz
     
     try {
-      // Criar registro de alerta de qualidade
+      // ✅ Fase 5 item 5.5 do cronograma: gravava em `details`, campo que
+      // nunca existiu em AuditLog (schema.prisma so tem requestBody/
+      // responseBody/oldValues/newValues/errorMessage), e `userId: 'system'`
+      // violava a FK (userId so aceita um id real de users ou null) - essa
+      // chamada sempre falhava e o alerta de qualidade nunca era
+      // registrado de verdade, so o catch abaixo silenciava o erro.
       await prisma.auditLog.create({
         data: {
-          userId: 'system',
           action: 'QUALITY_ALERT',
           resource: 'production_pointing',
           resourceId: data.pointingId,
-          details: JSON.stringify({
+          description: `Refugo alto: ${data.scrapRate?.toFixed?.(2) ?? data.scrapRate}% (limite: ${data.threshold}%)`,
+          newValues: {
             type: 'HIGH_SCRAP',
             scrapRate: data.scrapRate,
             threshold: data.threshold,
             productionOrderId: data.productionOrderId,
-          }),
+          },
         },
       });
     } catch (error) {
@@ -191,13 +225,15 @@ export function initializeEventListeners() {
     // - Notificar equipe técnica
     
     try {
+      // ✅ Fase 5 item 5.5: mesmo problema do listener de qualidade acima
+      // (campo `details` inexistente, `userId: 'system'` violando FK).
       await prisma.auditLog.create({
         data: {
-          userId: 'system',
           action: 'SYSTEM_ERROR',
           resource: data.type || 'unknown',
-          resourceId: data.receiptId || data.pointingId || data.orderId || 'unknown',
-          details: JSON.stringify(data),
+          resourceId: data.receiptId || data.pointingId || data.orderId || undefined,
+          errorMessage: typeof data.error === 'string' ? data.error : JSON.stringify(data.error),
+          newValues: data,
         },
       });
     } catch (error) {

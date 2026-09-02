@@ -277,6 +277,8 @@ import { useRoutingStore } from '@/stores/routing.store'
 import { useWorkCenterStore } from '@/stores/work-center.store'
 import type { Product } from '@/services/product.service'
 import type { Routing } from '@/services/routing.service'
+import { useToast } from '@/composables/useToast'
+import { confirmDialog } from '@/composables/useConfirm'
 
 type FormMode = 'create' | 'edit'
 
@@ -302,6 +304,7 @@ const emit = defineEmits<{
 
 const routingStore = useRoutingStore()
 const workCenterStore = useWorkCenterStore()
+const toast = useToast()
 
 const loading = computed(() => routingStore.loading)
 const error = computed(() => routingStore.error)
@@ -410,7 +413,7 @@ async function openCalculation(routing: Routing) {
     calculationResult.value = result
     showCalculation.value = true
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao calcular tempo')
+    toast.error(error.response?.data?.message || 'Erro ao calcular tempo')
   }
 }
 
@@ -420,7 +423,7 @@ async function recalculate() {
       const result = await routingStore.calculateTotalTime(calculationResult.value.routing.id, calculationQuantity.value)
       calculationResult.value = result
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao recalcular tempo')
+      toast.error(error.response?.data?.message || 'Erro ao recalcular tempo')
     }
   }
 }
@@ -455,7 +458,7 @@ const handleSubmit = async () => {
         active: form.active,
         operations: payloadOperations,
       })
-      alert('Roteiro criado com sucesso!')
+      toast.success('Roteiro criado com sucesso!')
     } else if (editingRoutingId.value) {
       await routingStore.updateRouting(editingRoutingId.value, props.product.id, {
         description: form.description || undefined,
@@ -464,13 +467,13 @@ const handleSubmit = async () => {
         active: form.active,
         operations: payloadOperations,
       })
-      alert('Roteiro atualizado com sucesso!')
+      toast.success('Roteiro atualizado com sucesso!')
     }
 
     await routingStore.fetchByProduct(props.product.id)
     closeForm()
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar roteiro')
+    toast.error(error.response?.data?.message || 'Erro ao salvar roteiro')
   }
 }
 
@@ -479,21 +482,21 @@ const setActive = async (routing: Routing) => {
   try {
     await routingStore.setActiveRouting(routing.id, props.product.id, true)
     await routingStore.fetchByProduct(props.product.id)
-    alert('Roteiro ativado com sucesso!')
+    toast.success('Roteiro ativado com sucesso!')
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao ativar roteiro')
+    toast.error(error.response?.data?.message || 'Erro ao ativar roteiro')
   }
 }
 
 const deleteRouting = async (routing: Routing) => {
   if (!props.product) return
-  if (!confirm(`Deseja realmente excluir o roteiro versão ${routing.version}?`)) return
+  if (!(await confirmDialog(`Deseja realmente excluir o roteiro versão ${routing.version}?`))) return
 
   try {
     await routingStore.deleteRouting(routing.id, props.product.id)
-    alert('Roteiro excluído com sucesso!')
+    toast.success('Roteiro excluído com sucesso!')
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao excluir roteiro')
+    toast.error(error.response?.data?.message || 'Erro ao excluir roteiro')
   }
 }
 

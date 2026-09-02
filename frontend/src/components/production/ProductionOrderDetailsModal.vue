@@ -228,6 +228,8 @@ import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import { useProductionOrderStore } from '@/stores/production-order.store';
 import type { ProductionOrder } from '@/services/production-order.service';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
 
 const props = defineProps<{
   modelValue: boolean;
@@ -240,6 +242,7 @@ const emit = defineEmits<{
 }>();
 
 const orderStore = useProductionOrderStore();
+const toast = useToast();
 
 const loading = ref(false);
 const loadingMaterials = ref(false);
@@ -281,15 +284,15 @@ const loadOperations = async () => {
 
 const changeStatus = async (newStatus: string) => {
   if (!props.order) return;
-  if (!confirm(`Deseja realmente mudar o status para ${getStatusLabel(newStatus)}?`)) return;
+  if (!(await confirmDialog(`Deseja realmente mudar o status para ${getStatusLabel(newStatus)}?`))) return;
 
   try {
     await orderStore.changeStatus(props.order.id, newStatus);
-    alert('Status atualizado com sucesso!');
+    toast.success('Status atualizado com sucesso!');
     emit('refresh');
     close();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao mudar status');
+    toast.error(error.response?.data?.message || 'Erro ao mudar status');
   }
 };
 
@@ -298,11 +301,11 @@ const updateProgress = async () => {
 
   try {
     await orderStore.updateProgress(props.order.id, progressForm.value.producedQty, progressForm.value.scrapQty);
-    alert('Progresso atualizado com sucesso!');
+    toast.success('Progresso atualizado com sucesso!');
     emit('refresh');
     close();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao atualizar progresso');
+    toast.error(error.response?.data?.message || 'Erro ao atualizar progresso');
   }
 };
 
