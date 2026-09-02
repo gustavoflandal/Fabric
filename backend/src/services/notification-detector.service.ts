@@ -183,10 +183,10 @@ export class NotificationDetectorService {
       const required = bomItem.quantity * order.quantity;
 
       if (currentStock < required) {
-        // Buscar compradores e gerente de produção
-        const buyers = await this.getUsersByRole('BUYER');
-        const managers = await this.getUsersByRole('MANAGER');
-        const recipients = [...buyers, ...managers];
+        // Fix (01/09/2026): 'BUYER' nunca existiu como perfil no sistema (só
+        // ADMIN/MANAGER/OPERATOR são seedados) - a busca sempre retornava
+        // vazio e a notificação não chegava a ninguém além de MANAGER.
+        const recipients = await this.getUsersByRole('MANAGER');
 
         await notificationService.createBulk(
           recipients.map(u => u.id),
@@ -247,10 +247,14 @@ export class NotificationDetectorService {
     const maxScrapRate = 5; // 5% - Configurável
 
     if (scrapRate > maxScrapRate) {
-      // Notificar gerente de qualidade, gerente de produção e operador
-      const qualityManagers = await this.getUsersByRole('QUALITY_MANAGER');
+      // Fix (01/09/2026): 'QUALITY_MANAGER' nunca existiu como perfil no
+      // sistema - a busca sempre retornava vazio. Notifica MANAGER + o
+      // operador que registrou o apontamento; dedupe por id caso o operador
+      // também tenha o perfil MANAGER.
       const productionManagers = await this.getUsersByRole('MANAGER');
-      const recipients = [...qualityManagers, ...productionManagers, pointing.user];
+      const recipients = Array.from(
+        new Map([...productionManagers, pointing.user].map((u) => [u.id, u])).values()
+      );
 
       await notificationService.createBulk(
         recipients.map(u => u.id),
@@ -319,9 +323,10 @@ export class NotificationDetectorService {
         );
 
         if (!alreadyNotified) {
-          const buyers = await this.getUsersByRole('BUYER');
-          const stockManagers = await this.getUsersByRole('STOCK_MANAGER');
-          const recipients = [...buyers, ...stockManagers];
+          // Fix (01/09/2026): 'BUYER' e 'STOCK_MANAGER' nunca existiram como
+          // perfil no sistema - a busca sempre retornava vazio e esta era a
+          // única notificação crítica do sistema sem nenhum destinatário real.
+          const recipients = await this.getUsersByRole('MANAGER');
 
           const priority = currentStock === 0 ? 4 : 3; // Crítico se zerado, alto se baixo
 
