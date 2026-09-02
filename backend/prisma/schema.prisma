@@ -275,7 +275,25 @@ model Product {
   standardCost  Float?
   lastCost      Float?
   averageCost   Float?
-  
+
+  // --- Dados para Armazenagem (WMS) ---------------------------------------
+  // F0.9 do plano do WMS (docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md)
+  // e secao 3.2 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md: campos OPCIONAIS na
+  // propria entidade compartilhada, nunca uma tabela ProductWMS paralela. Um
+  // cliente so-PCP nunca preenche nada disso e nao e impactado (colunas nullable).
+  // Alimentam a regra de alocacao (StorageRule, F4.6) e a checagem de capacidade
+  // da posicao. Unidades: weight em kg; width/height/depth em metros;
+  // volume em m3 (derivado de width*height*depth em product.service quando as
+  // tres dimensoes existem e volume nao foi informado explicitamente).
+  weight           Float?  // peso unitario (kg)
+  width            Float?  // largura (m)
+  height           Float?  // altura (m)
+  depth            Float?  // profundidade (m)
+  volume           Float?  // volume unitario (m3) - derivado ou informado
+  packagingType    String? // tipo de embalagem (CAIXA, PALLET, FARDO, ...)
+  maxStackQty      Int?    // quantas unidades podem ser empilhadas
+  segregationGroup String? // grupo de incompatibilidade de armazenagem
+
   active        Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -800,7 +818,17 @@ model NotificationPreference {
 // MÓDULO DE CONTAGEM DE ESTOQUE
 // ============================================
 
-// Localização Física
+/// @deprecated CONGELADO (F0.6 do plano do WMS).
+/// Nenhum codigo novo deve referenciar `Location` nem `LocationType`. O
+/// enderecamento fisico do sistema e a arvore
+/// `Warehouse -> WarehouseStructure -> StoragePosition` (decisao 4.1 de
+/// docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md).
+/// Este model nunca teve service, controller, rota, validator nem store: a
+/// unica FK (`CountingItem.locationId`) e NULL em 100% dos itens gerados pelo
+/// sistema. O DROP acontece na Fase 3 (F3.1), depois que `CountingItem` migrar
+/// para `storagePositionId` - nao antes, para a remocao nao ser destrutiva.
+/// O seed `prisma/seed-locations.ts` foi tirado da cadeia de seed (o arquivo
+/// continua no repo apenas como historico).
 model Location {
   id            String    @id @default(uuid())
   code          String    @unique
@@ -1008,6 +1036,9 @@ enum CounterRole {
 // ENUMS - CONTAGEM DE ESTOQUE
 // ============================================
 
+/// @deprecated CONGELADO (F0.6 do plano do WMS) - ver o comentario em `model Location`.
+/// Sera removido junto com `Location` na Fase 3 (F3.1). O tipo de endereco
+/// vivo do sistema e `PositionType`, em `StoragePosition`.
 enum LocationType {
   WAREHOUSE
   AREA
@@ -1089,11 +1120,16 @@ model WarehouseStructure {
   streetCode      String
   floors          Int
   positions       Int
-  weightCapacity  Float
-  height          Float
-  width           Float
-  depth           Float
-  maxHeight       Float
+  // F0.3: campos dimensionais passaram a ser opcionais. Um tipo de AREA
+  // (PISO, DOCA, QUARENTENA, BLOQUEIO, EXPEDICAO) nao tem paletizacao, entao
+  // exigir peso/dimensao nao faz sentido. Continuam OBRIGATORIOS para os
+  // tipos de rack - regra aplicada nos validators (Joi .when/positionType),
+  // nao no banco, porque a obrigatoriedade e condicional ao tipo.
+  weightCapacity  Float?
+  height          Float?
+  width           Float?
+  depth           Float?
+  maxHeight       Float?
   blocked         Boolean  @default(false)
   positionType    PositionType
   createdAt       DateTime @default(now())
@@ -1108,18 +1144,28 @@ model WarehouseStructure {
 model StoragePosition {
   id              String   @id @default(uuid())
   structureId     String
+  // F0.1: endereco persistido no formato `ARM-RUA-AA-PP` (warehouseCode,
+  // streetCode, floor e position com 2 digitos). Antes era concatenado em
+  // memoria a cada leitura em getPositionsByStructure() - nao dava para buscar
+  // por codigo, indexar nem pendurar saldo/movimento/etiqueta nele. E a unidade
+  // enderecavel atomica do WMS (decisao 4.1 do WMS_IMPLEMENTATION_ANALYSIS.md).
+  code            String   @unique
   warehouseCode   String
   streetCode      String
   floor           Int
   position        Int
   positionType    PositionType
-  weightCapacity  Float
-  height          Float
-  width           Float
-  depth           Float
-  maxHeight       Float
+  // F0.3: opcionais - ver o comentario equivalente em WarehouseStructure.
+  weightCapacity  Float?
+  height          Float?
+  width           Float?
+  depth           Float?
+  maxHeight       Float?
   blocked         Boolean  @default(false)
-  occupied        Boolean  @default(false)
+  // F0.4 (decisao D3): `occupied` foi REMOVIDO. Era uma flag denormalizada que
+  // nenhum codigo jamais escrevia; mante-la seria criar uma fonte de divergencia
+  // com o saldo real. Ocupacao passa a ser derivada da existencia de saldo na
+  // posicao (StockPositionBalance, Fase 1).
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -1128,11 +1174,11 @@ model StoragePosition {
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])
   @@index([blocked])
-  @@index([occupied])
   @@map("storage_positions")
 }
 
 enum PositionType {
+  // Tipos de RACK - exigem peso/dimensao (paletizacao).
   PORTA_PALETES
   MINI_PORTA_PALETES
   DRIVE_IN
@@ -1146,4 +1192,41 @@ enum PositionType {
   CARROSSEL
   MINI_LOAD
   ESTANTES_INDUSTRIAIS
+  // F0.3 - tipos de AREA (nao-rack). Cobrem o unico caso real que `Location`
+  // atendia e `StoragePosition` nao (piso e area). Nao tem paletizacao, entao
+  // os campos dimensionais sao opcionais para eles.
+  PISO
+  DOCA
+  QUARENTENA
+  BLOQUEIO
+  EXPEDICAO
+}
+
+// ============================================
+// LICENCIAMENTO DE MÓDULOS
+// ============================================
+
+// F0.8 do plano do WMS, implementando a secao 3.1 de
+// docs/fase-2026-09-modernizacao/04_ARQUITETURA_MODULAR_LICENCIAMENTO.md.
+//
+// O modelo de deploy e UMA INSTALACAO POR CLIENTE (nao e SaaS multi-tenant
+// compartilhado), entao licenciar um modulo e uma configuracao por instalacao -
+// nao um filtro por tenantId espalhado pelo schema. Por isso a tabela e uma
+// lista curta (PCP, WMS, YMS), lida uma vez no boot e cacheada em memoria.
+//
+// Duas checagens em camadas, nesta ordem por requisicao:
+//   authMiddleware -> requireModule(codigo) -> requirePermission(recurso, acao)
+// A INSTALACAO tem o modulo licenciado? (requireModule, novo)
+// O USUARIO tem a permissao? (requirePermission, RBAC ja existente, inalterado)
+//
+// `PCP` nasce sempre habilitado - e o nucleo, nao e opcional, e nenhuma rota
+// recebe requireModule('PCP') (seria custo sem beneficio e risco de travar o
+// nucleo por erro de configuracao).
+model LicensedModule {
+  id        String   @id @default(uuid())
+  code      String   @unique // PCP | WMS | YMS
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@map("licensed_modules")
 }

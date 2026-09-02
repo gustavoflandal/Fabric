@@ -27,6 +27,8 @@ import countingRoutes from './counting.routes';
 import warehouseRoutes from './warehouse.routes';
 import warehouseStructureRoutes from './warehouse-structure.routes';
 import storagePositionRoutes from './storage-position.routes';
+import systemRoutes from './system.routes';
+import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
 
@@ -46,9 +48,26 @@ router.use('/units-of-measure', unitOfMeasureRoutes);
 router.use('/suppliers', supplierRoutes);
 router.use('/customers', customerRoutes);
 router.use('/work-centers', workCenterRoutes);
-router.use('/warehouses', warehouseRoutes);
-router.use('/warehouse-structures', warehouseStructureRoutes);
-router.use('/storage-positions', storagePositionRoutes);
+
+// ============================================
+// MÓDULO WMS (licenciável por instalação)
+// ============================================
+// F0.8 do plano do WMS / seção 3.1 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md:
+// `requireModule('WMS')` no ponto de montagem bloqueia (404) a superfície
+// inteira do módulo com uma linha por montagem, em vez de checagem espalhada
+// rota a rota - e qualquer rota nova de armazém já nasce protegida.
+//
+// A ordem efetiva por requisição é: authMiddleware (aplicado DENTRO de cada
+// arquivo de rota) -> requireModule -> requirePermission. O middleware de
+// módulo não depende do usuário, só da instalação, então rodar antes ou depois
+// do auth é indiferente para a decisão; o que importa é ficar antes do RBAC.
+//
+// `PCP` NÃO recebe requireModule em lugar nenhum: é o núcleo, sempre
+// habilitado - checá-lo seria custo por requisição sem benefício e risco de
+// travar o sistema inteiro por um erro de configuração.
+router.use('/warehouses', requireModule('WMS'), warehouseRoutes);
+router.use('/warehouse-structures', requireModule('WMS'), warehouseStructureRoutes);
+router.use('/storage-positions', requireModule('WMS'), storagePositionRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);
@@ -79,6 +98,9 @@ router.use('/notifications', notificationRoutes);
 
 // Rotas de contagem de estoque
 router.use('/counting', countingRoutes);
+
+// Rotas de sistema (F0.8: quais módulos esta instalação tem licenciados)
+router.use('/system', systemRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {

@@ -6,6 +6,48 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...');
 
+  // ============================================
+  // MÓDULOS LICENCIADOS DESTA INSTALAÇÃO
+  // ============================================
+  // F0.8 do plano do WMS, implementando a seção 3.1 de
+  // docs/fase-2026-09-modernizacao/04_ARQUITETURA_MODULAR_LICENCIAMENTO.md.
+  //
+  // O modelo de deploy é uma instalação por cliente, então a licença é
+  // configurada aqui (seed/script de onboarding), sem UI de autoatendimento nem
+  // chave criptográfica.
+  //
+  // - PCP é o NÚCLEO: sempre habilitado, nunca desligável.
+  // - WMS nasce habilitado NESTE ambiente porque é o módulo em construção — as
+  //   rotas /warehouses, /warehouse-structures e /storage-positions estão atrás
+  //   de requireModule('WMS') e responderiam 404 se a linha viesse desabilitada.
+  //   Numa instalação de cliente só-PCP, este valor é `false` (ou a linha nem
+  //   existe: módulo ausente da tabela conta como não licenciado).
+  // - YMS ainda não tem código nenhum — só o nome reservado. Nasce desabilitado.
+  //
+  // `update: {}` nos módulos opcionais é deliberado: rodar o seed de novo NÃO
+  // reativa um módulo que o fornecedor desligou nesta instalação. O PCP é a
+  // exceção — ele é reafirmado como habilitado, porque desligar o núcleo não é
+  // um estado válido.
+  console.log('🧩 Configurando módulos licenciados...');
+  const licensedModules = [
+    { code: 'PCP', enabled: true, core: true },
+    { code: 'WMS', enabled: true, core: false },
+    { code: 'YMS', enabled: false, core: false },
+  ];
+
+  for (const { code, enabled, core } of licensedModules) {
+    await prisma.licensedModule.upsert({
+      where: { code },
+      update: core ? { enabled: true } : {},
+      create: { code, enabled },
+    });
+  }
+  console.log(
+    `   - ${licensedModules
+      .map((m) => `${m.code}=${m.enabled ? 'on' : 'off'}`)
+      .join(', ')}`
+  );
+
   // Criar permissões padrão
   console.log('📝 Criando permissões...');
   const permissions = [

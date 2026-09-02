@@ -5,12 +5,24 @@ import { prisma } from './config/database';
 import { initializeEventListeners } from './events/listeners';
 import notificationScheduler from './services/notification-scheduler.service';
 import logCleanupJob from './jobs/log-cleanup.job';
+import { loadLicensedModules } from './services/licensed-module.service';
 
 const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
     logger.info('✅ Database connected successfully');
+
+    // F0.8: módulos licenciados desta instalação, lidos UMA vez e cacheados em
+    // memória (uma instalação não muda de licença a cada request). O middleware
+    // requireModule() também sabe carregar sob demanda, então isto é
+    // aquecimento de cache, não um passo obrigatório do boot.
+    const licensedModules = await loadLicensedModules();
+    logger.info(
+      `✅ Módulos licenciados: ${[...licensedModules.entries()]
+        .map(([code, enabled]) => `${code}=${enabled ? 'on' : 'off'}`)
+        .join(', ')}`
+    );
 
     // Initialize event listeners
     initializeEventListeners();

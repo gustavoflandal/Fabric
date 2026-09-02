@@ -17,15 +17,48 @@ export interface CreateProductDto {
   standardCost?: number;
   lastCost?: number;
   averageCost?: number;
+  // Dados para Armazenagem (WMS) - F0.9. Opcionais: instalação só-PCP nunca
+  // preenche. weight em kg; width/height/depth em m; volume em m³.
+  weight?: number | null;
+  width?: number | null;
+  height?: number | null;
+  depth?: number | null;
+  volume?: number | null;
+  packagingType?: string | null;
+  maxStackQty?: number | null;
+  segregationGroup?: string | null;
   active?: boolean;
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}
 
+/**
+ * F0.9: o volume unitário pode ser informado explicitamente (embalagem
+ * irregular, em que largura × altura × profundidade superestima muito) ou
+ * derivado das três dimensões. Só deriva quando o cliente NÃO informou volume e
+ * as três dimensões estão presentes no mesmo payload — nunca sobrescreve um
+ * volume informado, e num update parcial que mande só uma dimensão não há como
+ * recalcular sem reler o produto, então o volume fica como está.
+ */
+const withDerivedVolume = <T extends UpdateProductDto>(data: T): T => {
+  const { volume, width, height, depth } = data;
+
+  if (
+    (volume === undefined || volume === null) &&
+    typeof width === 'number' &&
+    typeof height === 'number' &&
+    typeof depth === 'number'
+  ) {
+    return { ...data, volume: width * height * depth };
+  }
+
+  return data;
+};
+
 export class ProductService {
   async create(data: CreateProductDto) {
     return await prisma.product.create({
-      data,
+      data: withDerivedVolume(data),
       include: { unit: true, category: true },
     });
   }
@@ -77,7 +110,7 @@ export class ProductService {
   async update(id: string, data: UpdateProductDto) {
     return await prisma.product.update({
       where: { id },
-      data,
+      data: withDerivedVolume(data),
       include: { unit: true, category: true },
     });
   }

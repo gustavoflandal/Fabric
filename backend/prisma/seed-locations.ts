@@ -1,3 +1,17 @@
+// ⚠️ FORA DA CADEIA DE SEED — F0.6 do plano do WMS
+// (docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md).
+//
+// `Location` foi CONGELADO: o endereçamento físico do sistema é a árvore
+// `Warehouse -> WarehouseStructure -> StoragePosition` (decisão 4.1). Manter
+// duas hierarquias de endereço em paralelo produziria dois saldos, duas
+// contagens e duas versões da verdade sobre onde o material está.
+//
+// Este arquivo continua no repositório apenas como histórico. O script npm
+// `prisma:seed-locations` foi removido do package.json e nenhum outro seed o
+// invoca — NÃO reintroduza a chamada. O drop de `Location`/`LocationType`
+// acontece na Fase 3 (F3.1), depois que `CountingItem` migrar para
+// `storagePositionId`.
+
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
