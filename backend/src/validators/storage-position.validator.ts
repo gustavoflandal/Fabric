@@ -38,7 +38,7 @@ export const updateStoragePositionSchema = Joi.object({
   // F4.10: marcar/desmarcar a posição como ÁREA DE PICKING. Entra por esta
   // rota, e não por uma rota nova, pela mesma razão de `blocked`: é um atributo
   // operacional da posição individual, editável por quem já pode editar a
-  // posição (`storage_positions:update`). Não é campo de identidade nem
+  // posição (`estruturas_armazem:atualizar_posicao`). Não é campo de identidade nem
   // dimensional, então fica fora da regra condicional por `positionType`.
   isPickingArea: Joi.boolean(),
 }).min(1);

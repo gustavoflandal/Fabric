@@ -14,18 +14,6 @@ interface RateLimitStore {
   };
 }
 
-const store: RateLimitStore = {};
-
-// Limpar entradas antigas a cada 5 minutos
-setInterval(() => {
-  const now = Date.now();
-  Object.keys(store).forEach(key => {
-    if (store[key].resetTime < now) {
-      delete store[key];
-    }
-  });
-}, 5 * 60 * 1000);
-
 export interface RateLimitOptions {
   windowMs: number; // Janela de tempo em milissegundos
   max: number; // Máximo de requisições
@@ -35,9 +23,39 @@ export interface RateLimitOptions {
 }
 
 /**
- * Cria um middleware de rate limiting
+ * Cria um middleware de rate limiting.
+ *
+ * O `store` é criado AQUI DENTRO, uma instância por chamada de `rateLimit()`, e
+ * não no escopo do módulo. Enquanto era module-level, TODOS os limitadores
+ * compartilhavam o mesmo mapa: `generalLimiter` (aplicado globalmente em
+ * app.ts) e `authLimiter` (aplicado por cima dele em /auth/login e
+ * /auth/refresh) usam o mesmo `keyGenerator` padrão (`req.ip`), então
+ * escreviam na MESMA chave do MESMO objeto. Consequências reais: (a) qualquer
+ * requisição comum consumia a cota de tentativas de login do IP - 10 chamadas
+ * a /products em produção já estouravam o limite de 10 do authLimiter; (b) o
+ * `resetTime` da janela era o de quem criou a entrada primeiro, misturando
+ * janelas de 15 min com a de 1 min do writeLimiter; (c) o
+ * `skipSuccessfulRequests` do authLimiter decrementava o contador do
+ * limitador geral.
+ *
+ * O intervalo de limpeza também passa a ser por instância. `unref()` para que
+ * ele não segure o event loop vivo sozinho (com o timer module-level anterior,
+ * a suíte de testes só terminava por causa do `forceExit` do jest.config.js).
  */
 export function rateLimit(options: RateLimitOptions) {
+  const store: RateLimitStore = {};
+
+  // Limpar entradas antigas a cada 5 minutos
+  const cleanupTimer = setInterval(() => {
+    const now = Date.now();
+    Object.keys(store).forEach(key => {
+      if (store[key].resetTime < now) {
+        delete store[key];
+      }
+    });
+  }, 5 * 60 * 1000);
+  cleanupTimer.unref?.();
+
   const {
     windowMs,
     max,
@@ -115,8 +133,8 @@ export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   // Fase 3 item 3.5: 'test' também precisa de um limite alto - uma suíte de
   // integração legitimamente faz muitas chamadas de login numa janela curta
-  // (o rate limiter é por IP e o store é compartilhado entre todos os
-  // testes do processo), sem que isso represente risco real de segurança
+  // (o rate limiter é por IP e o store desta instância é compartilhado entre
+  // todos os testes do processo), sem que isso represente risco real de segurança
   // (não é o ambiente de produção).
   max: config.nodeEnv === 'development' || config.nodeEnv === 'test' ? 50 : 10,
   skipSuccessfulRequests: true, // Não contar logins bem-sucedidos

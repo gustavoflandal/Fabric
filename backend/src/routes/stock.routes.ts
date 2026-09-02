@@ -43,7 +43,9 @@ router.post(
  * pertence ao módulo, então a checagem é pontual aqui. Ordem preservada:
  * authMiddleware (router.use acima) -> requireModule -> requirePermission.
  *
- * RBAC — `storage_positions:update`, recurso REAPROVEITADO, nenhum criado:
+ * RBAC — `estruturas_armazem:atualizar_posicao` (era `storage_positions:update`,
+ * renomeado para a convenção portuguesa do módulo de armazém), recurso
+ * REAPROVEITADO, nenhum criado:
  *   * é a permissão de ESCRITA sobre endereço que já existe (seed) e que já
  *     está atribuída a MANAGER e OPERATOR — exatamente quem opera o armazém;
  *   * transferência não altera o saldo agregado do produto, só o conteúdo de
@@ -59,7 +61,7 @@ router.post(
 router.post(
   '/transfer',
   requireModule('WMS'),
-  requirePermission('storage_positions', 'update'),
+  requirePermission('estruturas_armazem', 'atualizar_posicao'),
   validate(transferSchema),
   stockController.transfer
 );

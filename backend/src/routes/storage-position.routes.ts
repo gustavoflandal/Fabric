@@ -68,9 +68,17 @@ router.delete(
 );
 
 // Atualizar uma posição individual (bloquear/desbloquear)
+//
+// RBAC: `estruturas_armazem:atualizar_posicao`. Era `storage_positions:update`
+// — o único par em inglês de todo o módulo de armazém, que usa
+// `armazens`/`estruturas_armazem` em português. Renomeado para o mesmo recurso
+// das outras cinco rotas deste arquivo, inclusive a de EXCLUIR esta mesma
+// posição individual logo abaixo (`estruturas_armazem:excluir_posicoes`), com
+// ação própria porque atualizar (bloquear/desbloquear) não é nem gerar nem
+// excluir posição.
 router.put(
   '/position/:positionId',
-  requirePermission('storage_positions', 'update'),
+  requirePermission('estruturas_armazem', 'atualizar_posicao'),
   validate(updateStoragePositionSchema),
   storagePositionController.updatePosition
 );
