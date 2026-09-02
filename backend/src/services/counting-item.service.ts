@@ -1,5 +1,6 @@
 import { PrismaClient, CountingItem, CountingItemStatus } from '@prisma/client';
 import { AppError } from '../middleware/error.middleware';
+import { COUNTING_POSITION_SELECT } from '../utils/counting-position.util';
 
 const prisma = new PrismaClient();
 
@@ -57,7 +58,7 @@ class CountingItemService {
             unitId: true,
           },
         },
-        location: true,
+        storagePosition: { select: COUNTING_POSITION_SELECT },
         counter: {
           select: {
             id: true,
@@ -85,9 +86,11 @@ class CountingItemService {
           },
         },
       },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      // F3.3: `sequence` primeiro — é a ordem da ROTA de contagem (serpentina
+      // por armazém/rua/andar/posição). Itens não endereçados ficam todos com
+      // `sequence = 0` e caem no desempate por `createdAt`, que é exatamente a
+      // ordem que este método devolvia antes da Fase 3.
+      orderBy: [{ sequence: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
@@ -99,7 +102,7 @@ class CountingItemService {
       where: { id },
       include: {
         product: true,
-        location: true,
+        storagePosition: { select: COUNTING_POSITION_SELECT },
         counter: {
           select: {
             id: true,
@@ -389,7 +392,7 @@ class CountingItemService {
             type: true,
           },
         },
-        location: true,
+        storagePosition: { select: COUNTING_POSITION_SELECT },
         session: {
           select: {
             id: true,
@@ -402,9 +405,9 @@ class CountingItemService {
           },
         },
       },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      // F3.3: mesma ordem de rota de `findAll()` — este é o método que alimenta
+      // a fila de trabalho do contador, então é onde a sequência mais importa.
+      orderBy: [{ sequence: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
@@ -427,7 +430,7 @@ class CountingItemService {
             standardCost: true,
           },
         },
-        location: true,
+        storagePosition: { select: COUNTING_POSITION_SELECT },
         counter: {
           select: {
             name: true,

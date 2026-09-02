@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { CountingPlanStatus, Prisma } from '@prisma/client';
 import { testPrisma } from './db';
 
 let unitCounter = 0;
@@ -44,7 +45,16 @@ let sessionCounter = 0;
 
 export async function createTestCountingPlan(
   creatorId: string,
-  overrides: Partial<{ tolerancePercent: number; toleranceQty: number; requireRecount: boolean }> = {}
+  overrides: Partial<{
+    tolerancePercent: number;
+    toleranceQty: number;
+    requireRecount: boolean;
+    // F3.2: `status` e `criteria` são necessários para exercitar
+    // countingSessionService.create(), que exige plano ACTIVE e lê
+    // `plan.criteria` sem guarda de null.
+    status: CountingPlanStatus;
+    criteria: Prisma.InputJsonValue;
+  }> = {}
 ) {
   planCounter += 1;
   return testPrisma.countingPlan.create({
@@ -57,7 +67,33 @@ export async function createTestCountingPlan(
       tolerancePercent: overrides.tolerancePercent ?? 0,
       toleranceQty: overrides.toleranceQty ?? 0,
       requireRecount: overrides.requireRecount ?? true,
+      status: overrides.status ?? 'DRAFT',
+      criteria: overrides.criteria ?? {},
     },
+  });
+}
+
+/**
+ * F3.2: liga/desliga o módulo na instalação de teste. Quem chamar precisa
+ * invalidar o cache em memória (`clearLicensedModuleCache()`) — ele é
+ * proposital e sobrevive ao `cleanDatabase()`.
+ */
+export async function setTestLicensedModule(code: string, enabled: boolean) {
+  return testPrisma.licensedModule.upsert({
+    where: { code },
+    update: { enabled },
+    create: { code, enabled },
+  });
+}
+
+/** F3.2: saldo endereçado (produto × posição), a fonte de `systemQty`. */
+export async function createTestPositionBalance(
+  productId: string,
+  storagePositionId: string,
+  quantity: number
+) {
+  return testPrisma.stockPositionBalance.create({
+    data: { productId, storagePositionId, quantity },
   });
 }
 
@@ -94,9 +130,14 @@ let warehouseCounter = 0;
  * `buildPositionCode()` (F0.1) — aqui em linha, e não importando o service, para
  * que a fixture não dependa da implementação que alguns testes verificam.
  */
-export async function createTestPositions(count = 2) {
+export async function createTestPositions(count = 2, options: { floors?: number; streetCode?: string } = {}) {
   warehouseCounter += 1;
   const warehouseCode = `WH${warehouseCounter}`;
+  // F3.3: `floors` permite montar a rota serpentina (a direção de leitura das
+  // posições alterna a cada andar). Default 1 — as fases anteriores criavam só
+  // o andar 1 e os testes delas continuam vendo exatamente a mesma árvore.
+  const floors = options.floors ?? 1;
+  const streetCode = options.streetCode ?? 'R01';
 
   const warehouse = await testPrisma.warehouse.create({
     data: { code: warehouseCode, name: `Armazém de Teste ${warehouseCounter}` },
@@ -105,8 +146,8 @@ export async function createTestPositions(count = 2) {
   const structure = await testPrisma.warehouseStructure.create({
     data: {
       warehouseId: warehouse.id,
-      streetCode: 'R01',
-      floors: 1,
+      streetCode,
+      floors,
       positions: count,
       positionType: 'PORTA_PALETES',
       weightCapacity: 1000,
@@ -118,25 +159,27 @@ export async function createTestPositions(count = 2) {
   });
 
   const positions = [];
-  for (let position = 1; position <= count; position += 1) {
-    positions.push(
-      await testPrisma.storagePosition.create({
-        data: {
-          structureId: structure.id,
-          code: `${warehouseCode}-R01-01-${position.toString().padStart(2, '0')}`,
-          warehouseCode,
-          streetCode: 'R01',
-          floor: 1,
-          position,
-          positionType: 'PORTA_PALETES',
-          weightCapacity: 1000,
-          height: 2,
-          width: 1.2,
-          depth: 1.1,
-          maxHeight: 1.8,
-        },
-      })
-    );
+  for (let floor = 1; floor <= floors; floor += 1) {
+    for (let position = 1; position <= count; position += 1) {
+      positions.push(
+        await testPrisma.storagePosition.create({
+          data: {
+            structureId: structure.id,
+            code: `${warehouseCode}-${streetCode}-${floor.toString().padStart(2, '0')}-${position.toString().padStart(2, '0')}`,
+            warehouseCode,
+            streetCode,
+            floor,
+            position,
+            positionType: 'PORTA_PALETES',
+            weightCapacity: 1000,
+            height: 2,
+            width: 1.2,
+            depth: 1.1,
+            maxHeight: 1.8,
+          },
+        })
+      );
+    }
   }
 
   return { warehouse, structure, positions };

@@ -131,7 +131,6 @@ export interface CountingItem {
   id: string;
   sessionId: string;
   productId: string;
-  locationId?: string;
   systemQty: number;
   countedQty?: number;
   recountQty?: number;

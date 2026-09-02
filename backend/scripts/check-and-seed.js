@@ -8,7 +8,6 @@ async function main() {
   const counts = {
     users: await prisma.user.count(),
     products: await prisma.product.count(),
-    locations: await prisma.location.count(),
     notifications: await prisma.notification.count(),
     stockMovements: await prisma.stockMovement.count(),
     productionOrders: await prisma.productionOrder.count(),
@@ -72,22 +71,10 @@ async function main() {
     console.log('✅ 20 produtos criados');
   }
 
-  if (counts.locations < 5) {
-    console.log('\n📍 Criando localizações...');
-    for (let i = 1; i <= 10; i++) {
-      await prisma.location.upsert({
-        where: { code: `LOC-${String(i).padStart(2, '0')}` },
-        update: {},
-        create: {
-          code: `LOC-${String(i).padStart(2, '0')}`,
-          name: `Localização ${i}`,
-          type: i % 3 === 0 ? 'WAREHOUSE' : i % 3 === 1 ? 'AREA' : 'CORRIDOR',
-          active: true
-        }
-      });
-    }
-    console.log('✅ 10 localizações criadas');
-  }
+  // F3.1 do plano do WMS: o bloco que semeava `Location` saiu junto com o model.
+  // O endereçamento do sistema é `Warehouse -> WarehouseStructure ->
+  // StoragePosition`, semeado por scripts/seed-warehouses.ts e
+  // scripts/seed-warehouse-structures.ts.
 
   if (counts.notifications < 5) {
     console.log('\n🔔 Criando notificações...');
@@ -121,7 +108,6 @@ async function main() {
     console.log('\n📋 Criando planos de contagem...');
     
     const products = await prisma.product.findMany({ take: 15 });
-    const locations = await prisma.location.findMany({ take: 5 });
 
     for (let i = 1; i <= 3; i++) {
       const plan = await prisma.countingPlan.create({
@@ -168,22 +154,19 @@ async function main() {
         where: { planId: plan.id }
       });
 
+      // F3.1/F3.2: item de contagem SEM endereço - é o caminho só-PCP, e este
+      // script não semeia saldo por posição. Com WMS licenciado, quem gera item
+      // endereçado é countingSessionService.create(), a partir de
+      // StockPositionBalance.
       for (const planProduct of planProducts) {
-        for (let k = 0; k < 2; k++) {
-          const location = locations[k];
-          if (location) {
-            await prisma.countingItem.create({
-              data: {
-                sessionId: session.id,
-                productId: planProduct.productId,
-                locationId: location.id,
-                systemQty: 50 + Math.floor(Math.random() * 50),
-                status: 'PENDING',
-                sequence: k + 1
-              }
-            });
+        await prisma.countingItem.create({
+          data: {
+            sessionId: session.id,
+            productId: planProduct.productId,
+            systemQty: 50 + Math.floor(Math.random() * 50),
+            status: 'PENDING'
           }
-        }
+        });
       }
     }
     console.log('✅ 3 planos de contagem criados com sessões e itens');
@@ -236,7 +219,6 @@ async function main() {
   const finalCounts = {
     users: await prisma.user.count(),
     products: await prisma.product.count(),
-    locations: await prisma.location.count(),
     notifications: await prisma.notification.count(),
     stockMovements: await prisma.stockMovement.count(),
     productionOrders: await prisma.productionOrder.count(),

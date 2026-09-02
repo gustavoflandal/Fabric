@@ -43,45 +43,29 @@ async function main() {
   }
   console.log(`✅ ${products.length} produtos criados/atualizados`);
 
-  // 3. Criar localizações
-  console.log('\n📍 Criando localizações...');
-  const locations = [];
-  
-  for (let i = 1; i <= 10; i++) {
-    const location = await prisma.location.upsert({
-      where: { code: `LOC-${String(i).padStart(2, '0')}` },
-      update: {},
-      create: {
-        code: `LOC-${String(i).padStart(2, '0')}`,
-        name: `Localização ${i}`,
-        type: i % 2 === 0 ? 'STORAGE' : 'PRODUCTION',
-        isActive: true
-      }
-    });
-    locations.push(location);
-  }
-  console.log(`✅ ${locations.length} localizações criadas/atualizadas`);
+  // 3. (removido) Criar localizações
+  // F3.1 do plano do WMS: `Location` foi removido do schema. Este script já
+  // estava desatualizado bem antes disso (semeava `type: 'STORAGE'/'PRODUCTION'`,
+  // que nunca existiram em `LocationType`, e `isActive`, que nunca existiu no
+  // model) — ele é ad-hoc, não faz parte da cadeia de seed do package.json e
+  // nunca rodou contra o schema atual. Aqui só se remove a referência ao model
+  // que deixou de existir; o resto da defasagem é anterior e independente.
 
   // 4. Criar movimentações de estoque
   console.log('\n📊 Criando movimentações de estoque...');
   let stockMovementCount = 0;
-  
+
   for (const product of products.slice(0, 10)) {
-    for (const location of locations.slice(0, 5)) {
-      await prisma.stockMovement.create({
-        data: {
-          productId: product.id,
-          locationId: location.id,
-          type: 'IN',
-          quantity: 50 + Math.floor(Math.random() * 50),
-          unitCost: product.standardCost,
-          totalCost: product.standardCost * (50 + Math.floor(Math.random() * 50)),
-          reason: 'Entrada inicial de estoque',
-          userId: adminUser.id
-        }
-      });
-      stockMovementCount++;
-    }
+    await prisma.stockMovement.create({
+      data: {
+        productId: product.id,
+        type: 'IN',
+        quantity: 50 + Math.floor(Math.random() * 50),
+        reason: 'Entrada inicial de estoque',
+        userId: adminUser.id
+      }
+    });
+    stockMovementCount++;
   }
   console.log(`✅ ${stockMovementCount} movimentações criadas`);
 
@@ -206,19 +190,18 @@ async function main() {
       include: { product: true }
     });
 
+    // F3.1/F3.2: item de contagem SEM endereço — o caminho só-PCP. Este script
+    // não semeia StockPositionBalance; com WMS licenciado, quem gera item
+    // endereçado é countingSessionService.create().
     for (const planProduct of planProducts) {
-      for (const location of locations.slice(0, 2)) {
-        await prisma.countingItem.create({
-          data: {
-            sessionId: session.id,
-            productId: planProduct.productId,
-            locationId: location.id,
-            systemQty: 50 + Math.floor(Math.random() * 50),
-            status: 'PENDING',
-            sequence: Math.floor(Math.random() * 100)
-          }
-        });
-      }
+      await prisma.countingItem.create({
+        data: {
+          sessionId: session.id,
+          productId: planProduct.productId,
+          systemQty: 50 + Math.floor(Math.random() * 50),
+          status: 'PENDING'
+        }
+      });
     }
   }
   console.log(`✅ ${countingSessions.length} sessões de contagem criadas`);
@@ -227,7 +210,6 @@ async function main() {
   console.log('\n📊 RESUMO FINAL:');
   const finalCounts = {
     produtos: await prisma.product.count(),
-    localizacoes: await prisma.location.count(),
     movimentacoes: await prisma.stockMovement.count(),
     ordensProducao: await prisma.productionOrder.count(),
     apontamentos: await prisma.productionPointing.count(),

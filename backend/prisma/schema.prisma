@@ -918,35 +918,15 @@ model NotificationPreference {
 // MÓDULO DE CONTAGEM DE ESTOQUE
 // ============================================
 
-/// @deprecated CONGELADO (F0.6 do plano do WMS).
-/// Nenhum codigo novo deve referenciar `Location` nem `LocationType`. O
-/// enderecamento fisico do sistema e a arvore
-/// `Warehouse -> WarehouseStructure -> StoragePosition` (decisao 4.1 de
-/// docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md).
-/// Este model nunca teve service, controller, rota, validator nem store: a
-/// unica FK (`CountingItem.locationId`) e NULL em 100% dos itens gerados pelo
-/// sistema. O DROP acontece na Fase 3 (F3.1), depois que `CountingItem` migrar
-/// para `storagePositionId` - nao antes, para a remocao nao ser destrutiva.
-/// O seed `prisma/seed-locations.ts` foi tirado da cadeia de seed (o arquivo
-/// continua no repo apenas como historico).
-model Location {
-  id        String       @id @default(uuid())
-  code      String       @unique
-  name      String
-  type      LocationType
-  parentId  String?
-  active    Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  parent        Location?      @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children      Location[]     @relation("LocationHierarchy")
-  countingItems CountingItem[]
-
-  @@index([parentId])
-  @@index([type, active])
-  @@map("locations")
-}
+// F3.1 do plano do WMS: `model Location` e `enum LocationType` foram REMOVIDOS
+// aqui, junto com a tabela `locations` (migration
+// `20260902200000_fase3_wms_contagem_por_endereco`) e com
+// `prisma/seed-locations.ts`. E a conclusao da decisao 4.1 de
+// docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md: existe UMA
+// hierarquia de endereco no sistema, `Warehouse -> WarehouseStructure ->
+// StoragePosition`. A F0.6 apenas congelou o model; o drop so podia vir depois
+// que `CountingItem` - sua unica FK, NULL em 100% das linhas - migrasse para
+// `storagePositionId`, o que acontece nesta mesma fase.
 
 // Plano de Contagem
 model CountingPlan {
@@ -1036,10 +1016,25 @@ model CountingSession {
 
 // Item de Contagem
 model CountingItem {
-  id         String  @id @default(uuid())
-  sessionId  String
-  productId  String
-  locationId String?
+  id        String @id @default(uuid())
+  sessionId String
+  productId String
+  // F3.1 do plano do WMS: `locationId` (FK para o model `Location`, congelado na
+  // F0.6) virou `storagePositionId` - a unidade enderecavel atomica do WMS
+  // (decisao 4.1 do WMS_IMPLEMENTATION_ANALYSIS.md). A migracao de dados foi
+  // TRIVIAL porque a coluna antiga era NULL em 100% das linhas: nenhum codigo de
+  // aplicacao jamais a escreveu.
+  //
+  // Continua OPCIONAL, e isso e deliberado - sao dois caminhos de geracao de
+  // item, decididos por `isModuleEnabled('WMS')` em
+  // counting-session.service.ts::buildSessionItems():
+  //   WMS licenciado     -> um item por (produto x posicao com saldo), com o
+  //                         endereco preenchido. Produto sem NENHUM saldo
+  //                         enderecado ainda gera um item com NULL, para nao
+  //                         sumir da contagem.
+  //   WMS nao licenciado -> um item por produto, sempre NULL (comportamento
+  //                         historico, inalterado numa instalacao so-PCP).
+  storagePositionId String?
   // ✅ Fase 4 item 4.2: lock otimista - camada extra alem do lock pessimista
   // (SELECT ... FOR UPDATE) ja adicionado em count()/recount() na Fase 3;
   // esse cobre chamadas concorrentes na MESMA requisicao logica, este cobre
@@ -1071,6 +1066,10 @@ model CountingItem {
   recountedAt DateTime?
 
   // Sequência para ordenação
+  // F3.3: populado por `assignItemSequences()` para itens ENDERECADOS,
+  // ordenando por warehouseCode -> streetCode -> floor -> position em rota
+  // SERPENTINA (a direcao de leitura das posicoes alterna a cada andar da mesma
+  // rua). Item sem endereco - o caminho so-PCP - continua com o default 0.
   sequence Int? @default(0)
 
   // Auditoria
@@ -1078,17 +1077,28 @@ model CountingItem {
   updatedAt DateTime @updatedAt
 
   // Relações
-  session   CountingSession @relation(fields: [sessionId], references: [id])
-  product   Product         @relation(fields: [productId], references: [id])
-  location  Location?       @relation(fields: [locationId], references: [id])
-  counter   User?           @relation("ItemCountedBy", fields: [countedBy], references: [id])
-  recounter User?           @relation("ItemRecountedBy", fields: [recountedBy], references: [id])
+  session CountingSession @relation(fields: [sessionId], references: [id])
+  product Product         @relation(fields: [productId], references: [id])
+  // `Restrict` EXPLICITO, mesmo padrao de StockMovement.fromPositionId/
+  // toPositionId (F2.1): o default do Prisma para relacao OPCIONAL e `SetNull`,
+  // que NAO serve aqui. Um item de contagem e registro historico de inventario -
+  // apagar um endereco nao pode zerar silenciosamente ONDE aquela contagem
+  // aconteceu. Endereco que ja foi contado se aposenta com `blocked = true`,
+  // nao com DELETE.
+  storagePosition StoragePosition? @relation(fields: [storagePositionId], references: [id], onDelete: Restrict)
+  counter         User?            @relation("ItemCountedBy", fields: [countedBy], references: [id])
+  recounter       User?            @relation("ItemRecountedBy", fields: [recountedBy], references: [id])
 
-  @@unique([sessionId, productId, locationId])
+  @@unique([sessionId, productId, storagePositionId])
   @@index([sessionId, status])
   @@index([productId])
   @@index([hasDifference])
   @@index([countedBy])
+  // Indice DEDICADO, e nao so o prefixo do unique acima: `storagePositionId` e a
+  // TERCEIRA coluna do composto, entao nenhum prefixo dele responde "quais
+  // contagens ja tocaram neste endereco?" (e o MySQL exige indice de suporte
+  // para a FK de qualquer forma).
+  @@index([storagePositionId])
   @@map("counting_items")
 }
 
@@ -1136,17 +1146,8 @@ enum CounterRole {
 // ENUMS - CONTAGEM DE ESTOQUE
 // ============================================
 
-/// @deprecated CONGELADO (F0.6 do plano do WMS) - ver o comentario em `model Location`.
-/// Sera removido junto com `Location` na Fase 3 (F3.1). O tipo de endereco
-/// vivo do sistema e `PositionType`, em `StoragePosition`.
-enum LocationType {
-  WAREHOUSE
-  AREA
-  CORRIDOR
-  SHELF
-  BIN
-  FLOOR
-}
+// F3.1: `enum LocationType` removido junto com `model Location`. O tipo de
+// endereco vivo do sistema e `PositionType`, em `StoragePosition`.
 
 enum CountingType {
   CYCLIC
@@ -1278,6 +1279,9 @@ model StoragePosition {
   stockPositionBalances StockPositionBalance[]
   movementsFrom         StockMovement[]        @relation("StockMovementFrom")
   movementsTo           StockMovement[]        @relation("StockMovementTo")
+  // F3.1: o inventario ciclico passou a contar POR ENDERECO. Tambem RESTRICT
+  // (ver o comentario em CountingItem.storagePosition).
+  countingItems         CountingItem[]
 
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])
