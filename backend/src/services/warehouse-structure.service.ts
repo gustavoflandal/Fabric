@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { assertPositionsDeletable } from './storage-position.service';
 
 const prisma = new PrismaClient();
 
@@ -88,6 +89,15 @@ export class WarehouseStructureService {
   }
 
   async delete(id) {
+    // F1.1 do plano do WMS: `storage_positions.structureId` tem ON DELETE
+    // CASCADE (estrutura -> posições, vindo da Fase 0), mas a partir da Fase 1
+    // as posições são referenciadas por `stock_position_balances` e
+    // `stock_movements.positionId` com FK RESTRICT. Resultado: apagar uma
+    // estrutura cujas posições tenham saldo ou histórico falha no banco. Sem
+    // esta guarda, isso vazaria como um P2003 cru (500) em vez de dizer ao
+    // usuário o que está no caminho.
+    await assertPositionsDeletable({ structureId: id });
+
     return await prisma.warehouseStructure.delete({
       where: { id },
     });

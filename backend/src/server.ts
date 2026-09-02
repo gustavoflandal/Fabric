@@ -5,6 +5,7 @@ import { prisma } from './config/database';
 import { initializeEventListeners } from './events/listeners';
 import notificationScheduler from './services/notification-scheduler.service';
 import logCleanupJob from './jobs/log-cleanup.job';
+import stockPositionReconciliationJob from './jobs/stock-position-reconciliation.job';
 import { loadLicensedModules } from './services/licensed-module.service';
 
 const startServer = async () => {
@@ -36,6 +37,10 @@ const startServer = async () => {
     logCleanupJob.start();
     logger.info('✅ Log cleanup job initialized');
 
+    // F1.3: reconciliação diária do saldo por posição contra o saldo agregado.
+    // O próprio job sai cedo quando o WMS não está licenciado nesta instalação.
+    stockPositionReconciliationJob.start();
+
     // Start server
     app.listen(config.port, () => {
       logger.info(`🚀 Server running on port ${config.port}`);
@@ -53,6 +58,7 @@ process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully');
   notificationScheduler.stop();
   logCleanupJob.stop();
+  stockPositionReconciliationJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
@@ -61,6 +67,7 @@ process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully');
   notificationScheduler.stop();
   logCleanupJob.stop();
+  stockPositionReconciliationJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

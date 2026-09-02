@@ -84,6 +84,64 @@ export async function createTestCountingItem(sessionId: string, productId: strin
   });
 }
 
+let warehouseCounter = 0;
+
+/**
+ * F1.5 do plano do WMS: endereço pronto para pendurar saldo.
+ *
+ * Cria a árvore mínima `Warehouse -> WarehouseStructure -> StoragePosition` e
+ * devolve as posições geradas. O `code` é montado com a mesma regra de
+ * `buildPositionCode()` (F0.1) — aqui em linha, e não importando o service, para
+ * que a fixture não dependa da implementação que alguns testes verificam.
+ */
+export async function createTestPositions(count = 2) {
+  warehouseCounter += 1;
+  const warehouseCode = `WH${warehouseCounter}`;
+
+  const warehouse = await testPrisma.warehouse.create({
+    data: { code: warehouseCode, name: `Armazém de Teste ${warehouseCounter}` },
+  });
+
+  const structure = await testPrisma.warehouseStructure.create({
+    data: {
+      warehouseId: warehouse.id,
+      streetCode: 'R01',
+      floors: 1,
+      positions: count,
+      positionType: 'PORTA_PALETES',
+      weightCapacity: 1000,
+      height: 2,
+      width: 1.2,
+      depth: 1.1,
+      maxHeight: 1.8,
+    },
+  });
+
+  const positions = [];
+  for (let position = 1; position <= count; position += 1) {
+    positions.push(
+      await testPrisma.storagePosition.create({
+        data: {
+          structureId: structure.id,
+          code: `${warehouseCode}-R01-01-${position.toString().padStart(2, '0')}`,
+          warehouseCode,
+          streetCode: 'R01',
+          floor: 1,
+          position,
+          positionType: 'PORTA_PALETES',
+          weightCapacity: 1000,
+          height: 2,
+          width: 1.2,
+          depth: 1.1,
+          maxHeight: 1.8,
+        },
+      })
+    );
+  }
+
+  return { warehouse, structure, positions };
+}
+
 let roleCounter = 0;
 
 /**

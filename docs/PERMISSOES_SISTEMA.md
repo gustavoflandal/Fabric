@@ -82,6 +82,17 @@ Todas as rotas de `purchase-quotation.routes.ts`, `purchase-order.routes.ts` e `
 | `estruturas_armazem` | `visualizar`, `criar`, `editar`, `excluir`, `gerar_posicoes`, `excluir_posicoes` |
 | `storage_positions` | `update` |
 
+**Saldo por posição (`/stock-positions`, F1.1–F1.5 do plano do WMS).** Nenhum recurso novo foi criado — as rotas reaproveitam pares que já existiam e já estão atribuídos a MANAGER e OPERATOR:
+
+| Método + rota | Permissão exigida | Por quê este recurso |
+|---|---|---|
+| `GET /stock-positions/product/:productId` | `estruturas_armazem:visualizar` | Mesmo recurso que já protege `GET /storage-positions/*`: quem pode ver o endereço pode ver o que tem nele. |
+| `GET /stock-positions/position/:positionId` | `estruturas_armazem:visualizar` | idem |
+| `GET /stock-positions/occupied` | `estruturas_armazem:visualizar` | idem |
+| `GET /stock-positions/divergences` | `stock:read` | Expõe o saldo agregado do produto (compara `stock_position_balances` com `stock_balances`) — é leitura de estoque, não de endereçamento, e os mesmos números já saem em `GET /stock/balances`. |
+
+Todas as quatro estão montadas sob `requireModule('WMS')` em `routes/index.ts`, como o resto do módulo de armazém.
+
 ### Contagem de Estoque
 
 | Recurso | Ações exigidas |

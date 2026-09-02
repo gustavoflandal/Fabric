@@ -27,6 +27,7 @@ import countingRoutes from './counting.routes';
 import warehouseRoutes from './warehouse.routes';
 import warehouseStructureRoutes from './warehouse-structure.routes';
 import storagePositionRoutes from './storage-position.routes';
+import stockPositionRoutes from './stock-position.routes';
 import systemRoutes from './system.routes';
 import { requireModule } from '../middleware/module.middleware';
 
@@ -68,6 +69,11 @@ router.use('/work-centers', workCenterRoutes);
 router.use('/warehouses', requireModule('WMS'), warehouseRoutes);
 router.use('/warehouse-structures', requireModule('WMS'), warehouseStructureRoutes);
 router.use('/storage-positions', requireModule('WMS'), storagePositionRoutes);
+// F1.3/F1.4: saldo por posição. Montado sob o mesmo requireModule('WMS') que o
+// resto do armazém — saber ONDE o material está só faz sentido para quem
+// licenciou o WMS. Uma instalação só-PCP continua usando `/stock/*`, que não é
+// tocado por esta fase.
+router.use('/stock-positions', requireModule('WMS'), stockPositionRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);

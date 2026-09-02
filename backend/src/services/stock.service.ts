@@ -16,6 +16,29 @@ export interface StockMovementDto {
   countingSessionId?: string;
   userId: string;
   notes?: string;
+  /**
+   * F1.2 do plano do WMS: posição de armazenagem (`storage_positions.id`)
+   * envolvida na movimentação.
+   *
+   * Semântica NESTA fase (só existem IN/OUT/ADJUSTMENT):
+   *   IN         → a posição onde a quantidade ENTROU
+   *   OUT        → a posição de onde a quantidade SAIU
+   *   ADJUSTMENT → a posição sendo corrigida
+   *
+   * Omitir (o caso de 100% dos chamadores atuais: recebimento, contagem,
+   * reserva de produção, entrada/saída manual) mantém o comportamento
+   * exatamente como antes — só o saldo agregado é mexido. Isso é esperado até
+   * as fases seguintes conectarem esses fluxos ao endereço.
+   *
+   * EVOLUÇÃO PLANEJADA (F2.1, Fase 2 — transferência interna): quando o tipo
+   * `TRANSFER` entrar, este campo único vira o par
+   * `fromPositionId`/`toPositionId`, e a migration deve REAPROVEITAR os valores
+   * já gravados (`IN` → `toPositionId`, `OUT` → `fromPositionId`,
+   * `ADJUSTMENT` → um dos dois conforme o sinal). O nome e a semântica já
+   * nascem alinhados a isso para que a Fase 2 seja rename + backfill, não uma
+   * remodelagem.
+   */
+  positionId?: string;
 }
 
 export interface StockBalance {
@@ -53,7 +76,35 @@ export class StockServiceRefactored {
     return this.applyMovement(tx, data);
   }
 
+  /**
+   * F1.2 do plano do WMS — ORDEM DETERMINÍSTICA DE LOCK.
+   *
+   * Quando a movimentação informa posição, DUAS linhas são travadas na mesma
+   * transação: `stock_balances` (agregado do produto) e
+   * `stock_position_balances` (produto × posição). Se uma transação travasse
+   * A→B e outra B→A, elas se bloqueariam mutuamente — deadlock.
+   *
+   * A ordem escolhida e INVARIANTE é: **`stock_balances` PRIMEIRO, depois
+   * `stock_position_balances`**. O motivo é que o agregado é o lock mais
+   * grosso e o único sempre presente — toda movimentação o trava,
+   * endereçada ou não. Adotá-lo como lock externo significa que qualquer
+   * transação que vá mexer numa posição do produto X já está serializada
+   * pelo lock de X antes de tocar em qualquer linha de posição. Fosse o
+   * contrário, uma movimentação sem posição (que só trava o agregado)
+   * poderia entrar no meio de uma endereçada e inverter a ordem.
+   *
+   * Isso também prepara a Fase 2 (F2.3, `TRANSFER`, duas posições do MESMO
+   * produto na mesma transação): o agregado continua sendo travado primeiro, e
+   * as DUAS linhas de posição depois, ordenadas entre si por
+   * `storagePositionId` — sem essa segunda regra, duas transferências
+   * concorrentes A→B e B→A voltariam a poder deadlockar.
+   *
+   * Regra prática para quem mexer aqui: nunca trave uma linha de
+   * `stock_position_balances` sem já segurar o lock do `stock_balances` do
+   * mesmo produto.
+   */
   private async applyMovement(tx: TransactionClient, data: StockMovementDto) {
+    // ---- LOCK 1 (externo): saldo agregado do produto -----------------------
     await tx.stockBalance.upsert({
       where: { productId: data.productId },
       create: { productId: data.productId, quantity: 0 },
@@ -73,6 +124,64 @@ export class StockServiceRefactored {
       );
     }
 
+    // ---- LOCK 2 (interno): saldo da posição, só quando endereçada ----------
+    // Sem `positionId` este bloco inteiro não roda e o comportamento é
+    // byte-a-byte o de antes da Fase 1 (compatibilidade — nenhum chamador de
+    // produção passa posição hoje).
+    let newPositionQty: Prisma.Decimal | null = null;
+
+    if (data.positionId) {
+      const position = await tx.storagePosition.findUnique({
+        where: { id: data.positionId },
+        select: { id: true, code: true },
+      });
+
+      if (!position) {
+        throw new AppError(404, 'Posição de armazenagem não encontrada');
+      }
+
+      await tx.stockPositionBalance.upsert({
+        where: {
+          productId_storagePositionId: {
+            productId: data.productId,
+            storagePositionId: data.positionId,
+          },
+        },
+        create: {
+          productId: data.productId,
+          storagePositionId: data.positionId,
+          quantity: 0,
+        },
+        update: {},
+      });
+
+      const lockedPosition = await tx.$queryRaw<{ quantity: Prisma.Decimal }[]>`
+        SELECT quantity FROM stock_position_balances
+        WHERE productId = ${data.productId} AND storagePositionId = ${data.positionId}
+        FOR UPDATE
+      `;
+
+      // Aritmética em Decimal, não em Number: a coluna é DECIMAL(18,4)
+      // (decisão D2) e converter para float aqui reintroduziria justamente o
+      // erro de arredondamento que o Decimal existe para evitar.
+      const currentPositionQty = new Prisma.Decimal(lockedPosition[0]?.quantity ?? 0);
+      const positionDelta = new Prisma.Decimal(data.quantity).times(
+        data.type === 'OUT' ? -1 : 1
+      );
+
+      // Validação de saldo NA POSIÇÃO, além da do agregado: ter 100 no produto
+      // não autoriza tirar 100 de um endereço que só tem 3.
+      if (data.type === 'OUT' && currentPositionQty.lessThan(data.quantity)) {
+        throw new AppError(
+          400,
+          `Estoque insuficiente na posição ${position.code}. ` +
+            `Disponível: ${currentPositionQty.toString()}, Solicitado: ${data.quantity}`
+        );
+      }
+
+      newPositionQty = currentPositionQty.plus(positionDelta);
+    }
+
     const movement = await tx.stockMovement.create({
       data: {
         productId: data.productId,
@@ -84,6 +193,7 @@ export class StockServiceRefactored {
         countingSessionId: data.countingSessionId,
         userId: data.userId,
         notes: data.notes,
+        positionId: data.positionId,
       },
       include: {
         product: true,
@@ -101,6 +211,18 @@ export class StockServiceRefactored {
       where: { productId: data.productId },
       data: { quantity: currentQty + delta, version: { increment: 1 } },
     });
+
+    if (data.positionId && newPositionQty !== null) {
+      await tx.stockPositionBalance.update({
+        where: {
+          productId_storagePositionId: {
+            productId: data.productId,
+            storagePositionId: data.positionId,
+          },
+        },
+        data: { quantity: newPositionQty, version: { increment: 1 } },
+      });
+    }
 
     return movement;
   }
