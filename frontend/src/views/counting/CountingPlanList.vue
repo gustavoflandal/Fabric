@@ -202,10 +202,13 @@ import { useAuthStore } from '@/stores/auth.store';
 import { storeToRefs } from 'pinia';
 import type { PlanFilters } from '@/types/counting.types';
 import Button from '@/components/common/Button.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
 
 const router = useRouter();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
+const toast = useToast();
 const { plans, loading } = storeToRefs(countingStore);
 
 const handleLogout = () => {
@@ -251,16 +254,16 @@ const pausePlan = async (id: string) => {
 };
 
 const deletePlan = async (id: string) => {
-  if (!confirm('Tem certeza que deseja excluir este plano de contagem?')) {
+  if (!(await confirmDialog('Tem certeza que deseja excluir este plano de contagem?'))) {
     return;
   }
-  
+
   try {
     await countingStore.deletePlan(id);
     await loadPlans();
   } catch (error) {
     console.error('Erro ao excluir plano:', error);
-    alert('Erro ao excluir plano. Verifique se não há sessões vinculadas.');
+    toast.error('Erro ao excluir plano. Verifique se não há sessões vinculadas.');
   }
 };
 

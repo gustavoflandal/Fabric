@@ -3,6 +3,7 @@ import { prisma } from '../config/database';
 import materialConsumptionService from './material-consumption.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
+import { AppError } from '../middleware/error.middleware';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -49,7 +50,7 @@ export class ProductionPointingService {
       });
 
       if (!order) {
-        throw new Error('Ordem de produção não encontrada');
+        throw new AppError(404, 'Ordem de produção não encontrada');
       }
 
       const operation = await tx.productionOrderOperation.findUnique({
@@ -57,13 +58,14 @@ export class ProductionPointingService {
       });
 
       if (!operation) {
-        throw new Error('Operação não encontrada');
+        throw new AppError(404, 'Operação não encontrada');
       }
 
       // VALIDAÇÃO 1: Quantidade não pode exceder OP
       const totalPointed = await this.getTotalPointed(data.productionOrderId, tx);
       if (totalPointed + data.goodQuantity > order.quantity) {
-        throw new Error(
+        throw new AppError(
+          400,
           `Quantidade apontada (${totalPointed + data.goodQuantity}) excede quantidade da OP (${order.quantity})`
         );
       }
@@ -344,7 +346,7 @@ export class ProductionPointingService {
       });
 
       if (!pointing) {
-        throw new Error('Apontamento não encontrado');
+        throw new AppError(404, 'Apontamento não encontrado');
       }
 
       // Calcular tempo decorrido se endTime foi fornecido. ProductionPointing
@@ -416,11 +418,11 @@ export class ProductionPointingService {
       });
 
       if (!pointing) {
-        throw new Error('Apontamento não encontrado');
+        throw new AppError(404, 'Apontamento não encontrado');
       }
 
       if (pointing.endTime) {
-        throw new Error('Apontamento já foi finalizado');
+        throw new AppError(409, 'Apontamento já foi finalizado');
       }
 
       // Calcular tempo decorrido e gravar em runTime (ver comentário em update())
@@ -484,7 +486,7 @@ export class ProductionPointingService {
       });
 
       if (!pointing) {
-        throw new Error('Apontamento não encontrado');
+        throw new AppError(404, 'Apontamento não encontrado');
       }
 
       await tx.productionPointing.delete({ where: { id } });

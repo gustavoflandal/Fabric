@@ -418,10 +418,12 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useReportsStore } from '@/stores/reports.store';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const reportsStore = useReportsStore();
+const toast = useToast();
 
 const activeTab = ref<'consolidated' | 'production' | 'efficiency' | 'quality'>('consolidated');
 const loading = ref(false);
@@ -443,7 +445,7 @@ const hasReports = computed(() => {
 
 async function loadReports() {
   if (!filters.value.startDate || !filters.value.endDate) {
-    alert('Por favor, selecione o período');
+    toast.warning('Por favor, selecione o período');
     return;
   }
 
@@ -457,7 +459,7 @@ async function loadReports() {
     ]);
   } catch (error) {
     console.error('Erro ao carregar relatórios:', error);
-    alert('Erro ao carregar relatórios');
+    toast.error('Erro ao carregar relatórios');
   } finally {
     loading.value = false;
   }

@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import countingPlanProductService from '../services/counting-plan-product.service';
 
 class CountingPlanProductController {
@@ -6,7 +6,7 @@ class CountingPlanProductController {
    * POST /api/counting/plans/:planId/products
    * Adicionar produto ao plano
    */
-  async addProduct(req: Request, res: Response) {
+  async addProduct(req: Request, res: Response, next: NextFunction) {
     try {
       const { planId } = req.params;
       const data = {
@@ -14,11 +14,11 @@ class CountingPlanProductController {
         productId: req.body.productId,
         priority: req.body.priority || 0
       };
-      
+
       const result = await countingPlanProductService.addProduct(data);
       res.status(201).json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -26,13 +26,13 @@ class CountingPlanProductController {
    * DELETE /api/counting/plans/:planId/products/:productId
    * Remover produto do plano
    */
-  async removeProduct(req: Request, res: Response) {
+  async removeProduct(req: Request, res: Response, next: NextFunction) {
     try {
       const { planId, productId } = req.params;
       await countingPlanProductService.removeProduct(planId, productId);
       res.status(204).send();
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -40,13 +40,13 @@ class CountingPlanProductController {
    * GET /api/counting/plans/:planId/products
    * Listar produtos do plano
    */
-  async listProducts(req: Request, res: Response) {
+  async listProducts(req: Request, res: Response, next: NextFunction) {
     try {
       const { planId } = req.params;
       const products = await countingPlanProductService.listProducts(planId);
       res.json(products);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -54,17 +54,17 @@ class CountingPlanProductController {
    * PATCH /api/counting/plans/:planId/products/:productId
    * Atualizar prioridade do produto no plano
    */
-  async updatePriority(req: Request, res: Response) {
+  async updatePriority(req: Request, res: Response, next: NextFunction) {
     try {
       const { planId, productId } = req.params;
       const result = await countingPlanProductService.updatePriority(
-        planId, 
-        productId, 
+        planId,
+        productId,
         { priority: req.body.priority }
       );
       res.json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 }

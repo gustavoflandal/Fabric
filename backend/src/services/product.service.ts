@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateProductDto {
   code: string;
@@ -87,7 +88,7 @@ export class ProductService {
 
   async toggleActive(id: string) {
     const product = await this.getById(id);
-    if (!product) throw new Error('Produto não encontrado');
+    if (!product) throw new AppError(404, 'Produto não encontrado');
     return await this.update(id, { active: !product.active });
   }
 }

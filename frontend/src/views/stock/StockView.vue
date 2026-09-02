@@ -458,10 +458,12 @@ import { useAuthStore } from '@/stores/auth.store';
 import { useStockStore } from '@/stores/stock.store';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const stockStore = useStockStore();
+const toast = useToast();
 
 const loading = ref(false);
 const summary = ref(stockStore.summary);
@@ -540,10 +542,10 @@ async function handleRegisterEntry() {
     showMovementModal.value = false;
     movementForm.value = { productId: '', quantity: 0, reason: '', reference: '' };
     await loadData();
-    alert('Entrada registrada com sucesso!');
+    toast.success('Entrada registrada com sucesso!');
   } catch (error) {
     console.error('Erro ao registrar entrada:', error);
-    alert('Erro ao registrar entrada');
+    toast.error('Erro ao registrar entrada');
   }
 }
 
@@ -553,10 +555,10 @@ async function handleRegisterExit() {
     showExitModal.value = false;
     exitForm.value = { productId: '', quantity: 0, reason: '', reference: '' };
     await loadData();
-    alert('Saída registrada com sucesso!');
+    toast.success('Saída registrada com sucesso!');
   } catch (error) {
     console.error('Erro ao registrar saída:', error);
-    alert('Erro ao registrar saída');
+    toast.error('Erro ao registrar saída');
   }
 }
 
@@ -566,10 +568,10 @@ async function handleRegisterAdjustment() {
     showAdjustmentModal.value = false;
     adjustmentForm.value = { productId: '', quantity: 0, reason: '' };
     await loadData();
-    alert('Ajuste registrado com sucesso!');
+    toast.success('Ajuste registrado com sucesso!');
   } catch (error) {
     console.error('Erro ao registrar ajuste:', error);
-    alert('Erro ao registrar ajuste');
+    toast.error('Erro ao registrar ajuste');
   }
 }
 
@@ -583,7 +585,7 @@ async function viewMovements(productId: string) {
     movements.value = stockStore.movements;
   } catch (error) {
     console.error('Erro ao carregar movimentações:', error);
-    alert('Erro ao carregar movimentações');
+    toast.error('Erro ao carregar movimentações');
   } finally {
     loadingMovements.value = false;
   }

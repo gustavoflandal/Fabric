@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreatePurchaseQuotationDto {
   supplierId: string;
@@ -173,7 +174,7 @@ export class PurchaseQuotationService {
     });
 
     if (!quotation) {
-      throw new Error('Orçamento não encontrado');
+      throw new AppError(404, 'Orçamento não encontrado');
     }
 
     return quotation;
@@ -278,7 +279,7 @@ export class PurchaseQuotationService {
     // Verificar se há pedidos vinculados
     const quotation = await this.getById(id);
     if (quotation.purchaseOrders && quotation.purchaseOrders.length > 0) {
-      throw new Error('Não é possível excluir orçamento com pedidos vinculados');
+      throw new AppError(409, 'Não é possível excluir orçamento com pedidos vinculados');
     }
 
     await prisma.purchaseQuotation.delete({

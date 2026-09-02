@@ -1,4 +1,5 @@
 import { PrismaClient, CountingItem, CountingItemStatus } from '@prisma/client';
+import { AppError } from '../middleware/error.middleware';
 
 const prisma = new PrismaClient();
 
@@ -146,11 +147,11 @@ class CountingItemService {
       });
 
       if (!item) {
-        throw new Error('Item de contagem não encontrado');
+        throw new AppError(404, 'Item de contagem não encontrado');
       }
 
       if (item.status !== 'PENDING') {
-        throw new Error('Item já foi contado');
+        throw new AppError(409, 'Item já foi contado');
       }
 
       // Calcular divergência
@@ -250,11 +251,11 @@ class CountingItemService {
       });
 
       if (!item) {
-        throw new Error('Item de contagem não encontrado');
+        throw new AppError(404, 'Item de contagem não encontrado');
       }
 
       if (item.status !== 'COUNTED') {
-        throw new Error('Item não está aguardando recontagem');
+        throw new AppError(400, 'Item não está aguardando recontagem');
       }
 
       // Calcular divergência com a recontagem
@@ -314,11 +315,11 @@ class CountingItemService {
   async accept(id: string, reason?: string): Promise<CountingItem> {
     const item = await this.findById(id);
     if (!item) {
-      throw new Error('Item de contagem não encontrado');
+      throw new AppError(404, 'Item de contagem não encontrado');
     }
 
     if (item.status !== 'COUNTED') {
-      throw new Error('Item não pode ser aceito');
+      throw new AppError(400, 'Item não pode ser aceito');
     }
 
     return await prisma.countingItem.update({

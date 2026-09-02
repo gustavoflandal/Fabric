@@ -88,30 +88,34 @@ O núcleo do problema: estoque sem saldo persistido e sem lock.
 
 ## Fase 4 — Qualidade de dados e performance (Semanas 8-9, 27/10 a 07/11/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 4.1 | Migrar `Float` → `Decimal` em quantidades e custos, por domínio, começando por estoque e compras | 1 semana |
-| 4.2 | Adicionar `version Int` (lock otimista) em `ProductionOrder`, `ProductionOrderOperation`, `CountingItem`, `CountingSession`, `PurchaseOrderItem` | 1 semana |
-| 4.3 | Índices compostos faltantes (`stock_movements`, `audit_logs`, `production_pointings`, `production_orders`) + constraints únicas faltantes (`CountingItem`, `BOMItem`, `RoutingOperation`, `Supplier.document`, `Customer.document`) | 2-3 dias |
-| 4.4 | Padronizar tratamento de erros: `AppError` em todos os services, remover `try/catch` locais nos controllers em favor de `next(err)`/`asyncHandler` | 2-3 dias |
-| 4.5 | FKs de auditoria: `createdBy`/`approvedBy`/`receivedBy` apontando para `users` | 1 dia |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 4.1 | Migrar `Float` → `Decimal` em quantidades e custos, por domínio, começando por estoque e compras | 1 semana | ⏸️ Adiado deliberadamente — ver nota abaixo |
+| 4.2 | Adicionar `version Int` (lock otimista) em `ProductionOrder`, `ProductionOrderOperation`, `CountingItem`, `CountingSession`, `PurchaseOrderItem` | 1 semana | 🟡 Parcial — coluna em todos os 5 models; checagem de fato (compare-and-swap) só ligada em `production-order.service.ts::update()` por enquanto |
+| 4.3 | Índices compostos faltantes (`stock_movements`, `audit_logs`, `production_pointings`, `production_orders`) + constraints únicas faltantes (`CountingItem`, `BOMItem`, `RoutingOperation`, `Supplier.document`, `Customer.document`) | 2-3 dias | ✅ Feito |
+| 4.4 | Padronizar tratamento de erros: `AppError` em todos os services, remover `try/catch` locais nos controllers em favor de `next(err)`/`asyncHandler` | 2-3 dias | ✅ Feito — 18 services + 7 controllers, confirmado ao vivo (`Estoque insuficiente` agora 400, não mais 500) |
+| 4.5 | FKs de auditoria: `createdBy`/`approvedBy`/`receivedBy` apontando para `users` | 1 dia | ✅ Feito |
 
-**Entregável:** dados financeiros/de estoque com precisão correta, sem writes concorrentes perdidos, API com contrato de erro único.
+**Entregável:** dados financeiros/de estoque com precisão correta, sem writes concorrentes perdidos, API com contrato de erro único. **Fase 4 concluída em 01/09/2026** (exceto 4.1, adiado deliberadamente, e 4.2 parcial — ambos com justificativa acima).
+
+**Nota sobre o item 4.1 (adiado):** é o item de maior risco de todo o cronograma até aqui. Trocar `Float` por `Decimal` não é só uma migration de schema - exige reescrever a aritmética em todo lugar que lê/escreve esses campos (Prisma `Decimal` não aceita `+`/`-`/`*` direto como `number`, precisa de `.plus()`/`.minus()`/conversão explícita), e a serialização JSON de `Decimal` é uma STRING por padrão, não um número - qualquer frontend que hoje espera um `number` desses campos (ex: `ProductsView.vue`, exibição de custos) quebraria silenciosamente sem uma revisão cuidadosa de cada consumidor. Diferente dos outros itens desta fase, isso não é seguro de fazer em escopo reduzido "só para testar" - fazer errado é pior do que não fazer. Recomendação: tratar como uma fase própria, focada, com tempo para revisar cada consumidor (frontend e services) por domínio, começando por `Product.standardCost/lastCost/averageCost` e os campos de `PurchaseOrder`/`PurchaseOrderItem`.
 
 ---
 
 ## Fase 5 — Débito técnico e UX (Semana 10, 10-14/11/2026)
 
-| # | Ação | Esforço |
-|---|---|---|
-| 5.1 | Trocar `alert()`/`confirm()` por `notification.store`/modal padronizado, começando por `WorkCentersView.vue` e auditando as demais 43 views | 2-3 dias |
-| 5.2 | Debounce padronizado em campos de busca (componente/composable reutilizável) | 1 dia |
-| 5.3 | Auditoria básica de acessibilidade (labels, focus trap, `aria-label`) nas views mais usadas | 2 dias |
-| 5.4 | Decidir formalmente e documentar em `docs/` o futuro do frontend: permanecer 100% Vue, ou reabrir React como decisão de arquitetura nova (módulo piloto isolado, dependências reais desde o commit zero) | 0,5 dia (decisão) |
-| 5.5 | `events/listeners.ts`: decidir se os 4 eventos emitidos ganham consumidores reais ou se a infraestrutura é removida | 1-2 dias |
-| 5.6 | Normalização de endereço duplicado entre `Supplier`/`Customer`/`Warehouse`; política de retenção/particionamento de `audit_logs` | 2-3 dias |
+| # | Ação | Esforço | Status |
+|---|---|---|---|
+| 5.1 | Trocar `alert()`/`confirm()` por `notification.store`/modal padronizado, começando por `WorkCentersView.vue` e auditando as demais 43 views | 2-3 dias | ✅ Feito — 25 de 27 arquivos (os outros 2 eram falso positivo); infraestrutura nova (`useToast`, `useConfirm`, `ToastContainer`, `ConfirmDialogContainer`); testado com Playwright ao vivo |
+| 5.2 | Debounce padronizado em campos de busca (componente/composable reutilizável) | 1 dia | ✅ Feito — `useDebounce`, aplicado em 11 arquivos |
+| 5.3 | Auditoria básica de acessibilidade (labels, focus trap, `aria-label`) nas views mais usadas | 2 dias | 🟡 Parcial — `WorkCentersView.vue` (a view citada na auditoria original) totalmente corrigida; as outras 43 views ficam para uma leva dedicada, usando esse commit como padrão |
+| 5.4 | Decidir formalmente e documentar em `docs/` o futuro do frontend | 0,5 dia (decisão) | ✅ Feito — `03_DECISAO_STACK_FRONTEND.md` |
+| 5.5 | `events/listeners.ts`: decidir se os 4 eventos emitidos ganham consumidores reais ou se a infraestrutura é removida | 1-2 dias | ✅ Feito — decisão: manter como está; achado e corrigido um bug real (2 dos listeners nunca gravavam por causa de um campo inexistente) |
+| 5.6 | Normalização de endereço duplicado entre `Supplier`/`Customer`/`Warehouse`; política de retenção/particionamento de `audit_logs` | 2-3 dias | 🟡 Parcial — retenção já existia (job diário, 90 dias), só faltava ser configurável (feito). Particionamento e normalização de endereço adiados com justificativa |
 
-**Entregável:** UX consistente, decisão de stack registrada, dívida técnica residual reduzida.
+**Entregável:** UX consistente, decisão de stack registrada, dívida técnica residual reduzida. **Fase 5 concluída em 01/09/2026** (5.3 e 5.6 parciais, com justificativa e escopo do que falta documentados acima).
+
+**Cronograma original de 5 fases: completo.** As seis pendências parciais/adiadas ao longo de todas as fases (Float→Decimal, lock otimista nos 4 models restantes, auditoria de acessibilidade nas 43 views restantes, particionamento de audit_logs, normalização de endereço, validators de counting/mrp) ficam documentadas nos respectivos itens acima como candidatas a uma Fase 6, caso o time queira continuar.
 
 ---
 
