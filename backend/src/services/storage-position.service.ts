@@ -183,18 +183,35 @@ export const assertPositionsDeletable = async (
     );
   }
 
+  // F2.1: a movimentação aponta para a posição por DOIS lados desde a Fase 2.
+  // A checagem tem que olhar os dois — considerar só a origem deixaria passar a
+  // exclusão de um endereço que só apareceu como DESTINO, e o delete então
+  // estouraria na FK como 500 em vez de virar o 409 explicativo abaixo.
   const withMovements = await prisma.stockMovement.findMany({
-    where: { positionId: { in: positionIds } },
-    select: { positionId: true },
-    distinct: ['positionId'],
+    where: {
+      OR: [
+        { fromPositionId: { in: positionIds } },
+        { toPositionId: { in: positionIds } }
+      ]
+    },
+    select: { fromPositionId: true, toPositionId: true },
     take: 5
   });
 
   if (withMovements.length > 0) {
-    const codes = withMovements
-      .map((m) => (m.positionId ? codeById.get(m.positionId) : null))
-      .filter(Boolean)
-      .join(', ');
+    // `distinct` não serve com o OR acima (distinguiria pelo par, não pela
+    // posição), então a deduplicação é feita aqui: uma mesma posição pode
+    // aparecer como origem numa linha e destino em outra.
+    const usedCodes = new Set<string>();
+    for (const movement of withMovements) {
+      for (const id of [movement.fromPositionId, movement.toPositionId]) {
+        const code = id ? codeById.get(id) : undefined;
+        if (code) {
+          usedCodes.add(code);
+        }
+      }
+    }
+    const codes = [...usedCodes].join(', ');
     throw new AppError(
       409,
       `Não é possível excluir: há histórico de movimentação nas posições ${codes}. ` +
@@ -226,4 +243,66 @@ export const deletePosition = async (positionId: string) => {
   return await prisma.storagePosition.delete({
     where: { id: positionId }
   });
+};
+
+/**
+ * F2.4 do plano do WMS — histórico de movimentação de um ENDEREÇO.
+ *
+ * A pergunta que este endpoint responde é "o que passou por esta posição?", e
+ * a resposta inclui as duas direções: a posição pode ter sido ORIGEM
+ * (`fromPositionId`: saída ou perna de saída de uma transferência) ou DESTINO
+ * (`toPositionId`: entrada ou perna de chegada). Daí o `OR` — atendido pelos
+ * dois índices de coluna única criados na migration da Fase 2.
+ *
+ * `direction` é derivado e devolvido pronto para o consumidor: sem ele, cada
+ * linha exigiria que o cliente comparasse os dois ids com o da posição
+ * consultada para saber se aquele movimento tirou ou pôs material ali — que é
+ * a única informação que ele realmente quer.
+ */
+export const getPositionMovements = async (
+  positionId: string,
+  filters?: { limit?: number; productId?: string }
+) => {
+  const position = await prisma.storagePosition.findUnique({
+    where: { id: positionId },
+    select: {
+      id: true,
+      code: true,
+      warehouseCode: true,
+      streetCode: true,
+      floor: true,
+      position: true,
+      positionType: true,
+      blocked: true
+    }
+  });
+
+  if (!position) {
+    throw new AppError(404, 'Posição de armazenagem não encontrada');
+  }
+
+  const movements = await prisma.stockMovement.findMany({
+    where: {
+      OR: [{ fromPositionId: positionId }, { toPositionId: positionId }],
+      ...(filters?.productId ? { productId: filters.productId } : {})
+    },
+    include: {
+      product: { select: { id: true, code: true, name: true } },
+      user: { select: { id: true, name: true } },
+      fromPosition: { select: { id: true, code: true } },
+      toPosition: { select: { id: true, code: true } }
+    },
+    orderBy: { createdAt: 'desc' },
+    take: filters?.limit ?? 100
+  });
+
+  return {
+    position,
+    movements: movements.map((movement) => ({
+      ...movement,
+      // IN  = o material CHEGOU nesta posição (ela é o destino)
+      // OUT = o material SAIU desta posição (ela é a origem)
+      direction: movement.toPositionId === positionId ? 'IN' : 'OUT'
+    }))
+  };
 };

@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import notificationService from './notification.service';
+import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
 
 /**
  * Service responsável por detectar eventos e criar notificações automaticamente
@@ -171,8 +172,10 @@ export class NotificationDetectorService {
 
     for (const bomItem of bom.items) {
       // Buscar estoque atual
+      // F2.2: `TRANSFER` excluído — transferência interna não altera o saldo
+      // do produto, e o reduce abaixo a trataria como saída.
       const stockMovements = await prisma.stockMovement.findMany({
-        where: { productId: bomItem.componentId },
+        where: { productId: bomItem.componentId, type: { in: AGGREGATE_MOVEMENT_TYPES } },
         select: { quantity: true, type: true },
       });
 
@@ -306,8 +309,9 @@ export class NotificationDetectorService {
 
     for (const product of products) {
       // Calcular estoque atual
+      // F2.2: `TRANSFER` excluído — ver a nota equivalente acima.
       const stockMovements = await prisma.stockMovement.findMany({
-        where: { productId: product.id },
+        where: { productId: product.id, type: { in: AGGREGATE_MOVEMENT_TYPES } },
         select: { quantity: true, type: true },
       });
 

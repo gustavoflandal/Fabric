@@ -8,9 +8,15 @@
  *
  * `<=`, e não `==`, nesta fase: nenhum fluxo de produção informa posição ainda
  * (recebimento, contagem, reserva de produção e as entradas/saídas manuais
- * chamam `applyMovement` sem `positionId`), então o normal é o agregado ser
- * MAIOR que a soma endereçada. Essa diferença é saldo legítimo NÃO ENDEREÇADO e
- * vai encolhendo conforme as fases 2 a 4 conectam cada fluxo ao endereço. A
+ * chamam `applyMovement` sem `fromPositionId`/`toPositionId`), então o normal é
+ * o agregado ser MAIOR que a soma endereçada. Essa diferença é saldo legítimo
+ * NÃO ENDEREÇADO e vai encolhendo conforme as fases 3 e 4 conectam cada fluxo
+ * ao endereço.
+ *
+ * F2.3 não muda esta conta: `TRANSFER` debita uma posição e credita outra na
+ * mesma transação, então a SOMA endereçada fica igual — e o agregado, que a
+ * transferência não toca, também. Uma transferência nunca cria nem resolve
+ * divergência. A
  * divergência real é o outro lado — mais material endereçado do que existe no
  * produto — que só pode vir de escrita fora de `stock.service.ts::applyMovement()`.
  *

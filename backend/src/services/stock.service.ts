@@ -1,14 +1,31 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, StockMovementType } from '@prisma/client';
 import { prisma } from '../config/database';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
 import { AppError } from '../middleware/error.middleware';
+import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
 
 type TransactionClient = Prisma.TransactionClient;
 
+/**
+ * F2.2 do plano do WMS: o tipo da movimentação deixou de ser um literal string
+ * declarado à mão em cada arquivo e passou a ser o enum `StockMovementType`
+ * gerado pelo Prisma a partir do schema — uma única fonte de verdade, alinhada
+ * com a constraint do banco. Reexportado daqui porque este é o service dono do
+ * conceito; quem precisar do tipo importa dele, não do `@prisma/client`.
+ */
+export { StockMovementType };
+
+/**
+ * F2.2 — reexportado por conveniência de quem já importa deste service. A
+ * definição mora em `utils/stock-movement.util.ts` para não fechar ciclo de
+ * módulos com `notification-detector.service.ts` (ver a nota lá).
+ */
+export { AGGREGATE_MOVEMENT_TYPES };
+
 export interface StockMovementDto {
   productId: string;
-  type: 'IN' | 'OUT' | 'ADJUSTMENT';
+  type: StockMovementType;
   quantity: number;
   reason: string;
   reference?: string;
@@ -17,29 +34,63 @@ export interface StockMovementDto {
   userId: string;
   notes?: string;
   /**
-   * F1.2 do plano do WMS: posição de armazenagem (`storage_positions.id`)
-   * envolvida na movimentação.
+   * F2.1 do plano do WMS — o par ORIGEM/DESTINO que substituiu o campo único
+   * `positionId` da Fase 1 (a migration reaproveitou os valores existentes).
    *
-   * Semântica NESTA fase (só existem IN/OUT/ADJUSTMENT):
-   *   IN         → a posição onde a quantidade ENTROU
-   *   OUT        → a posição de onde a quantidade SAIU
-   *   ADJUSTMENT → a posição sendo corrigida
+   * Semântica, validada em `assertPositionsMatchType()`:
+   *   IN         → só `toPositionId`   (onde a quantidade ENTROU)
+   *   OUT        → só `fromPositionId` (de onde a quantidade SAIU)
+   *   TRANSFER   → os DOIS, obrigatórios e diferentes entre si
+   *   ADJUSTMENT → UM dos dois (`to` = sobra encontrada, `from` = quebra)
    *
-   * Omitir (o caso de 100% dos chamadores atuais: recebimento, contagem,
-   * reserva de produção, entrada/saída manual) mantém o comportamento
-   * exatamente como antes — só o saldo agregado é mexido. Isso é esperado até
-   * as fases seguintes conectarem esses fluxos ao endereço.
-   *
-   * EVOLUÇÃO PLANEJADA (F2.1, Fase 2 — transferência interna): quando o tipo
-   * `TRANSFER` entrar, este campo único vira o par
-   * `fromPositionId`/`toPositionId`, e a migration deve REAPROVEITAR os valores
-   * já gravados (`IN` → `toPositionId`, `OUT` → `fromPositionId`,
-   * `ADJUSTMENT` → um dos dois conforme o sinal). O nome e a semântica já
-   * nascem alinhados a isso para que a Fase 2 seja rename + backfill, não uma
-   * remodelagem.
+   * Omitir os dois (o caso de 100% dos chamadores de produção: recebimento,
+   * contagem, reserva de produção, entrada/saída manual) mantém o comportamento
+   * exatamente como antes da Fase 1 — só o saldo agregado é mexido. Isso é
+   * esperado até as fases 3 e 4 conectarem esses fluxos ao endereço.
    */
-  positionId?: string;
+  fromPositionId?: string;
+  toPositionId?: string;
 }
+
+/**
+ * F2.3 — entrada de `transfer()`. Não é um `StockMovementDto` com `type`
+ * fixado: `type`, `referenceType` e a obrigatoriedade das duas posições são
+ * decisões do próprio método, não do chamador.
+ */
+export interface StockTransferDto {
+  productId: string;
+  fromPositionId: string;
+  toPositionId: string;
+  quantity: number;
+  reason: string;
+  userId: string;
+  reference?: string;
+  notes?: string;
+}
+
+/**
+ * F2.1 — uma perna do efeito de uma movimentação sobre `stock_position_balances`.
+ * `IN`/`OUT`/`ADJUSTMENT` endereçados geram uma; `TRANSFER` gera duas (débito na
+ * origem, crédito no destino).
+ */
+interface PositionDelta {
+  positionId: string;
+  delta: Prisma.Decimal;
+}
+
+/**
+ * F2.4 — projeção do endereço embutida no histórico de movimentação. Enxuta de
+ * propósito: o consumidor precisa identificar e exibir o endereço (`code` é o
+ * que está na etiqueta), não do registro inteiro da posição.
+ */
+const MOVEMENT_POSITION_SELECT = {
+  id: true,
+  code: true,
+  warehouseCode: true,
+  streetCode: true,
+  floor: true,
+  position: true,
+} as const;
 
 export interface StockBalance {
   productId: string;
@@ -77,33 +128,135 @@ export class StockServiceRefactored {
   }
 
   /**
-   * F1.2 do plano do WMS — ORDEM DETERMINÍSTICA DE LOCK.
+   * F2.1 — coerência entre `type` e o par origem/destino.
    *
-   * Quando a movimentação informa posição, DUAS linhas são travadas na mesma
-   * transação: `stock_balances` (agregado do produto) e
-   * `stock_position_balances` (produto × posição). Se uma transação travasse
-   * A→B e outra B→A, elas se bloqueariam mutuamente — deadlock.
+   * Sem esta guarda o service aceitaria combinações que o banco não tem como
+   * recusar (as duas colunas são nullable) e que produziriam saldo errado em
+   * silêncio: um `TRANSFER` com só uma ponta debitaria a origem sem creditar
+   * ninguém; um `IN` com `fromPositionId` sugeriria uma origem que a
+   * movimentação nunca debitou.
    *
-   * A ordem escolhida e INVARIANTE é: **`stock_balances` PRIMEIRO, depois
-   * `stock_position_balances`**. O motivo é que o agregado é o lock mais
-   * grosso e o único sempre presente — toda movimentação o trava,
-   * endereçada ou não. Adotá-lo como lock externo significa que qualquer
-   * transação que vá mexer numa posição do produto X já está serializada
-   * pelo lock de X antes de tocar em qualquer linha de posição. Fosse o
-   * contrário, uma movimentação sem posição (que só trava o agregado)
-   * poderia entrar no meio de uma endereçada e inverter a ordem.
+   * Lançado como `AppError` (400), não `Error`: é erro de USO da API, e o
+   * middleware de erro precisa traduzi-lo em 400, não em 500.
+   */
+  private assertPositionsMatchType(data: StockMovementDto): void {
+    const { type, fromPositionId, toPositionId } = data;
+
+    switch (type) {
+      case StockMovementType.IN:
+        if (fromPositionId) {
+          throw new AppError(
+            400,
+            'Movimentação de entrada (IN) não pode ter posição de origem — ' +
+              'informe apenas toPositionId.'
+          );
+        }
+        break;
+
+      case StockMovementType.OUT:
+        if (toPositionId) {
+          throw new AppError(
+            400,
+            'Movimentação de saída (OUT) não pode ter posição de destino — ' +
+              'informe apenas fromPositionId.'
+          );
+        }
+        break;
+
+      case StockMovementType.TRANSFER:
+        if (!fromPositionId || !toPositionId) {
+          throw new AppError(
+            400,
+            'Transferência exige posição de origem (fromPositionId) e de ' +
+              'destino (toPositionId).'
+          );
+        }
+        if (fromPositionId === toPositionId) {
+          throw new AppError(
+            400,
+            'Posição de origem e destino são a mesma — nada a transferir.'
+          );
+        }
+        break;
+
+      case StockMovementType.ADJUSTMENT:
+        if (fromPositionId && toPositionId) {
+          throw new AppError(
+            400,
+            'Ajuste endereça UMA posição: informe fromPositionId (quebra) ou ' +
+              'toPositionId (sobra), não os dois.'
+          );
+        }
+        break;
+    }
+  }
+
+  /**
+   * F2.1 — traduz `type` + par de posições no efeito sobre
+   * `stock_position_balances`, já ORDENADO pelo id da posição (ver a nota de
+   * ordem determinística em `applyMovement`).
    *
-   * Isso também prepara a Fase 2 (F2.3, `TRANSFER`, duas posições do MESMO
-   * produto na mesma transação): o agregado continua sendo travado primeiro, e
-   * as DUAS linhas de posição depois, ordenadas entre si por
-   * `storagePositionId` — sem essa segunda regra, duas transferências
-   * concorrentes A→B e B→A voltariam a poder deadlockar.
+   * Devolve lista vazia para movimentação não endereçada, que é o caminho de
+   * 100% dos chamadores legados.
+   */
+  private buildPositionDeltas(data: StockMovementDto): PositionDelta[] {
+    const quantity = new Prisma.Decimal(data.quantity);
+    const deltas: PositionDelta[] = [];
+
+    // Origem sempre DEBITA, destino sempre CREDITA — independente do tipo.
+    // É essa simetria que faz TRANSFER (as duas pernas) cair no mesmo caminho
+    // de código que IN e OUT (uma perna só), em vez de num ramo paralelo.
+    if (data.fromPositionId) {
+      deltas.push({ positionId: data.fromPositionId, delta: quantity.negated() });
+    }
+    if (data.toPositionId) {
+      deltas.push({ positionId: data.toPositionId, delta: quantity });
+    }
+
+    return deltas.sort((a, b) => (a.positionId < b.positionId ? -1 : 1));
+  }
+
+  /**
+   * F1.2 / F2.1 do plano do WMS — ORDEM DETERMINÍSTICA DE LOCK.
+   *
+   * Quando a movimentação informa posição, ATÉ TRÊS linhas são travadas na
+   * mesma transação: `stock_balances` (agregado do produto) e uma ou duas de
+   * `stock_position_balances` (produto × posição — duas no caso de
+   * `TRANSFER`). Se uma transação travasse A→B e outra B→A, elas se
+   * bloqueariam mutuamente — deadlock.
+   *
+   * A ordem escolhida e INVARIANTE tem dois níveis:
+   *
+   *   1) **`stock_balances` PRIMEIRO, sempre.** O agregado é o lock mais grosso
+   *      e o único sempre presente — toda movimentação o trava, endereçada ou
+   *      não, INCLUSIVE `TRANSFER` (que o trava sem alterá-lo, ver abaixo).
+   *      Adotá-lo como lock externo significa que qualquer transação que vá
+   *      mexer numa posição do produto X já está serializada pelo lock de X
+   *      antes de tocar em qualquer linha de posição. Fosse o contrário, uma
+   *      movimentação sem posição (que só trava o agregado) poderia entrar no
+   *      meio de uma endereçada e inverter a ordem.
+   *
+   *   2) **`stock_position_balances` depois, em ordem CRESCENTE de
+   *      `storagePositionId`** (`buildPositionDeltas` já devolve ordenado).
+   *      Sem essa segunda regra, duas transferências concorrentes A→B e B→A
+   *      travariam as duas mesmas linhas em ordem oposta e poderiam
+   *      deadlockar. Ordenando, ambas pegam A antes de B e a segunda
+   *      simplesmente espera.
+   *
+   * `TRANSFER` é o único tipo que **não altera o saldo agregado**: transferir
+   * não muda quanto o produto tem, só onde está. Ele ainda assim adquire o
+   * lock do agregado (nível 1 acima) — o lock é sobre a ORDEM, não sobre a
+   * escrita —, mas a linha de `stock_balances` não é atualizada, nem tem
+   * `version` incrementada: bumpar a versão sinalizaria a um leitor com lock
+   * otimista uma mudança que não houve.
    *
    * Regra prática para quem mexer aqui: nunca trave uma linha de
    * `stock_position_balances` sem já segurar o lock do `stock_balances` do
-   * mesmo produto.
+   * mesmo produto, e nunca trave duas posições fora da ordem crescente de id.
    */
   private async applyMovement(tx: TransactionClient, data: StockMovementDto) {
+    this.assertPositionsMatchType(data);
+
     // ---- LOCK 1 (externo): saldo agregado do produto -----------------------
     await tx.stockBalance.upsert({
       where: { productId: data.productId },
@@ -115,71 +268,104 @@ export class StockServiceRefactored {
       SELECT quantity FROM stock_balances WHERE productId = ${data.productId} FOR UPDATE
     `;
     const currentQty = Number(locked[0]?.quantity ?? 0);
-    const delta = data.type === 'OUT' ? -data.quantity : data.quantity;
 
-    if (data.type === 'OUT' && currentQty < data.quantity) {
+    // TRANSFER: delta ZERO no agregado (só muda de endereço). OUT: negativo.
+    // IN/ADJUSTMENT: positivo.
+    const delta =
+      data.type === StockMovementType.TRANSFER
+        ? 0
+        : data.type === StockMovementType.OUT
+          ? -data.quantity
+          : data.quantity;
+
+    if (data.type === StockMovementType.OUT && currentQty < data.quantity) {
       throw new AppError(
         400,
         `Estoque insuficiente. Disponível: ${currentQty}, Solicitado: ${data.quantity}`
       );
     }
 
-    // ---- LOCK 2 (interno): saldo da posição, só quando endereçada ----------
-    // Sem `positionId` este bloco inteiro não roda e o comportamento é
-    // byte-a-byte o de antes da Fase 1 (compatibilidade — nenhum chamador de
-    // produção passa posição hoje).
-    let newPositionQty: Prisma.Decimal | null = null;
+    // ---- LOCK 2 (interno): saldo das posições, na ordem crescente de id ----
+    // Sem posição nenhuma este bloco não roda e o comportamento é byte-a-byte
+    // o de antes da Fase 1 (compatibilidade — nenhum chamador legado passa
+    // posição).
+    const positionDeltas = this.buildPositionDeltas(data);
+    const newPositionQuantities = new Map<string, Prisma.Decimal>();
 
-    if (data.positionId) {
-      const position = await tx.storagePosition.findUnique({
-        where: { id: data.positionId },
-        select: { id: true, code: true },
+    if (positionDeltas.length > 0) {
+      const positions = await tx.storagePosition.findMany({
+        where: { id: { in: positionDeltas.map((d) => d.positionId) } },
+        select: { id: true, code: true, blocked: true },
       });
+      const positionById = new Map(positions.map((p) => [p.id, p]));
 
-      if (!position) {
-        throw new AppError(404, 'Posição de armazenagem não encontrada');
+      for (const { positionId } of positionDeltas) {
+        if (!positionById.has(positionId)) {
+          throw new AppError(404, 'Posição de armazenagem não encontrada');
+        }
       }
 
-      await tx.stockPositionBalance.upsert({
-        where: {
-          productId_storagePositionId: {
-            productId: data.productId,
-            storagePositionId: data.positionId,
+      // F2.3 — o DESTINO de uma transferência não pode estar bloqueado.
+      // A checagem mora aqui, DENTRO da transação, e não só no validator: uma
+      // posição pode ser bloqueada entre a validação da borda e a escrita, e
+      // este é o único ponto que enxerga o estado sob lock. Escopo deliberado
+      // em TRANSFER: um `IN` de recebimento em posição bloqueada é decisão da
+      // Fase 4 (regra de endereçamento, F4.6), não desta.
+      if (data.type === StockMovementType.TRANSFER && data.toPositionId) {
+        const destination = positionById.get(data.toPositionId)!;
+        if (destination.blocked) {
+          throw new AppError(
+            400,
+            `Posição de destino ${destination.code} está bloqueada e não pode receber material.`
+          );
+        }
+      }
+
+      for (const { positionId, delta: positionDelta } of positionDeltas) {
+        const position = positionById.get(positionId)!;
+
+        await tx.stockPositionBalance.upsert({
+          where: {
+            productId_storagePositionId: {
+              productId: data.productId,
+              storagePositionId: positionId,
+            },
           },
-        },
-        create: {
-          productId: data.productId,
-          storagePositionId: data.positionId,
-          quantity: 0,
-        },
-        update: {},
-      });
+          create: {
+            productId: data.productId,
+            storagePositionId: positionId,
+            quantity: 0,
+          },
+          update: {},
+        });
 
-      const lockedPosition = await tx.$queryRaw<{ quantity: Prisma.Decimal }[]>`
-        SELECT quantity FROM stock_position_balances
-        WHERE productId = ${data.productId} AND storagePositionId = ${data.positionId}
-        FOR UPDATE
-      `;
+        const lockedPosition = await tx.$queryRaw<{ quantity: Prisma.Decimal }[]>`
+          SELECT quantity FROM stock_position_balances
+          WHERE productId = ${data.productId} AND storagePositionId = ${positionId}
+          FOR UPDATE
+        `;
 
-      // Aritmética em Decimal, não em Number: a coluna é DECIMAL(18,4)
-      // (decisão D2) e converter para float aqui reintroduziria justamente o
-      // erro de arredondamento que o Decimal existe para evitar.
-      const currentPositionQty = new Prisma.Decimal(lockedPosition[0]?.quantity ?? 0);
-      const positionDelta = new Prisma.Decimal(data.quantity).times(
-        data.type === 'OUT' ? -1 : 1
-      );
+        // Aritmética em Decimal, não em Number: a coluna é DECIMAL(18,4)
+        // (decisão D2) e converter para float aqui reintroduziria justamente o
+        // erro de arredondamento que o Decimal existe para evitar.
+        const currentPositionQty = new Prisma.Decimal(lockedPosition[0]?.quantity ?? 0);
+        const newQty = currentPositionQty.plus(positionDelta);
 
-      // Validação de saldo NA POSIÇÃO, além da do agregado: ter 100 no produto
-      // não autoriza tirar 100 de um endereço que só tem 3.
-      if (data.type === 'OUT' && currentPositionQty.lessThan(data.quantity)) {
-        throw new AppError(
-          400,
-          `Estoque insuficiente na posição ${position.code}. ` +
-            `Disponível: ${currentPositionQty.toString()}, Solicitado: ${data.quantity}`
-        );
+        // Validação de saldo NA POSIÇÃO, além da do agregado: ter 100 no
+        // produto não autoriza tirar 100 de um endereço que só tem 3. Vale
+        // para toda perna de DÉBITO — a saída de um OUT e a origem de um
+        // TRANSFER —, e é checada com o lock da linha já na mão, então o valor
+        // lido não pode mudar antes da escrita.
+        if (newQty.isNegative()) {
+          throw new AppError(
+            400,
+            `Estoque insuficiente na posição ${position.code}. ` +
+              `Disponível: ${currentPositionQty.toString()}, Solicitado: ${data.quantity}`
+          );
+        }
+
+        newPositionQuantities.set(positionId, newQty);
       }
-
-      newPositionQty = currentPositionQty.plus(positionDelta);
     }
 
     const movement = await tx.stockMovement.create({
@@ -193,7 +379,8 @@ export class StockServiceRefactored {
         countingSessionId: data.countingSessionId,
         userId: data.userId,
         notes: data.notes,
-        positionId: data.positionId,
+        fromPositionId: data.fromPositionId,
+        toPositionId: data.toPositionId,
       },
       include: {
         product: true,
@@ -207,20 +394,24 @@ export class StockServiceRefactored {
       },
     });
 
-    await tx.stockBalance.update({
-      where: { productId: data.productId },
-      data: { quantity: currentQty + delta, version: { increment: 1 } },
-    });
+    // `delta === 0` só acontece em TRANSFER: nem escrita nem `version` no
+    // agregado, porque nada nele mudou (ver a nota do cabeçalho).
+    if (delta !== 0) {
+      await tx.stockBalance.update({
+        where: { productId: data.productId },
+        data: { quantity: currentQty + delta, version: { increment: 1 } },
+      });
+    }
 
-    if (data.positionId && newPositionQty !== null) {
+    for (const [positionId, quantity] of newPositionQuantities) {
       await tx.stockPositionBalance.update({
         where: {
           productId_storagePositionId: {
             productId: data.productId,
-            storagePositionId: data.positionId,
+            storagePositionId: positionId,
           },
         },
-        data: { quantity: newPositionQty, version: { increment: 1 } },
+        data: { quantity, version: { increment: 1 } },
       });
     }
 
@@ -429,12 +620,20 @@ export class StockServiceRefactored {
   }
 
   /**
-   * Obtém histórico de movimentações de um produto
+   * Obtém histórico de movimentações de um produto.
+   *
+   * F2.4 — ganhou o filtro `positionId`: "o que aconteceu com ESTE produto
+   * NESTE endereço". Uma posição pode ter sido origem OU destino da
+   * movimentação (e, num `TRANSFER` interno à mesma posição, nunca as duas —
+   * `assertPositionsMatchType` recusa origem igual a destino), então o filtro é
+   * um OR sobre as duas colunas, atendido pelos índices de
+   * `fromPositionId`/`toPositionId`.
    */
   async getMovementHistory(
     productId: string,
     filters?: {
-      type?: 'IN' | 'OUT' | 'ADJUSTMENT';
+      type?: StockMovementType;
+      positionId?: string;
       startDate?: Date;
       endDate?: Date;
       limit?: number;
@@ -444,6 +643,13 @@ export class StockServiceRefactored {
 
     if (filters?.type) {
       where.type = filters.type;
+    }
+
+    if (filters?.positionId) {
+      where.OR = [
+        { fromPositionId: filters.positionId },
+        { toPositionId: filters.positionId },
+      ];
     }
 
     if (filters?.startDate || filters?.endDate) {
@@ -472,12 +678,82 @@ export class StockServiceRefactored {
             name: true,
           },
         },
+        // F2.4 — o endereço é o dado que torna o histórico rastreável ("de onde
+        // veio, para onde foi"). `code` é o que o operador lê na etiqueta; sem
+        // ele a resposta traria só um UUID e o consumidor precisaria de uma
+        // segunda chamada por linha.
+        fromPosition: { select: MOVEMENT_POSITION_SELECT },
+        toPosition: { select: MOVEMENT_POSITION_SELECT },
       },
       orderBy: { createdAt: 'desc' },
       take: filters?.limit || 100,
     });
 
     return movements;
+  }
+
+  /**
+   * F2.3 — TRANSFERÊNCIA INTERNA entre dois endereços.
+   *
+   * Uma ÚNICA movimentação `TRANSFER` que debita a origem e credita o destino
+   * na mesma transação — e não um par OUT/IN, que poderia ficar órfão pela
+   * metade e apareceria no histórico como se o material tivesse saído do
+   * armazém e voltado.
+   *
+   * O saldo agregado (`stock_balances`) NÃO é tocado: transferir não muda
+   * quanto o produto tem, só onde está. Consequências deliberadas, diferentes
+   * de `registerMovement()`:
+   *   * `checkStockLevels()` não é chamado — os limiares (mín./máx./segurança)
+   *     são do agregado, que não mudou; disparar os eventos aqui geraria
+   *     alerta repetido a cada transferência sem nenhum fato novo.
+   *   * a notificação de estoque baixo, pelo mesmo motivo, não é disparada.
+   *   * `STOCK_MOVEMENT_CREATED` É emitido: rastreabilidade é justamente o
+   *     ponto desta fase, e o listener só registra o fato.
+   *
+   * As validações de coerência (as duas pontas presentes, diferentes entre si,
+   * posições existentes, destino não bloqueado, saldo suficiente NA ORIGEM)
+   * moram em `applyMovement()`, dentro da transação e com os locks na mão —
+   * checá-las aqui fora seria TOCTOU.
+   */
+  async transfer(data: StockTransferDto) {
+    const product = await prisma.product.findUnique({
+      where: { id: data.productId },
+    });
+
+    if (!product) {
+      throw new AppError(404, 'Produto não encontrado');
+    }
+
+    if (data.quantity <= 0) {
+      throw new AppError(400, 'Quantidade deve ser maior que zero');
+    }
+
+    const movement = await prisma.$transaction((tx) =>
+      this.applyMovement(tx, {
+        productId: data.productId,
+        type: StockMovementType.TRANSFER,
+        quantity: data.quantity,
+        reason: data.reason,
+        reference: data.reference,
+        // Transferência é operação interna de armazém, não produção/compra/
+        // contagem — `MANUAL` é o valor existente que a descreve.
+        referenceType: 'MANUAL',
+        userId: data.userId,
+        notes: data.notes,
+        fromPositionId: data.fromPositionId,
+        toPositionId: data.toPositionId,
+      })
+    );
+
+    await eventBus.emit(SystemEvents.STOCK_MOVEMENT_CREATED, {
+      movementId: movement.id,
+      productId: movement.productId,
+      type: movement.type,
+      quantity: movement.quantity,
+      reference: movement.reference,
+    });
+
+    return movement;
   }
 
   /**
@@ -632,10 +908,14 @@ export class StockServiceRefactored {
   }
 
   /**
-   * Obtém movimentações de um produto
+   * Obtém movimentações de um produto.
+   *
+   * F2.4 — `positionId` é opcional e recorta o histórico do produto a um
+   * endereço. Assinatura posicional mantida (`limit` continua sendo o 2º
+   * argumento) para não quebrar os chamadores existentes.
    */
-  async getMovements(productId: string, limit = 50) {
-    return this.getMovementHistory(productId, { limit });
+  async getMovements(productId: string, limit = 50, positionId?: string) {
+    return this.getMovementHistory(productId, { limit, positionId });
   }
 
   /**

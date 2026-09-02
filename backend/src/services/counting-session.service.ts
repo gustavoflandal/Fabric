@@ -2,6 +2,7 @@ import { PrismaClient, CountingSession, SessionStatus } from '@prisma/client';
 import countingPlanService from './counting-plan.service';
 import stockService from './stock.service';
 import { AppError } from '../middleware/error.middleware';
+import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
 
 const prisma = new PrismaClient();
 
@@ -201,8 +202,12 @@ class CountingSessionService {
     // Atualizar quantidades do sistema nos itens
     for (const item of session.items) {
       // Buscar estoque atual do produto
+      // F2.2: `TRANSFER` excluído — transferência interna não altera o saldo
+      // do produto (só o endereço), e o laço abaixo a somaria como saída,
+      // fazendo a contagem nascer com `systemQty` menor que o real. A Fase 3
+      // (F3.2) troca esta soma inteira por `StockPositionBalance`.
       const movements = await prisma.stockMovement.findMany({
-        where: { productId: item.productId },
+        where: { productId: item.productId, type: { in: AGGREGATE_MOVEMENT_TYPES } },
         select: {
           type: true,
           quantity: true,

@@ -591,10 +591,30 @@ model ProductionPointing {
 // ESTOQUE
 // ============================================
 
+// F2.2 do plano do WMS (decisao D4): `type` deixou de ser `String` livre e
+// virou ENUM. Antes, nada no banco impedia gravar "in", "SAIDA" ou um typo -
+// e o calculo de saldo legado (mrp.service, notification-detector,
+// counting-session) simplesmente ignorava ou somava errado o valor invalido.
+// Com o enum, o banco recusa; com `StockMovementType` gerado pelo Prisma, o
+// TypeScript recusa antes ainda.
+//
+// TRANSFER e o valor NOVO desta fase (F2.3): transferencia interna entre dois
+// enderecos. Ele e o unico tipo que NAO altera o saldo agregado
+// (`stock_balances`) - so muda ONDE o material esta, nao QUANTO existe. Todo
+// codigo que soma movimentacoes para derivar saldo precisa exclui-lo
+// explicitamente (ver os `type: { in: [...] }` em mrp.service.ts,
+// notification-detector.service.ts e counting-session.service.ts).
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  TRANSFER
+}
+
 model StockMovement {
-  id                String   @id @default(uuid())
+  id                String            @id @default(uuid())
   productId         String
-  type              String // IN, OUT, ADJUSTMENT
+  type              StockMovementType
   quantity          Float
   reason            String
   reference         String? // ID da OP, Pedido, etc (sem FK - campo polimorfico, ver referenceType)
@@ -602,37 +622,40 @@ model StockMovement {
   countingSessionId String? // FK dedicada, preenchida apenas quando referenceType = COUNTING
   userId            String
   notes             String?
-  // F1.2 do plano do WMS: posicao de armazenagem envolvida na movimentacao.
-  // Semantica NESTA fase (so existem IN/OUT/ADJUSTMENT):
-  //   IN         -> a posicao onde a quantidade ENTROU
-  //   OUT        -> a posicao de onde a quantidade SAIU
-  //   ADJUSTMENT -> a posicao sendo corrigida
-  // NULL = movimentacao nao enderecada (todo o fluxo atual: recebimento,
-  // contagem, reserva de producao, entrada/saida manual). Esse caminho continua
-  // funcionando exatamente como antes - ver applyMovement().
+  // F2.1 do plano do WMS - o par ORIGEM/DESTINO que substituiu o campo unico
+  // `positionId` da Fase 1 (migration `20260902100000_fase2_wms_movimentacao_transferencia`,
+  // que reaproveitou os valores gravados em vez de descarta-los).
   //
-  // EVOLUCAO PLANEJADA (F2.1, Fase 2 - transferencia interna): quando o tipo
-  // `TRANSFER` for introduzido, este campo unico vira o par
-  // `fromPositionId`/`toPositionId`, e a migration deve REAPROVEITAR os valores
-  // ja gravados aqui em vez de descarta-los:
-  //   type IN         -> toPositionId   = positionId
-  //   type OUT        -> fromPositionId = positionId
-  //   type ADJUSTMENT -> um dos dois, conforme o sinal do ajuste
-  // O nome/semantica ja nascem alinhados a isso justamente para que a Fase 2
-  // seja um RENAME + backfill, e nao uma remodelagem.
-  positionId        String?
-  createdAt         DateTime @default(now())
+  // Semantica, VALIDADA em stock.service.ts::applyMovement() com AppError:
+  //   IN         -> so `toPositionId`   (onde a quantidade entrou)
+  //   OUT        -> so `fromPositionId` (de onde a quantidade saiu)
+  //   TRANSFER   -> os DOIS obrigatorios e diferentes entre si
+  //   ADJUSTMENT -> UM dos dois (to = sobra encontrada, from = quebra)
+  // Os dois NULL = movimentacao nao enderecada. Continua sendo 100% do fluxo
+  // legado (recebimento, contagem, reserva de producao, entrada/saida manual) e
+  // funciona exatamente como antes - a dimensao de endereco e aditiva.
+  //
+  // O par nao e redundante com `type`: e ele que permite que UMA linha de
+  // movimentacao represente a transferencia inteira (debito na origem +
+  // credito no destino na mesma transacao), em vez de um par OUT/IN que
+  // poderia ficar orfao pela metade.
+  fromPositionId    String?
+  toPositionId      String?
+  createdAt         DateTime          @default(now())
 
   product         Product          @relation(fields: [productId], references: [id])
   user            User             @relation(fields: [userId], references: [id])
   countingSession CountingSession? @relation("CountingAdjustments", fields: [countingSessionId], references: [id])
-  // `Restrict` EXPLICITO - o default do Prisma para relacao OPCIONAL seria
-  // `SetNull`, que NAO serve aqui: historico de movimentacao e trilha de
-  // auditoria, e apagar uma posicao nao pode zerar silenciosamente o endereco
-  // onde o material esteve. A forma correta de aposentar um endereco que ja foi
-  // usado e `blocked = true`, nao DELETE - storage-position.service.ts traduz a
-  // violacao de FK em AppError explicando isso.
-  position        StoragePosition? @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  // `Restrict` EXPLICITO nos DOIS lados - o default do Prisma para relacao
+  // OPCIONAL seria `SetNull`, que NAO serve aqui: historico de movimentacao e
+  // trilha de auditoria, e apagar uma posicao nao pode zerar silenciosamente o
+  // endereco onde o material esteve. A forma correta de aposentar um endereco
+  // que ja foi usado e `blocked = true`, nao DELETE - storage-position.service.ts
+  // traduz a violacao de FK em AppError explicando isso. (Motivo herdado
+  // integralmente do `positionId` da Fase 1; F2.1 so o duplicou para origem e
+  // destino.)
+  fromPosition    StoragePosition? @relation("StockMovementFrom", fields: [fromPositionId], references: [id], onDelete: Restrict)
+  toPosition      StoragePosition? @relation("StockMovementTo", fields: [toPositionId], references: [id], onDelete: Restrict)
 
   @@index([productId])
   @@index([productId, createdAt])
@@ -640,7 +663,12 @@ model StockMovement {
   @@index([createdAt])
   @@index([reference])
   @@index([referenceType, reference])
-  @@index([positionId])
+  // Um indice por coluna, e nao um composto: o historico por posicao (F2.4)
+  // pergunta "esta posicao foi origem OU destino", que no MySQL vira um OR
+  // resolvido por index merge dos dois indices - um composto
+  // (fromPositionId, toPositionId) nao atenderia a segunda metade da condicao.
+  @@index([fromPositionId])
+  @@index([toPositionId])
   @@map("stock_movements")
 }
 
@@ -1242,10 +1270,14 @@ model StoragePosition {
   updatedAt      DateTime     @updatedAt
 
   structure             WarehouseStructure     @relation(fields: [structureId], references: [id], onDelete: Cascade)
-  // F1.1/F1.2: saldo e movimentacao pendurados no endereco. Ambas as relacoes
-  // sao RESTRICT (default) - ver o comentario em StockPositionBalance.
+  // F1.1/F1.2: saldo e movimentacao pendurados no endereco. Todas as relacoes
+  // sao RESTRICT - ver o comentario em StockPositionBalance.
+  // F2.1: a movimentacao passou a apontar para o endereco por DOIS lados
+  // (origem e destino), entao sao duas back-relations nomeadas. O historico de
+  // uma posicao (F2.4) e a UNIAO das duas.
   stockPositionBalances StockPositionBalance[]
-  stockMovements        StockMovement[]
+  movementsFrom         StockMovement[]        @relation("StockMovementFrom")
+  movementsTo           StockMovement[]        @relation("StockMovementTo")
 
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])
