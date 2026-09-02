@@ -91,6 +91,36 @@ if (jwtRefreshSecret.length < 32) {
 const smtpHost = process.env.SMTP_HOST?.trim() || '';
 const smtpPort = Number(process.env.SMTP_PORT) || 587;
 
+/**
+ * WMS — janela de antecedência do alerta de validade de lote (Fase 5,
+ * complemento: `notification-detector.service.ts::checkExpiringLots()`).
+ *
+ * DEFAULT 7 DIAS. É a menor antecedência que ainda cabe um ciclo de decisão
+ * completo do armazém (consultar o lote, priorizar a saída dele, escalar para
+ * quem compra/vende ou dar baixa) sem depender de alguém estar de plantão no
+ * dia. Uma janela de 1-2 dias avisaria quando já não há o que fazer; 30 dias
+ * transformaria o alerta em relatório de inventário — a maior parte dos lotes
+ * de um armazém com giro normal estaria dentro dela todo dia, e um alerta que
+ * lista quase tudo não prioriza nada.
+ *
+ * CONFIGURÁVEL porque prazo de validade é o parâmetro do domínio que mais varia
+ * entre instalações: alimento fresco quer 2-3 dias, insumo químico com processo
+ * de descarte regulado quer 60-90. É o mesmo motivo (e o mesmo padrão) de
+ * `AUDIT_LOG_RETENTION_DAYS` acima — um número que a instalação ajusta sem
+ * editar código.
+ *
+ * Valor ausente, não numérico, zero ou negativo cai no default: uma janela de 0
+ * não é uma configuração, é o desligamento silencioso de metade do detector (o
+ * evento "antes de vencer" nunca dispararia e só sobraria o "já venceu"), e
+ * silêncio por erro de digitação em `.env` é o pior modo de falha possível para
+ * um alerta.
+ */
+const parsedLotExpiryAlertDays = Number(process.env.LOT_EXPIRY_ALERT_DAYS);
+const lotExpiryAlertDays =
+  Number.isFinite(parsedLotExpiryAlertDays) && parsedLotExpiryAlertDays > 0
+    ? parsedLotExpiryAlertDays
+    : 7;
+
 export const config = {
   port: process.env.PORT || 3001,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -130,5 +160,9 @@ export const config = {
     from: process.env.SMTP_FROM || 'Fabric PCP <nao-responda@fabric.local>',
     /** Sem host não há como enviar: o serviço de email entra em modo no-op. */
     enabled: smtpHost !== '',
+  },
+  wms: {
+    /** Dias de antecedência do alerta `LOT_EXPIRING_SOON`. Ver a nota acima. */
+    lotExpiryAlertDays,
   },
 };
