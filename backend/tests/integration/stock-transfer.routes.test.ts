@@ -36,7 +36,7 @@ const login = async (permissions: { resource: string; action: string }[]) => {
   return res.body.data.accessToken as string;
 };
 
-const TRANSFER = { resource: 'storage_positions', action: 'update' };
+const TRANSFER = { resource: 'estruturas_armazem', action: 'atualizar_posicao' };
 const READ_POSITION = { resource: 'estruturas_armazem', action: 'visualizar' };
 const READ_STOCK = { resource: 'stock', action: 'read' };
 

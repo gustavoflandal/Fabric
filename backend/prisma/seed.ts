@@ -120,7 +120,13 @@ async function main() {
     { resource: 'estruturas_armazem', action: 'excluir', description: 'Excluir estruturas de armazém' },
     { resource: 'estruturas_armazem', action: 'gerar_posicoes', description: 'Gerar posições de armazenagem' },
     { resource: 'estruturas_armazem', action: 'excluir_posicoes', description: 'Excluir posições de armazenagem' },
-    { resource: 'storage_positions', action: 'update', description: 'Editar posições de armazenagem' },
+    // Renomeada de `storage_positions:update` (único par em inglês de todo o
+    // módulo de armazém, que já usa `armazens`/`estruturas_armazem` em
+    // português). Fica sob `estruturas_armazem` porque a EXCLUSÃO de uma
+    // posição individual (`DELETE /storage-positions/position/:id`) já usa
+    // `estruturas_armazem:excluir_posicoes` — não faria sentido excluir uma
+    // posição por um recurso e atualizar a mesma posição por outro.
+    { resource: 'estruturas_armazem', action: 'atualizar_posicao', description: 'Atualizar posição de armazenagem (bloquear/desbloquear, transferir conteúdo)' },
 
     // Tarefas de Armazém (WMS - Fase 4b, F4.9/F4.11)
     // Recurso NOVO, e não reaproveitamento de `recebimentos_compra` como na
@@ -249,6 +255,34 @@ async function main() {
 
   console.log(`✅ ${permissions.length} permissões criadas`);
 
+  // ============================================
+  // PERMISSÕES OBSOLETAS (renomeadas/removidas)
+  // ============================================
+  // Pares que já existiram no catálogo e não são mais checados por rota
+  // nenhuma. Precisam sair do banco: enquanto existirem, o seed do ADMIN
+  // (que atribui `allPermissions`) continua devolvendo permissão morta, e a
+  // tela de gestão de perfis oferece um par que não protege nada.
+  //
+  // A ordem importa: `role_permissions` referencia `permissions` por FK, então
+  // as associações saem primeiro (mesmo cuidado das remoções de permissão
+  // morta das rodadas anteriores de RBAC).
+  const obsoletePermissions = [
+    // Renomeada para `estruturas_armazem:atualizar_posicao` nesta rodada.
+    { resource: 'storage_positions', action: 'update' },
+  ];
+
+  for (const obsolete of obsoletePermissions) {
+    const found = await prisma.permission.findUnique({
+      where: { resource_action: { resource: obsolete.resource, action: obsolete.action } },
+    });
+
+    if (!found) continue;
+
+    await prisma.rolePermission.deleteMany({ where: { permissionId: found.id } });
+    await prisma.permission.delete({ where: { id: found.id } });
+    console.log(`🧹 Permissão obsoleta removida: ${obsolete.resource}:${obsolete.action}`);
+  }
+
   // Criar perfis
   console.log('👥 Criando perfis...');
   
@@ -324,6 +358,11 @@ async function main() {
     work_centers: ['create', 'read', 'update'],
     suppliers: ['create', 'read', 'update'],
     customers: ['create', 'read', 'update'],
+    // Cadastros de apoio: `units_of_measure` e `dashboard` já eram exigidos
+    // pelas rotas, mas nunca tinham entrado nestes mapas — MANAGER e OPERATOR
+    // tomavam 403 no dashboard e na lista de unidades de medida.
+    units_of_measure: ['create', 'read', 'update'],
+    dashboard: ['read'],
     stock: ['read', 'update', 'entry', 'exit', 'adjustment'],
     mrp: ['read', 'execute', 'consolidate'],
     reports: ['read', 'export', 'production', 'efficiency', 'quality'],
@@ -331,8 +370,7 @@ async function main() {
     pedidos_compra: ['visualizar', 'criar', 'editar', 'aprovar', 'confirmar', 'cancelar'],
     recebimentos_compra: ['visualizar', 'criar'],
     armazens: ['visualizar', 'criar', 'editar'],
-    estruturas_armazem: ['visualizar', 'criar', 'editar', 'gerar_posicoes'],
-    storage_positions: ['update'],
+    estruturas_armazem: ['visualizar', 'criar', 'editar', 'gerar_posicoes', 'atualizar_posicao'],
     // F4.9: o MANAGER é quem distribui trabalho no armazém (`atribuir`), além
     // de ver e poder executar.
     tarefas_armazem: ['visualizar', 'executar', 'atribuir'],
@@ -355,6 +393,10 @@ async function main() {
     work_centers: ['read'],
     suppliers: ['read'],
     customers: ['read'],
+    // Só leitura: quem opera consulta a unidade de medida e o dashboard, mas
+    // cadastro mestre continua sendo do MANAGER.
+    units_of_measure: ['read'],
+    dashboard: ['read'],
     stock: ['read', 'entry', 'exit'],
     mrp: ['read'],
     reports: ['read'],
@@ -362,8 +404,7 @@ async function main() {
     pedidos_compra: ['visualizar'],
     recebimentos_compra: ['visualizar', 'criar'],
     armazens: ['visualizar'],
-    estruturas_armazem: ['visualizar'],
-    storage_positions: ['update'],
+    estruturas_armazem: ['visualizar', 'atualizar_posicao'],
     // F4.9: o OPERATOR vê a fila e executa; NÃO atribui (mesmo critério que já
     // separa `contagem:executar` de `contagem:aprovar_divergencia` - distribuir
     // trabalho é decisão de supervisão, não de execução).
