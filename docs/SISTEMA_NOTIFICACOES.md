@@ -69,37 +69,36 @@ Preferências individuais do usuário por categoria.
 
 #### MATERIAL_UNAVAILABLE
 - **Quando:** Material necessário não está disponível para produção
-- **Destinatários:** Gerente de Produção, Comprador, Operador Atribuído
+- **Destinatários reais:** só `MANAGER` (a busca por "Comprador" usa um perfil que não existe — ver seção "Regras por Perfil"; não inclui o operador da ordem)
 - **Ação:** Verificar estoque e iniciar compra urgente
+- **Nota técnica:** recalcula o estoque somando `stock_movements` do zero a cada verificação, em vez de usar `StockBalance`/`stock.service.ts::getBalance()` (já otimizado desde a Fase 1 do cronograma de modernização) — candidato a correção, não feita aqui.
 
 #### QUALITY_SCRAP_HIGH
 - **Quando:** Taxa de refugo acima do limite (padrão: 5%)
-- **Destinatários:** Gerente de Qualidade, Gerente de Produção, Operador
+- **Destinatários reais:** `MANAGER` + o operador específico que registrou o apontamento (não "Gerente de Qualidade" — perfil inexistente)
 - **Ação:** Parar produção e investigar causa
 
 ### **Prioridade ALTA (3)** ⚠️
 
 #### PRODUCTION_DELAYED
 - **Quando:** Ordem de produção atrasada em relação ao cronograma
-- **Destinatários:** Gerente de Produção, Operador Atribuído
+- **Destinatários reais:** só `MANAGER` (não inclui o operador atribuído à ordem)
 - **Ação:** Repriorizar ou realocar recursos
 
 #### BOTTLENECK_DETECTED
 - **Quando:** Centro de trabalho com fila acima do limite (padrão: 5 operações)
-- **Destinatários:** Gerente de Produção, Manutenção
+- **Destinatários reais:** só `MANAGER` ("Manutenção" nunca existiu no código, é aspiracional)
 - **Ação:** Redistribuir carga ou adicionar capacidade
 
 #### STOCK_BELOW_SAFETY
 - **Quando:** Estoque abaixo do mínimo de segurança
-- **Destinatários:** Comprador, Gerente de Estoque
+- **Destinatários reais: NENHUM.** Busca `getUsersByRole('BUYER')` + `getUsersByRole('STOCK_MANAGER')` — **os dois perfis não existem**. Esta é, hoje, a notificação mais crítica do sistema por descrição (estoque zerado dispara prioridade 4) e a única cujo caminho de entrega está **totalmente morto**, não parcialmente — nem `MANAGER` está na lista. Prioridade alta de correção se este alerta for considerado importante para o negócio.
 - **Ação:** Iniciar processo de compra
 
 ### **Prioridade MÉDIA (2)** 📊
 
 #### CAPACITY_LOW
-- **Quando:** Centro de trabalho operando abaixo da capacidade esperada
-- **Destinatários:** Gerente de Produção
-- **Ação:** Investigar ociosidade
+- **Não existe no código.** `grep` por `CAPACITY_LOW`/`checkCapacity` em `notification-detector.service.ts` não retorna nada — é o mesmo evento do 5º cron job da seção "Detectores Automáticos" abaixo, que só loga "verificação de capacidade não implementada ainda". Mantido aqui só como registro do que foi planejado e nunca construído.
 
 #### OPERATION_COMPLETED
 - **Quando:** Operação de produção concluída
@@ -110,60 +109,43 @@ Preferências individuais do usuário por categoria.
 
 ## 🔐 Regras por Perfil
 
+**Achado ao atualizar este documento (01/09/2026):** `notification-detector.service.ts` busca destinatários por `getUsersByRole('BUYER')`, `getUsersByRole('QUALITY_MANAGER')` e `getUsersByRole('STOCK_MANAGER')` — mas os únicos perfis que de fato existem no sistema, seedados em `backend/prisma/seed.ts`, são **`ADMIN`, `MANAGER` e `OPERATOR`**. Não existe nem nunca existiu perfil `BUYER`, `QUALITY_MANAGER` ou `STOCK_MANAGER`. Na prática, toda notificação endereçada a esses três "perfis" busca uma lista vazia de usuários e não entrega a ninguém — as seções abaixo descrevem a *intenção* original do design (útil para saber o que cada evento deveria fazer), não o comportamento real de entrega. Ver `docs/PERMISSOES_SISTEMA.md` para o RBAC real do sistema.
+
 ### **ADMIN**
 - Recebe: Todas as notificações
 - Prioridade mínima: 1 (todas)
-- Canais: In-app + Email
+- Canais: In-app + Email (canal de email não implementado — ver "Próximos Passos")
 
-### **PRODUCTION_MANAGER (Gerente de Produção)**
-- Recebe:
-  - PRODUCTION_DELAYED
-  - BOTTLENECK_DETECTED
-  - MATERIAL_UNAVAILABLE
-  - QUALITY_SCRAP_HIGH
-  - CAPACITY_LOW
-  - OPERATION_COMPLETED
-- Prioridade mínima: 2
-- Canais: In-app + Email (críticas)
+### **MANAGER (mapeado no código como "Gerente de Produção", "Gerente de Qualidade" e "Comprador" simultaneamente)**
+- Recebe, de fato: `PRODUCTION_DELAYED`, `BOTTLENECK_DETECTED`, `MATERIAL_UNAVAILABLE`, `CAPACITY_LOW`, `OPERATION_COMPLETED` (via `getUsersByRole('MANAGER')`, chamado em múltiplos detectores)
+- **Não recebe** `QUALITY_SCRAP_HIGH` nem `STOCK_BELOW_SAFETY` de fato — esses dois chamam `getUsersByRole('QUALITY_MANAGER')`/`getUsersByRole('BUYER')`/`getUsersByRole('STOCK_MANAGER')`, que não retornam ninguém (ver achado acima). Se a intenção é que `MANAGER` receba esses eventos também, o código precisa ser corrigido para usar `'MANAGER'` em vez desses perfis inexistentes.
 
 ### **OPERATOR (Operador)**
-- Recebe (apenas suas ordens):
-  - OPERATION_COMPLETED
-  - MATERIAL_UNAVAILABLE
-  - QUALITY_SCRAP_HIGH
-- Prioridade mínima: 3
+- Recebe, de fato, só **`QUALITY_SCRAP_HIGH`** — e não por assinatura de perfil: o detector inclui diretamente `pointing.user` (quem registrou o apontamento que gerou o refugo alto) na lista de destinatários, então é sempre o operador daquele apontamento específico, nunca "todo operador".
+- **Não recebe** `OPERATION_COMPLETED` (vai só para `MANAGER` — é aviso *para* o gestor de que uma operação terminou, não uma confirmação *para* quem a completou) nem `MATERIAL_UNAVAILABLE` (vai para `MANAGER` + `BUYER`, e `BUYER` não existe — ver achado acima).
 - Canais: In-app
-- Filtro: `assignedToUser: true`
-
-### **BUYER (Comprador)**
-- Recebe:
-  - STOCK_BELOW_SAFETY
-  - MATERIAL_UNAVAILABLE
-- Prioridade mínima: 2
-- Canais: In-app + Email
-
-### **QUALITY_MANAGER (Gerente de Qualidade)**
-- Recebe:
-  - QUALITY_SCRAP_HIGH
-- Prioridade mínima: 2
-- Canais: In-app + Email
 
 ---
 
 ## ⚙️ Detectores Automáticos (Cron Jobs)
 
-### **A cada 5 minutos**
-- `detectProductionDelays()` - Verifica ordens atrasadas
-- `detectBottlenecks()` - Identifica gargalos em centros de trabalho
+Corrigido contra `notification-scheduler.service.ts` (nomes de função e frequência exatos — os nomes abaixo divergiam do código real na versão anterior deste documento):
 
-### **A cada 15 minutos**
-- `checkCapacity()` - Monitora capacidade dos centros
+### **A cada 5 minutos** — real
+- `detectProductionDelays()` — verifica ordens atrasadas
+- `detectBottlenecks()` — identifica gargalos em centros de trabalho
 
-### **Diariamente às 8h**
-- `sendDailySummary()` - Envia resumo do dia
+### **A cada 15 minutos** — real
+- `checkLowStock()` — verifica estoque abaixo do mínimo (é o job que deveria disparar `STOCK_BELOW_SAFETY`, hoje sem entrega — ver seção "Eventos Implementados")
 
-### **A cada 1 hora**
-- `cleanupOldNotifications()` - Remove notificações antigas (30 dias)
+### **A cada 1 hora** — real
+- `notificationService.cleanupExpired(30)` — remove notificações antigas (30 dias)
+
+### **Diariamente às 8h** — stub, não implementado
+Job roda e loga "Resumo diário não implementado ainda". Não gera nenhuma notificação.
+
+### **A cada 2 horas** — stub, não implementado
+Job roda e loga "Verificação de capacidade não implementada ainda" (é o job por trás do evento `CAPACITY_LOW`, que também não existe — ver "Eventos Implementados").
 
 ---
 
@@ -246,30 +228,29 @@ Substitui a seção "Ações Rápidas" com:
 
 ## 🚀 Próximos Passos
 
-### **Fase 1 - Fundação (Sprint 1)**
-✅ Schema Prisma criado
-⏳ Migração do banco
-⏳ Services básicos (NotificationService)
-⏳ Componente NotificationBell
-⏳ Substituir Ações Rápidas no Dashboard
+**Corrigido em 01/09/2026** — o estado abaixo é o real, verificado no código (`notification.service.ts`, `notification-detector.service.ts`, `notification-scheduler.service.ts`, `frontend/src/components/notifications/`), não o planejado em 21/10/2025.
 
-### **Fase 2 - Detectores (Sprint 2)**
-⏳ NotificationDetector service
-⏳ Integração com módulos existentes
-⏳ Cron jobs
-⏳ Eventos críticos implementados
+### **Fundação — feito**
+✅ Schema Prisma (`Notification`/`NotificationRule`/`NotificationPreference`)
+✅ `NotificationService`
+✅ `NotificationBell.vue`, `NotificationCenter.vue`, `NotificationsView.vue`
 
-### **Fase 3 - UI Completa (Sprint 3)**
-⏳ Página completa de notificações
-⏳ Dashboard de métricas
-⏳ Filtros e busca
-⏳ Preferências do usuário
+### **Detectores — feito, com um achado**
+✅ `NotificationDetector` + 5 cron jobs em `notification-scheduler.service.ts`
+✅ Eventos críticos implementados (código existe e roda)
+❌ **`getUsersByRole('BUYER')`, `getUsersByRole('QUALITY_MANAGER')` e `getUsersByRole('STOCK_MANAGER')` buscam perfis que não existem** — ver seção "Regras por Perfil" acima. `STOCK_BELOW_SAFETY` não entrega a ninguém; `MATERIAL_UNAVAILABLE` e `QUALITY_SCRAP_HIGH` entregam parcialmente (só a parte que já usava `MANAGER`). Não corrigido nesta atualização — é código, não documentação; registrado aqui para quem for tratar.
+⏳ 5º cron job (verificação de capacidade a cada 2h) é um stub — loga "não implementado ainda" e não faz nada.
 
-### **Fase 4 - Refinamento (Sprint 4)**
-⏳ Notificações por email
-⏳ Agrupamento inteligente
-⏳ Testes e ajustes
-⏳ Documentação final
+### **UI — feito**
+✅ Página completa de notificações, ícone com badge, dropdown
+
+### **Pendente de verdade**
+⏳ Notificações por email (`email: Boolean` existe em `NotificationRule`/`NotificationPreference`, mas nenhum código envia email — nenhum `nodemailer` ou equivalente no projeto)
+⏳ Dashboard de métricas (contagens/gráficos descritos abaixo) — não verificado nesta atualização, tratar como não confirmado
+⏳ Agrupamento inteligente de notificações
+
+### **Módulos além do PCP (WMS/YMS) — pendente, registrado em 01/09/2026**
+Todo detector e evento hoje é do núcleo PCP. Quando o WMS (ou outro módulo opcional) tiver seu primeiro evento de notificação real (candidato: reposição de posição de picking, item F4.10 do plano do WMS), seguir `docs/fase-2026-09-modernizacao/04_ARQUITETURA_MODULAR_LICENCIAMENTO.md` seção 3.4: categoria `WAREHOUSE` dedicada (não misturar em `STOCK`), e o detector chama `isModuleEnabled('WMS')` (`backend/src/services/licensed-module.service.ts`, já existe desde a Fase 0 do WMS) **antes** de rodar sua consulta — uma instalação só-PCP não deve gastar ciclo calculando notificação de um módulo que não tem.
 
 ---
 
@@ -298,5 +279,5 @@ npm run prisma:seed-notifications
 
 ---
 
-**Última atualização:** 21/10/2025
-**Versão:** 1.0.0
+**Última atualização:** 01/09/2026 (revisão 2 — verificado contra o código real: perfis de destinatário corrigidos, `STOCK_BELOW_SAFETY` identificado como sem entrega, "Próximos Passos" atualizado, e nota sobre notificações module-aware para quando WMS/YMS tiverem eventos próprios)
+**Versão:** 2.0
