@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
 
 export interface MRPRequirement {
   productId: string;
@@ -253,8 +254,12 @@ export class MRPService {
    */
   private async getAvailableStockBatch(productIds: string[]): Promise<Map<string, number>> {
     // Buscar todas as movimentações de uma vez
+    // F2.2: `TRANSFER` excluído explicitamente. Transferência interna não
+    // altera QUANTO existe do produto (só onde está), e este laço somaria a
+    // quantidade transferida como saída — derrubando o disponível a cada
+    // movimentação de armazém. Ver AGGREGATE_MOVEMENT_TYPES em stock.service.ts.
     const movements = await prisma.stockMovement.findMany({
-      where: { productId: { in: productIds } },
+      where: { productId: { in: productIds }, type: { in: AGGREGATE_MOVEMENT_TYPES } },
       select: { productId: true, type: true, quantity: true }
     });
     

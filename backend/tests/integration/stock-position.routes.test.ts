@@ -64,7 +64,7 @@ describe('Integração: saldo por posição (F1.3/F1.4)', () => {
       quantity: 12.5,
       reason: 'entrada endereçada',
       userId: user.id,
-      positionId: positions[0].id,
+      toPositionId: positions[0].id,
     });
     await stockService.registerMovement({
       productId: other.id,
@@ -72,7 +72,7 @@ describe('Integração: saldo por posição (F1.3/F1.4)', () => {
       quantity: 3,
       reason: 'entrada endereçada de outro produto na mesma posição',
       userId: user.id,
-      positionId: positions[0].id,
+      toPositionId: positions[0].id,
     });
     // Parcela NÃO endereçada do primeiro produto — normal nesta fase.
     await stockService.registerMovement({

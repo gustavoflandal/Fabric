@@ -12,16 +12,23 @@ import { createTestProduct, createTestUser, createTestPositions } from '../helpe
  * Mesma preocupação (e mesmo estilo, com MySQL real) dos testes de concorrência
  * já existentes em `tests/services/stock.service.test.ts`, mas para a dimensão
  * nova: `applyMovement()` agora trava DUAS linhas (agregado + posição) quando a
- * movimentação informa `positionId`, e o modo de falha que estes testes travam
+ * movimentação informa posição, e o modo de falha que estes testes travam
  * é o clássico read-modify-write concorrente — duas transações lerem o mesmo
  * saldo de posição e ambas decidirem que cabem.
  *
+ * ATUALIZADO NA FASE 2 (F2.1): o campo único `positionId` virou o par
+ * `fromPositionId`/`toPositionId`. Os cenários e os números destes testes são
+ * exatamente os mesmos da Fase 1 — só o nome do campo mudou, seguindo a
+ * semântica nova (`IN` → destino, `OUT` → origem). Os testes de `TRANSFER`
+ * (o tipo novo, com as DUAS pontas) vivem em `stock-transfer.service.test.ts`.
+ *
  * Por que chamar o SERVICE direto e não a API: nenhum chamador de produção
- * passa `positionId` ainda (isso só chega nas fases 2 a 4, quando recebimento,
- * contagem e transferência forem endereçados). Sem exercitar o caminho novo
- * aqui, ele entraria em produção sem nenhuma cobertura de concorrência — que é
- * exatamente o cenário em que a race condition original de estoque passou
- * despercebida até acontecer ao vivo.
+ * endereça movimentação ainda (isso só chega nas fases 3 e 4, quando
+ * recebimento e contagem forem endereçados; a transferência da F2.3 tem
+ * endpoint próprio). Sem exercitar o caminho novo aqui, ele entraria em
+ * produção sem nenhuma cobertura de concorrência — que é exatamente o cenário
+ * em que a race condition original de estoque passou despercebida até acontecer
+ * ao vivo.
  *
  * `registerMovement` e `registerMovementInTransaction` são os dois pontos de
  * entrada de `applyMovement`; ambos são exercitados.
@@ -48,7 +55,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
   // Comportamento básico
   // ------------------------------------------------------------------
 
-  it('IN com positionId cria o saldo da posição e mantém o agregado em sincronia', async () => {
+  it('IN com toPositionId cria o saldo da posição e mantém o agregado em sincronia', async () => {
     const product = await createTestProduct();
     const user = await createTestUser();
     const { positions } = await createTestPositions(1);
@@ -59,18 +66,18 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
       quantity: 40,
       reason: 'entrada endereçada',
       userId: user.id,
-      positionId: positions[0].id,
+      toPositionId: positions[0].id,
     });
 
-    // A movimentação registra o endereço (F1.2) - é o que a Fase 2 vai
-    // desdobrar em fromPositionId/toPositionId.
-    expect(movement.positionId).toBe(positions[0].id);
+    // F2.1: a entrada grava só o DESTINO - é ali que a quantidade chegou.
+    expect(movement.toPositionId).toBe(positions[0].id);
+    expect(movement.fromPositionId).toBeNull();
 
     expect(await balanceAt(product.id, positions[0].id)).toBe(40);
     expect((await stockService.getBalance(product.id)).quantity).toBe(40);
   });
 
-  it('movimentação SEM positionId não cria linha de saldo por posição (compatibilidade)', async () => {
+  it('movimentação SEM posição não cria linha de saldo por posição (compatibilidade)', async () => {
     const product = await createTestProduct();
     const user = await createTestUser();
 
@@ -98,7 +105,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
       quantity: 10,
       reason: 'entrada A',
       userId: user.id,
-      positionId: positions[0].id,
+      toPositionId: positions[0].id,
     });
     await stockService.registerMovement({
       productId: product.id,
@@ -106,7 +113,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
       quantity: 90,
       reason: 'entrada B',
       userId: user.id,
-      positionId: positions[1].id,
+      toPositionId: positions[1].id,
     });
 
     // 30 caberia no agregado (100), mas não no endereço A (10). É esta
@@ -118,7 +125,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
         quantity: 30,
         reason: 'saída maior que o saldo da posição',
         userId: user.id,
-        positionId: positions[0].id,
+        fromPositionId: positions[0].id,
       })
     ).rejects.toThrow(/insuficiente na posição/i);
 
@@ -127,7 +134,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
     expect((await stockService.getBalance(product.id)).quantity).toBe(100);
   });
 
-  it('positionId inexistente é erro de negócio (404), não erro de FK cru', async () => {
+  it('posição inexistente é erro de negócio (404), não erro de FK cru', async () => {
     const product = await createTestProduct();
     const user = await createTestUser();
 
@@ -138,9 +145,68 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
         quantity: 5,
         reason: 'endereço inexistente',
         userId: user.id,
-        positionId: '00000000-0000-0000-0000-000000000000',
+        toPositionId: '00000000-0000-0000-0000-000000000000',
       })
     ).rejects.toThrow(/Posição de armazenagem não encontrada/i);
+  });
+
+  // ------------------------------------------------------------------
+  // F2.1 - coerência entre `type` e o par origem/destino
+  // ------------------------------------------------------------------
+
+  it('recusa combinações incoerentes de type × origem/destino (F2.1)', async () => {
+    const product = await createTestProduct();
+    const user = await createTestUser();
+    const { positions } = await createTestPositions(2);
+
+    const base = {
+      productId: product.id,
+      quantity: 5,
+      reason: 'combinação incoerente',
+      userId: user.id,
+    };
+
+    // IN não tem de onde sair.
+    await expect(
+      stockService.registerMovement({
+        ...base,
+        type: 'IN',
+        fromPositionId: positions[0].id,
+      })
+    ).rejects.toThrow(/não pode ter posição de origem/i);
+
+    // OUT não tem para onde ir.
+    await expect(
+      stockService.registerMovement({
+        ...base,
+        type: 'OUT',
+        toPositionId: positions[0].id,
+      })
+    ).rejects.toThrow(/não pode ter posição de destino/i);
+
+    // TRANSFER exige as DUAS pontas - com uma só, debitaria a origem sem
+    // creditar ninguém (material evaporado).
+    await expect(
+      stockService.registerMovement({
+        ...base,
+        type: 'TRANSFER',
+        fromPositionId: positions[0].id,
+      })
+    ).rejects.toThrow(/exige posição de origem .* e de destino/i);
+
+    // ADJUSTMENT endereça UMA posição, nunca duas.
+    await expect(
+      stockService.registerMovement({
+        ...base,
+        type: 'ADJUSTMENT',
+        fromPositionId: positions[0].id,
+        toPositionId: positions[1].id,
+      })
+    ).rejects.toThrow(/Ajuste endereça UMA posição/i);
+
+    // Nenhuma delas pode ter chegado a gravar movimentação ou saldo.
+    expect(await testPrisma.stockMovement.count()).toBe(0);
+    expect(await testPrisma.stockPositionBalance.count()).toBe(0);
   });
 
   // ------------------------------------------------------------------
@@ -163,7 +229,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
         quantity: 50,
         reason: 'entrada inicial endereçada',
         userId: user.id,
-        positionId,
+        toPositionId: positionId,
       });
 
       const attempts = [0, 1].map((i) =>
@@ -173,7 +239,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
           quantity: 30,
           reason: `saída concorrente da posição ${i}`,
           userId: user.id,
-          positionId,
+          fromPositionId: positionId,
         })
       );
 
@@ -215,7 +281,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
         quantity: 10,
         reason: 'entrada inicial endereçada',
         userId: user.id,
-        positionId,
+        toPositionId: positionId,
       });
 
       const attempts = [7, 13].map((quantity) =>
@@ -225,7 +291,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
           quantity,
           reason: `entrada concorrente de ${quantity}`,
           userId: user.id,
-          positionId,
+          toPositionId: positionId,
         })
       );
 
@@ -248,6 +314,9 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
       const { positions } = await createTestPositions(2);
       const [posA, posB] = positions;
 
+      // F2.1: o endereço vai para a coluna que o tipo determina — `IN` credita
+      // o DESTINO, `OUT` debita a ORIGEM. É o mesmo mapeamento que a migration
+      // usou para redistribuir os valores do antigo `positionId`.
       const mov = (
         type: 'IN' | 'OUT',
         quantity: number,
@@ -259,7 +328,8 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
           quantity,
           reason: `${type} ${quantity}${positionId ? ' endereçada' : ' sem endereço'}`,
           userId: user.id,
-          positionId,
+          fromPositionId: type === 'OUT' ? positionId : undefined,
+          toPositionId: type === 'IN' ? positionId : undefined,
         });
 
       await mov('IN', 100, posA.id); // A: 100        | agregado: 100
@@ -279,7 +349,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
           quantity: 15,
           reason: 'entrada endereçada dentro de transação do chamador',
           userId: user.id,
-          positionId: posB.id,
+          toPositionId: posB.id,
         })
       );
 
@@ -316,7 +386,7 @@ describe('saldo por posição — StockPositionBalance (F1.2/F1.5)', () => {
       quantity: 100,
       reason: 'entrada endereçada',
       userId: user.id,
-      positionId: positions[0].id,
+      toPositionId: positions[0].id,
     });
 
     expect(await getDivergences()).toEqual([]);

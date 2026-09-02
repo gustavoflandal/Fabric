@@ -2,8 +2,11 @@ import { Router } from 'express';
 import * as storagePositionController from '../controllers/storage-position.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
-import { validate } from '../middleware/validation.middleware';
-import { updateStoragePositionSchema } from '../validators/storage-position.validator';
+import { validate, validateQuery } from '../middleware/validation.middleware';
+import {
+  updateStoragePositionSchema,
+  positionMovementsQuerySchema,
+} from '../validators/storage-position.validator';
 
 const router = Router();
 
@@ -26,6 +29,28 @@ router.get(
   '/by-code/:code',
   requirePermission('estruturas_armazem', 'visualizar'),
   storagePositionController.getPositionByCode
+);
+
+// F2.4: histórico de movimentação de um endereço (linhas em que a posição é
+// origem OU destino).
+//
+// Declarada antes de '/:structureId' pela mesma razão de '/by-code/:code': não
+// há ambiguidade real (esta rota exige um segundo segmento literal
+// 'movements', a de estrutura tem um segmento só), mas manter as rotas mais
+// específicas acima da paramétrica evita que uma mudança futura em
+// '/:structureId' as capture.
+//
+// `requireModule('WMS')` NÃO aparece aqui: ele já protege este arquivo inteiro
+// no ponto de montagem em routes/index.ts, como todas as rotas de armazém.
+//
+// RBAC: `estruturas_armazem:visualizar`, o mesmo recurso das demais LEITURAS de
+// posição deste arquivo e das leituras de saldo por endereço da Fase 1 — quem
+// pode ver o endereço pode ver o que passou por ele. Nenhum recurso novo.
+router.get(
+  '/:id/movements',
+  requirePermission('estruturas_armazem', 'visualizar'),
+  validateQuery(positionMovementsQuerySchema),
+  storagePositionController.getPositionMovements
 );
 
 // Listar posições de uma estrutura

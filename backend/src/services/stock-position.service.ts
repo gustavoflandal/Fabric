@@ -252,11 +252,15 @@ export interface PositionBalanceDivergence {
  * A regra desta fase é `SUM(StockPositionBalance.quantity) <= StockBalance.quantity`
  * por produto, e **não** `==`. O motivo é concreto: nenhum fluxo de produção
  * informa posição ainda (recebimento, contagem, reserva de produção e as
- * entradas/saídas manuais chamam `applyMovement` sem `positionId`), então o
- * normal, hoje, é o agregado ser MAIOR que a soma endereçada. Essa diferença é
- * saldo legítimo "não endereçado", e vai encolhendo à medida que as fases 2 a 4
- * conectarem cada fluxo ao endereço. Exigir `==` agora acusaria a base inteira
- * como divergente todo dia.
+ * entradas/saídas manuais chamam `applyMovement` sem `fromPositionId`/
+ * `toPositionId`), então o normal, hoje, é o agregado ser MAIOR que a soma
+ * endereçada. Essa diferença é saldo legítimo "não endereçado", e vai
+ * encolhendo à medida que as fases 3 e 4 conectarem cada fluxo ao endereço.
+ * Exigir `==` agora acusaria a base inteira como divergente todo dia.
+ *
+ * A transferência interna (F2.3) é neutra aqui: debita uma posição e credita
+ * outra na mesma transação, sem tocar no agregado — a soma endereçada e o
+ * agregado ficam ambos iguais ao que eram.
  *
  * O que é divergência de verdade é o outro lado: `SUM > agregado` significa que
  * há mais material endereçado do que existe no produto — ou seja, saldo por

@@ -36,3 +36,29 @@ export const updateStoragePositionSchema = Joi.object({
   maxHeight: dimensional('Altura máxima'),
   blocked: Joi.boolean(),
 }).min(1);
+
+/**
+ * F2.4 — `GET /storage-positions/:id/movements`.
+ *
+ * Todos os filtros são opcionais: sem nenhum, a rota devolve o histórico
+ * recente daquele endereço (o recorte já é a própria posição, então não há o
+ * risco de varredura que fez `occupied` exigir escopo na Fase 1).
+ *
+ * `limit` é validado aqui só para recusar lixo explícito (`?limit=abc`,
+ * `?limit=-1`); o teto de fato é aplicado no controller via
+ * `parsePositiveInt(..., 500)`, no mesmo padrão do histórico de produto.
+ *
+ * `.unknown(true)` pelo mesmo motivo de `occupiedPositionsQuerySchema`:
+ * `validateQuery()` não reatribui `req.query` e portanto não consegue aplicar
+ * `stripUnknown` — sem isso, um `?_=timestamp` de cache-busting do cliente
+ * viraria 400.
+ */
+export const positionMovementsQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(500).messages({
+    'number.base': 'limit deve ser um número inteiro',
+    'number.min': 'limit deve ser maior que zero',
+  }),
+  productId: Joi.string().uuid().messages({
+    'string.guid': 'productId deve ser um UUID válido',
+  }),
+}).unknown(true);

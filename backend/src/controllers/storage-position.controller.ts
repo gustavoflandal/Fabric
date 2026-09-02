@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as storagePositionService from '../services/storage-position.service';
+import { parsePositiveInt } from '../utils/validation.util';
 
 export const generatePositions = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -43,6 +44,33 @@ export const getPositionByCode = async (req: Request, res: Response, next: NextF
     res.json({
       success: true,
       data: position
+    });
+  } catch (error: any) {
+    next(error);
+  }
+};
+
+/**
+ * F2.4: histórico de movimentação de um endereço (origem OU destino).
+ *
+ * `limit` passa por `parsePositiveInt` com teto de 500 — mesmo tratamento (e
+ * mesmos números) que `stock.controller.ts::getMovements` já dá ao histórico de
+ * produto, para que os dois históricos não tenham regras de paginação
+ * diferentes.
+ */
+export const getPositionMovements = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { id } = req.params;
+    const limit = parsePositiveInt(req.query.limit, 100, 500);
+
+    const data = await storagePositionService.getPositionMovements(id, {
+      limit,
+      productId: req.query.productId as string | undefined
+    });
+
+    res.json({
+      success: true,
+      data
     });
   } catch (error: any) {
     next(error);

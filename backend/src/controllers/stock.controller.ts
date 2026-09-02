@@ -82,11 +82,42 @@ export class StockController {
     }
   }
 
+  /**
+   * F2.3 — transferência interna entre dois endereços.
+   *
+   * Uma única movimentação `TRANSFER`: debita a origem e credita o destino na
+   * mesma transação, sem tocar no saldo agregado do produto. 201 como as demais
+   * rotas de criação de movimentação deste controller.
+   */
+  async transfer(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.userId;
+      if (!userId) {
+        return res.status(401).json({ status: 'error', message: 'Usuário não autenticado' });
+      }
+
+      const movement = await stockService.transfer({ ...req.body, userId });
+      return res.status(201).json({
+        status: 'success',
+        message: 'Transferência registrada com sucesso',
+        data: movement,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
+   * F2.4 — o histórico de produto ganhou o filtro opcional `?positionId=`:
+   * "o que aconteceu com este produto NESTE endereço". Sem o parâmetro, a
+   * resposta é exatamente a de antes.
+   */
   async getMovements(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { productId } = req.params;
       const limit = parsePositiveInt(req.query.limit, 50, 500);
-      const movements = await stockService.getMovements(productId, limit);
+      const positionId = req.query.positionId as string | undefined;
+      const movements = await stockService.getMovements(productId, limit, positionId);
       return res.status(200).json({ status: 'success', data: movements });
     } catch (error) {
       return next(error);
