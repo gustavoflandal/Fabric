@@ -66,6 +66,18 @@ Consequência prática para o plano do WMS já escrito: as Fases 4 ("Recebimento
 
 **Superfície de API para dispositivo móvel:** decorre diretamente do parágrafo acima. Tarefas de armazém (descarga, conferência, etiquetagem, quarentena, alocação, picking) precisam de endpoints enxutos e orientados a fluxo de trabalho — "minhas tarefas", "iniciar tarefa", "confirmar leitura de código de barras/posição", "concluir etapa" — distintos da API administrativa CRUD que já existe. Essa superfície só existe quando WMS está licenciado (é, ela mesma, parte do módulo). Fica registrado como requisito novo para quando a Fase 4/5 revisada do plano do WMS for desenhada — este documento não especifica os endpoints, só estabelece que essa camada existe e é WMS-only.
 
+### 3.4 Notificações são módulo-aware (adendo pós-Fase 0)
+
+A Fase 0 do plano do WMS já implementou o mecanismo central (`backend/src/services/licensed-module.service.ts`, função `isModuleEnabled(codigo)`, cache em memória carregado no boot). O mesmo mecanismo se aplica ao sistema de notificações, ponto levantado depois da Fase 0 estar pronta: **quando outros módulos estiverem ativos, o sistema de notificação precisa funcionar para eles também** — e, pelo mesmo raciocínio da seção 3.1, uma instalação só-PCP não deve gerar (nem gastar ciclo de CPU calculando) notificações de um módulo que ela não tem.
+
+Verificado em `backend/prisma/schema.prisma` (`model Notification`, linha ~731): `category` hoje só tem valores do núcleo PCP (`PRODUCTION`, `STOCK`, `PURCHASE`, `QUALITY`, `CAPACITY`), e `notification-detector.service.ts` roda seus detectores sem nenhuma checagem de módulo licenciado — porque, até a Fase 0, não havia nenhum evento de WMS para detectar.
+
+Regra a seguir a partir do primeiro detector de notificação de WMS (o primeiro caso concreto é a reposição do item F4.10 do plano do WMS, "quando o saldo da posição de picking cai abaixo de um mínimo, gerar tarefa `REPLENISHMENT`... integrar ao `notification-detector.service.ts` já existente"):
+
+1. Nova categoria dedicada (`WAREHOUSE`, não misturar em `STOCK`) para eventos que só existem com WMS — tarefa de armazém atrasada, posição sem saldo, reposição necessária, etc.
+2. Todo detector cujo evento só faz sentido com um módulo opcional ativo chama `isModuleEnabled('WMS')` (ou o módulo pertinente) **antes** de rodar sua consulta — não depois de gerar a notificação e descartar. Mesmo padrão de "fail-closed" já usado no middleware `requireModule`: módulo não licenciado, o detector nem executa.
+3. `NotificationRule`/`NotificationPreference` (por perfil/usuário) continuam funcionando como hoje — a checagem de módulo é uma camada anterior, não substitui a de preferência do usuário.
+
 ## 4. O que fica para depois (não decidido/feito agora)
 
 - **Se "compras" (orçamentos/pedidos/recebimentos) é PCP-core ou um módulo próprio.** Proposta em aberto: por ora tratar como PCP-core (o recebimento sem WMS já funciona e faz parte do ciclo básico de produção — sem compra não tem matéria-prima). Nenhuma decisão formal tomada; revisitar se aparecer um caso real de cliente que quer produção sem compras formais.
@@ -80,6 +92,7 @@ Consequência prática para o plano do WMS já escrito: as Fases 4 ("Recebimento
 1. Fases 4 e 5 fundidas em uma única fase de "recebimento e separação orientados a tarefa", condicionada a WMS licenciado.
 2. Extensão de `Product` com os campos de armazenagem (peso, volume, embalagem, empilhamento, segregação) como pré-requisito da Fase 4 (`StorageRule` já dependia de capacidade — agora depende também desses campos).
 3. Nota explícita de que, sem WMS licenciado, `PurchaseReceipt` mantém o fluxo linear atual — a ramificação de processo é condicional, não uma migração forçada.
+4. ~~Fases 4 e 5 fundidas~~, ~~extensão de Product~~ e ~~nota sobre fluxo linear~~ — **já incorporados na revisão v2.1** de `WMS_IMPLEMENTATION_ANALYSIS.md`. Pendente ainda: quando o item F4.10 (reposição) for implementado, seguir a seção 3.4 deste documento (categoria `WAREHOUSE`, checagem de `isModuleEnabled('WMS')` antes do detector rodar).
 
 ---
 
