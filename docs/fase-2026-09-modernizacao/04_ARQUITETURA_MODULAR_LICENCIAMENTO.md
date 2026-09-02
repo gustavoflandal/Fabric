@@ -78,10 +78,17 @@ Regra a seguir a partir do primeiro detector de notificação de WMS (o primeiro
 2. Todo detector cujo evento só faz sentido com um módulo opcional ativo chama `isModuleEnabled('WMS')` (ou o módulo pertinente) **antes** de rodar sua consulta — não depois de gerar a notificação e descartar. Mesmo padrão de "fail-closed" já usado no middleware `requireModule`: módulo não licenciado, o detector nem executa.
 3. `NotificationRule`/`NotificationPreference` (por perfil/usuário) continuam funcionando como hoje — a checagem de módulo é uma camada anterior, não substitui a de preferência do usuário.
 
+### 3.5 Compras é módulo licenciável, não PCP-core (decisão de 02/09/2026)
+
+Resolvido: `COMPRAS` (orçamentos/pedidos/recebimentos — `purchase-quotation`/`purchase-order`/`purchase-receipt`) é um módulo licenciável próprio, no mesmo padrão do WMS, **não** parte do núcleo PCP. Um cliente pode ter PCP sem Compras (produção sem gestão formal de compra, ex. matéria-prima entra por outro processo/sistema).
+
+Implicação prática: `requireModule('COMPRAS')` no ponto de montagem das três rotas em `routes/index.ts`, `'COMPRAS'` adicionado a `MODULE_CODES` em `licensed-module.service.ts`, seed com `COMPRAS` habilitado neste ambiente de dev (mesmo raciocínio de `WMS` na Fase 0: desabilitar quebraria rotas que já funcionam e têm teste).
+
+**Dependência entre módulos que isso cria, registrada para não ser esquecida:** a Fase 4 do plano do WMS (recebimento orientado a tarefa) dispara a partir de `PurchaseReceipt`, que agora pertence ao módulo Compras. Se uma instalação tiver WMS licenciado **sem** Compras, as rotas de recebimento simplesmente não existem (404) — não há `PurchaseReceipt` para orquestrar tarefa nenhuma, então o fluxo de recebimento do WMS fica inerte, não quebrado. Não é necessário nenhum `requireModule('COMPRAS')` dentro do código do WMS por causa disso — a dependência já é respeitada pela ausência da rota que dispararia o processo. Mas vale deixar explícito: **WMS com recebimento por tarefa pressupõe Compras também licenciado**, na prática (o picking/separação da Fase 4, ao contrário, não depende de Compras — só de saldo já existente no armazém).
+
 ## 4. O que fica para depois (não decidido/feito agora)
 
-- **Se "compras" (orçamentos/pedidos/recebimentos) é PCP-core ou um módulo próprio.** Proposta em aberto: por ora tratar como PCP-core (o recebimento sem WMS já funciona e faz parte do ciclo básico de produção — sem compra não tem matéria-prima). Nenhuma decisão formal tomada; revisitar se aparecer um caso real de cliente que quer produção sem compras formais.
-- **Especificação dos endpoints de dispositivo móvel** e o desenho exato de `WarehouseTask` para recebimento/picking — depende da revisão das Fases 4/5 do plano do WMS.
+- **Especificação dos endpoints de dispositivo móvel** e o desenho exato de `WarehouseTask` para recebimento/picking — depende da revisão das Fases 4/5 do plano do WMS (já feita, ver seção 5 abaixo).
 - **UI de administração do licenciamento** (tela para o fornecedor ativar/desativar módulo de uma instalação) — hoje basta seed/script; uma tela só se justifica se o processo de onboarding pedir.
 - **Implementação do mecanismo em si** (`LicensedModule`, `requireModule`, endpoint de módulos licenciados, guard de frontend) — este documento descreve o desenho, a implementação é uma tarefa separada, pequena e fundacional, recomendada **antes** de retomar a branch `wms-analise-planejamento` (ou em paralelo, mas sem o WMS assumir nenhum atalho que a torne inviável depois).
 

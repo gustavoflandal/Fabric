@@ -94,10 +94,15 @@ router.use('/mrp', mrpRoutes);
 router.use('/stock', stockRoutes);
 router.use('/reports', reportsRoutes);
 
-// Rotas de compras
-router.use('/purchase-quotations', purchaseQuotationRoutes);
-router.use('/purchase-orders', purchaseOrderRoutes);
-router.use('/purchase-receipts', purchaseReceiptRoutes);
+// ============================================
+// MÓDULO COMPRAS (licenciável por instalação)
+// ============================================
+// Decisão de 02/09/2026 (04_ARQUITETURA_MODULAR_LICENCIAMENTO.md, seção 3.5):
+// compras é módulo próprio, não núcleo PCP — um cliente pode ter produção sem
+// gestão formal de compra. Mesmo padrão de requireModule('WMS') acima.
+router.use('/purchase-quotations', requireModule('COMPRAS'), purchaseQuotationRoutes);
+router.use('/purchase-orders', requireModule('COMPRAS'), purchaseOrderRoutes);
+router.use('/purchase-receipts', requireModule('COMPRAS'), purchaseReceiptRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);

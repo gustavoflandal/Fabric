@@ -17,6 +17,11 @@ async function main() {
   // chave criptográfica.
   //
   // - PCP é o NÚCLEO: sempre habilitado, nunca desligável.
+  // - COMPRAS nasce habilitado NESTE ambiente (decisão de 02/09/2026, seção 3.5
+  //   deste documento: compras é módulo próprio, não PCP-core) — as rotas
+  //   /purchase-quotations, /purchase-orders e /purchase-receipts estão atrás
+  //   de requireModule('COMPRAS') e já funcionam com teste; desabilitar aqui
+  //   quebraria isso. Numa instalação de cliente sem compras formais, `false`.
   // - WMS nasce habilitado NESTE ambiente porque é o módulo em construção — as
   //   rotas /warehouses, /warehouse-structures e /storage-positions estão atrás
   //   de requireModule('WMS') e responderiam 404 se a linha viesse desabilitada.
@@ -31,6 +36,7 @@ async function main() {
   console.log('🧩 Configurando módulos licenciados...');
   const licensedModules = [
     { code: 'PCP', enabled: true, core: true },
+    { code: 'COMPRAS', enabled: true, core: false },
     { code: 'WMS', enabled: true, core: false },
     { code: 'YMS', enabled: false, core: false },
   ];

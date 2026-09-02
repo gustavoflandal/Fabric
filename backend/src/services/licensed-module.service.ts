@@ -21,7 +21,7 @@ import { logger } from '../config/logger';
 // nenhuma rota recebe requireModule('PCP') — checá-lo seria custo por
 // requisição sem benefício, e criaria o risco de derrubar o sistema inteiro por
 // um erro de configuração.
-export const MODULE_CODES = ['PCP', 'WMS', 'YMS'] as const;
+export const MODULE_CODES = ['PCP', 'COMPRAS', 'WMS', 'YMS'] as const;
 export type ModuleCode = (typeof MODULE_CODES)[number];
 
 export const CORE_MODULE: ModuleCode = 'PCP';
