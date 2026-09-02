@@ -1,5 +1,9 @@
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import {
+  SEQUENCE_PREFIXES,
+  nextDocumentNumber,
+} from './document-sequence.service';
 
 export interface CreatePurchaseOrderDto {
   supplierId: string;
@@ -39,11 +43,22 @@ export interface UpdatePurchaseOrderDto {
 }
 
 export class PurchaseOrderService {
+  /**
+   * ✅ F4.7 — `orderNumber` saiu do `count() + 1` para a sequência atômica,
+   * pelo mesmo motivo e com o mesmo mecanismo de `receiptNumber` (ver
+   * `document-sequence.service.ts`). Aplicar aqui foi trivial e valia a pena:
+   * o defeito era idêntico (dois pedidos simultâneos com o mesmo número,
+   * número reciclado após exclusão) e `orderNumber` é a referência que
+   * `PurchaseReceipt`, os relatórios de compra e o `StockMovement` da entrada
+   * usam para amarrar o fluxo inteiro — é o pior lugar do módulo para ter
+   * número duplicado.
+   *
+   * A criação virou `$transaction` SÓ por isso: a sequência precisa de uma
+   * transação para que o lock da linha dure até o COMMIT. Nada mais no método
+   * mudou — o `create` com itens aninhados já era uma operação atômica no
+   * Prisma, agora ela apenas compartilha a transação com a numeração.
+   */
   async create(data: CreatePurchaseOrderDto, createdBy: string) {
-    // Gerar número do pedido
-    const count = await prisma.purchaseOrder.count();
-    const orderNumber = `PC-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
-
     // Calcular total dos itens
     const itemsTotal = data.items.reduce((sum, item) => {
       const itemTotal = item.quantity * item.unitPrice * (1 - (item.discount || 0) / 100);
@@ -54,43 +69,50 @@ export class PurchaseOrderService {
     const totalValue = itemsTotal + (data.shippingCost || 0) - (data.discount || 0);
 
     // Criar pedido com itens
-    const order = await prisma.purchaseOrder.create({
-      data: {
-        orderNumber,
-        supplierId: data.supplierId,
-        quotationId: data.quotationId,
-        expectedDate: new Date(data.expectedDate),
-        paymentTerms: data.paymentTerms,
-        paymentMethod: data.paymentMethod,
-        shippingCost: data.shippingCost || 0,
-        discount: data.discount || 0,
-        totalValue,
-        notes: data.notes,
-        createdBy,
-        items: {
-          create: data.items.map(item => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount || 0,
-            totalPrice: item.quantity * item.unitPrice * (1 - (item.discount || 0) / 100),
-            notes: item.notes,
-          })),
+    const order = await prisma.$transaction(async (tx) => {
+      const orderNumber = await nextDocumentNumber(
+        tx,
+        SEQUENCE_PREFIXES.PURCHASE_ORDER
+      );
+
+      return tx.purchaseOrder.create({
+        data: {
+          orderNumber,
+          supplierId: data.supplierId,
+          quotationId: data.quotationId,
+          expectedDate: new Date(data.expectedDate),
+          paymentTerms: data.paymentTerms,
+          paymentMethod: data.paymentMethod,
+          shippingCost: data.shippingCost || 0,
+          discount: data.discount || 0,
+          totalValue,
+          notes: data.notes,
+          createdBy,
+          items: {
+            create: data.items.map(item => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discount || 0,
+              totalPrice: item.quantity * item.unitPrice * (1 - (item.discount || 0) / 100),
+              notes: item.notes,
+            })),
+          },
         },
-      },
-      include: {
-        supplier: true,
-        quotation: true,
-        items: {
-          include: {
-            product: {
-              include: {
-                unit: true,
+        include: {
+          supplier: true,
+          quotation: true,
+          items: {
+            include: {
+              product: {
+                include: {
+                  unit: true,
+                },
               },
             },
           },
         },
-      },
+      });
     });
 
     return order;

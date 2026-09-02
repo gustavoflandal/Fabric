@@ -6,6 +6,7 @@ import { initializeEventListeners } from './events/listeners';
 import notificationScheduler from './services/notification-scheduler.service';
 import logCleanupJob from './jobs/log-cleanup.job';
 import stockPositionReconciliationJob from './jobs/stock-position-reconciliation.job';
+import replenishmentJob from './jobs/replenishment.job';
 import { loadLicensedModules } from './services/licensed-module.service';
 
 const startServer = async () => {
@@ -41,6 +42,10 @@ const startServer = async () => {
     // O próprio job sai cedo quando o WMS não está licenciado nesta instalação.
     stockPositionReconciliationJob.start();
 
+    // F4.10: reposição da área de picking a partir do pulmão. Mesmo padrão do
+    // job acima — sai cedo sem WMS licenciado.
+    replenishmentJob.start();
+
     // Start server
     app.listen(config.port, () => {
       logger.info(`🚀 Server running on port ${config.port}`);
@@ -59,6 +64,7 @@ process.on('SIGTERM', async () => {
   notificationScheduler.stop();
   logCleanupJob.stop();
   stockPositionReconciliationJob.stop();
+  replenishmentJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
@@ -68,6 +74,7 @@ process.on('SIGINT', async () => {
   notificationScheduler.stop();
   logCleanupJob.stop();
   stockPositionReconciliationJob.stop();
+  replenishmentJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

@@ -4,7 +4,14 @@ import { AppError } from '../middleware/error.middleware';
 export interface CreateNotificationDto {
   userId: string;
   type: 'INFO' | 'WARNING' | 'ERROR' | 'SUCCESS';
-  category: 'PRODUCTION' | 'STOCK' | 'PURCHASE' | 'QUALITY' | 'CAPACITY';
+  // F4.10 / seção 3.4 de `04_ARQUITETURA_MODULAR_LICENCIAMENTO.md`: `WAREHOUSE`
+  // é a categoria dos eventos que SÓ existem com um módulo opcional licenciado
+  // (hoje, WMS) — reposição necessária, tarefa de armazém atrasada, posição sem
+  // saldo. Deliberadamente NÃO é `STOCK`: `NotificationPreference` é por
+  // categoria, e misturar as duas obrigaria o comprador que quer alerta de
+  // estoque baixo a receber tarefa de armazém, e vice-versa. São públicos
+  // diferentes; a categoria é o mecanismo que os separa.
+  category: 'PRODUCTION' | 'STOCK' | 'PURCHASE' | 'QUALITY' | 'CAPACITY' | 'WAREHOUSE';
   eventType: string;
   title: string;
   message: string;
