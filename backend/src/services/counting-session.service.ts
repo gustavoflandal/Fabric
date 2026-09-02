@@ -275,17 +275,45 @@ class CountingSessionService {
       },
     });
 
-    const addressed: PlannedCountingItem[] = balances.map((balance) => ({
-      productId: balance.productId,
-      storagePositionId: balance.storagePositionId,
-      systemQty: balance.quantity,
-      route: {
-        warehouseCode: balance.storagePosition.warehouseCode,
-        streetCode: balance.storagePosition.streetCode,
-        floor: balance.storagePosition.floor,
-        position: balance.storagePosition.position,
-      },
-    }));
+    // ✅ FASE 5 — SOMA POR (PRODUTO, POSIÇÃO), e não uma linha de saldo = um
+    // item de contagem.
+    //
+    // Até a Fase 4 as duas coisas eram a mesma: o índice único garantia UMA
+    // linha por (produto, posição). A Fase 5 acrescentou o lote à chave, então
+    // um produto com dois lotes no mesmo endereço tem agora DUAS linhas — e
+    // mapear uma para uma geraria dois itens de contagem para o mesmo endereço,
+    // pedindo ao contador que contasse a mesma prateleira duas vezes.
+    //
+    // Somar é a tradução correta de "a contagem NÃO ganha dimensão de lote"
+    // (fora de escopo declarado da Fase 5): o contador vê o que sempre viu —
+    // "quantas unidades deste produto há neste endereço" — e o `systemQty`
+    // continua sendo exatamente esse número. Se um dia a contagem passar a
+    // contar por lote, é este agrupamento que deixa de existir.
+    const addressedByKey = new Map<string, PlannedCountingItem>();
+
+    for (const balance of balances) {
+      const key = `${balance.productId}|${balance.storagePositionId}`;
+      const existing = addressedByKey.get(key);
+
+      if (existing) {
+        existing.systemQty = existing.systemQty.plus(balance.quantity);
+        continue;
+      }
+
+      addressedByKey.set(key, {
+        productId: balance.productId,
+        storagePositionId: balance.storagePositionId,
+        systemQty: balance.quantity,
+        route: {
+          warehouseCode: balance.storagePosition.warehouseCode,
+          streetCode: balance.storagePosition.streetCode,
+          floor: balance.storagePosition.floor,
+          position: balance.storagePosition.position,
+        },
+      });
+    }
+
+    const addressed: PlannedCountingItem[] = [...addressedByKey.values()];
 
     // F3.3 — ordena a rota ANTES de numerar (a numeração acontece em `create()`,
     // que já recebe esta lista ordenada).
@@ -341,12 +369,21 @@ class CountingSessionService {
         select: { productId: true, storagePositionId: true, quantity: true },
       });
 
-      const balanceByKey = new Map(
-        balances.map((balance) => [
-          `${balance.productId}|${balance.storagePositionId}`,
-          balance.quantity,
-        ])
-      );
+      // ✅ FASE 5 — SOMA, pelo mesmo motivo de `buildSessionItems()`: com o lote
+      // na chave única, (produto, posição) pode ter mais de uma linha. Um `Map`
+      // montado por `map()` guardaria só a ÚLTIMA delas, e o contador receberia
+      // como `systemQty` o saldo de um lote arbitrário em vez do total do
+      // endereço — divergência fabricada, e silenciosa.
+      const balanceByKey = new Map<string, Prisma.Decimal>();
+
+      for (const balance of balances) {
+        const key = `${balance.productId}|${balance.storagePositionId}`;
+        const accumulated = balanceByKey.get(key);
+        balanceByKey.set(
+          key,
+          accumulated ? accumulated.plus(balance.quantity) : balance.quantity
+        );
+      }
 
       for (const item of addressedItems) {
         // Sem linha de saldo = a posição foi esvaziada entre a criação e a

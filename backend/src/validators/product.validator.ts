@@ -57,6 +57,14 @@ export const createProductSchema = Joi.object({
   }),
   segregationGroup: Joi.string().trim().max(50).allow(null, ''),
 
+  // --- Controle de lote (Fase 5 do plano do WMS) ---------------------------
+  // OPT-IN por produto. Sem `default(true/false)` no schema de propósito: o
+  // default mora na COLUNA (`@default(false)`), e repeti-lo aqui faria um update
+  // parcial que não menciona o campo DESLIGAR o controle de lote de um produto
+  // que o tinha — `updateProductSchema` deriva deste por `fork`, e um `default`
+  // é aplicado pelo Joi mesmo quando a chave está ausente.
+  lotTracked: Joi.boolean(),
+
   active: Joi.boolean().default(true),
 }).with('maxStock', 'minStock');
 

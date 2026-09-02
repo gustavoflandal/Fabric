@@ -329,10 +329,12 @@ describe('counting-session.service — contagem por endereço (Fase 3 do WMS)', 
       });
 
       // Movimentação entre o agendamento e a partida.
-      await testPrisma.stockPositionBalance.update({
-        where: {
-          productId_storagePositionId: { productId: product.id, storagePositionId: positions[0].id },
-        },
+      // Fase 5: `updateMany` filtrando `lotId: null` — a chave única composta
+      // ganhou o lote e o Prisma não aceita `lotId: null` no input dela. O
+      // produto deste teste não controla lote, então existe exatamente UMA
+      // linha sem lote nesta posição e o `updateMany` atinge só ela.
+      await testPrisma.stockPositionBalance.updateMany({
+        where: { productId: product.id, storagePositionId: positions[0].id, lotId: null },
         data: { quantity: 18 },
       });
 
@@ -451,10 +453,8 @@ describe('counting-session.service — contagem por endereço (Fase 3 do WMS)', 
 
       // O saldo DA POSIÇÃO foi debitado, não só o agregado — é isso que a
       // dimensão de endereço acrescenta ao ajuste.
-      const balance = await testPrisma.stockPositionBalance.findUnique({
-        where: {
-          productId_storagePositionId: { productId: product.id, storagePositionId: position.id },
-        },
+      const balance = await testPrisma.stockPositionBalance.findFirst({
+        where: { productId: product.id, storagePositionId: position.id, lotId: null },
       });
       expect(Number(balance?.quantity)).toBe(85);
     });

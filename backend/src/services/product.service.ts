@@ -27,6 +27,17 @@ export interface CreateProductDto {
   packagingType?: string | null;
   maxStackQty?: number | null;
   segregationGroup?: string | null;
+  /**
+   * Fase 5 do plano do WMS — controle de lote OPT-IN por produto. `false` na
+   * coluna, então todo produto existente segue exatamente como antes.
+   *
+   * LIGAR a flag não retroage: o saldo que já estava endereçado continua sem
+   * lote (não há como inventar o número de um lote que ninguém leu), e o
+   * planejamento de picking consome esse estoque legado por último. DESLIGAR
+   * também não apaga nada — os `Lot` e o `lotId` das linhas de saldo continuam
+   * lá, e o produto simplesmente para de exigir lote em novos recebimentos.
+   */
+  lotTracked?: boolean;
   active?: boolean;
 }
 

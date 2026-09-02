@@ -132,6 +132,9 @@ const taskSelect = {
   fromPositionId: true,
   toPositionId: true,
   productId: true,
+  // Fase 5 — o lote que a tarefa movimenta (FEFO no picking, herdado da linha
+  // de origem na reposição). `null` para produto sem `lotTracked`.
+  lotId: true,
   quantity: true,
   priority: true,
   assignedTo: true,
@@ -150,6 +153,10 @@ const taskSelect = {
  * gravado NA TAREFA (produto, quantidade, origem/destino), e esses campos
  * precisam vir da MESMA leitura travada — relê-los por fora do `FOR UPDATE`
  * reabriria a janela de read-then-write que o lock existe para fechar.
+ *
+ * A Fase 5 acrescentou `lotId` pelo MESMO motivo: o lote é parte da descrição do
+ * que a tarefa movimenta (é ele que identifica a linha de saldo por posição),
+ * então tem de vir da leitura travada junto com o resto.
  */
 export type LockedTask = {
   id: string;
@@ -161,6 +168,7 @@ export type LockedTask = {
   version: number;
   startedAt: Date | null;
   productId: string | null;
+  lotId: string | null;
   quantity: Prisma.Decimal | null;
   fromPositionId: string | null;
   toPositionId: string | null;
@@ -264,6 +272,14 @@ export const createReceiptTaskChain = async (
  * do B, e dois operadores podem tocar corredores diferentes ao mesmo tempo. É
  * exatamente o caso que `assertChainOrderResolved` já trata saindo cedo quando
  * `sequence` é nula ("tarefa sem sequência não é barrada por ninguém").
+ *
+ * ✅ FASE 5 — UMA TAREFA POR (componente × posição × LOTE). A granularidade
+ * ficou mais fina pelo mesmo argumento que já sustentava a divisão por posição:
+ * a conclusão da tarefa debita UMA linha de `stock_position_balances`, e com
+ * lote a linha é identificada por (produto, posição, lote). Uma tarefa que
+ * atravessasse dois lotes do mesmo endereço não teria como ser executada por
+ * uma única movimentação — e, pior, esconderia do operador QUAL lote sair, que
+ * é justamente a informação pela qual esta fase existe.
  */
 export const createPickingTasks = async (
   tx: TransactionClient,
@@ -271,6 +287,7 @@ export const createPickingTasks = async (
   allocations: {
     productId: string;
     storagePositionId: string;
+    lotId?: string | null;
     quantity: Prisma.Decimal;
   }[]
 ): Promise<void> => {
@@ -285,6 +302,7 @@ export const createPickingTasks = async (
       reference: productionOrderId,
       referenceType: PRODUCTION_ORDER_TASK_REFERENCE_TYPE,
       productId: allocation.productId,
+      lotId: allocation.lotId ?? null,
       quantity: allocation.quantity,
       fromPositionId: allocation.storagePositionId,
       sequence: null,
@@ -349,7 +367,7 @@ export const loadTaskForUpdate = async (
 ): Promise<LockedTask> => {
   const rows = await tx.$queryRaw<LockedTask[]>`
     SELECT id, type, status, reference, referenceType, sequence, version, startedAt,
-           productId, quantity, fromPositionId, toPositionId, assignedTo
+           productId, lotId, quantity, fromPositionId, toPositionId, assignedTo
     FROM warehouse_tasks
     WHERE id = ${taskId}
     FOR UPDATE
@@ -599,6 +617,11 @@ export const listMyTasks = async (
     select: {
       ...taskSelect,
       product: { select: { id: true, code: true, name: true } },
+      // Fase 5 — o coletor precisa MOSTRAR o lote, não só gravá-lo: a tarefa
+      // diz "tire 30 do lote L-2026-001", e o operador confere a etiqueta.
+      // Sem isso o FEFO decidiria em silêncio e o operador pegaria o palete da
+      // frente.
+      lot: { select: { id: true, lotNumber: true, expiresAt: true } },
       fromPosition: { select: { id: true, code: true } },
       toPosition: { select: { id: true, code: true } },
     },

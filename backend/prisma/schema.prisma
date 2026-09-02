@@ -230,6 +230,9 @@ model Supplier {
 
   quotations     PurchaseQuotation[]
   purchaseOrders PurchaseOrder[]
+  // Fase 5 do WMS: o fornecedor de um lote. Opcional do lado do lote (nem todo
+  // lote vem de compra), por isso aqui e uma lista que pode ficar vazia.
+  lots           Lot[]
 
   @@map("suppliers")
 }
@@ -299,6 +302,20 @@ model Product {
   maxStackQty      Int? // quantas unidades podem ser empilhadas
   segregationGroup String? // grupo de incompatibilidade de armazenagem
 
+  // --- Controle de lote (WMS Fase 5) --------------------------------------
+  // Fase 5 do plano do WMS: lote e OPT-IN POR PRODUTO, nao universal. Um
+  // parafuso nao tem lote; um lote de tinta tem. Toda a mecanica da fase
+  // (captura obrigatoria de `lotNumber` na conferencia do recebimento, FEFO no
+  // picking, bloqueio de saida de lote vencido, terceira dimensao do saldo por
+  // posicao) SO se aplica quando esta flag e `true`.
+  //
+  // `false` por default e a disciplina que todas as fases anteriores seguiram
+  // para MODULO ("sem WMS licenciado, comportamento identico ao de hoje"),
+  // aplicada aqui a PRODUTO: um produto sem lote controlado percorre todos os
+  // fluxos exatamente como antes desta fase, sem uma linha de comportamento
+  // diferente.
+  lotTracked       Boolean @default(false)
+
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,10 +337,59 @@ model Product {
   stockPositionBalances StockPositionBalance[]
   warehouseTasks        WarehouseTask[]
   storageRules          StorageRule[]
+  lots                  Lot[]
 
   @@index([type])
   @@index([active])
   @@map("products")
+}
+
+// Fase 5 do plano do WMS (WMS_IMPLEMENTATION_ANALYSIS.md, secao 5, Fase 5) —
+// LOTE: a terceira dimensao do saldo, depois de produto (Fase 1) e posicao
+// (Fase 1/2).
+//
+// ESCOPO DA UNICIDADE: `@@unique([productId, lotNumber])`, nao `lotNumber`
+// global. Numero de lote e emitido pelo FABRICANTE, nao pelo Fabric — dois
+// fornecedores diferentes podem perfeitamente emitir "L2026-001" para produtos
+// diferentes, e um unique global recusaria o segundo recebimento legitimo.
+//
+// SEM CAMPO DE STATUS, deliberadamente. Nao existe `ACTIVE`/`BLOCKED`/`EXPIRED`
+// aqui: vencimento e DERIVADO de `expiresAt < now()` no momento exato da
+// operacao, nunca um estado armazenado. Um estado armazenado precisaria de um
+// job para transiciona-lo e ficaria dessincronizado entre a virada do dia e a
+// proxima execucao — a data ja e a verdade, e derivar dela e a unica leitura
+// que nunca mente. Bloqueio administrativo/quarentena de lote NAO faz parte
+// desta fase (registrado no plano como fora de escopo).
+//
+// `supplierId` e OPCIONAL: um lote pode nascer de um recebimento de compra (e
+// entao herda o fornecedor do pedido) ou de producao propria/ajuste, que nao
+// tem fornecedor nenhum.
+model Lot {
+  id             String    @id @default(uuid())
+  productId      String
+  lotNumber      String
+  manufacturedAt DateTime?
+  expiresAt      DateTime?
+  supplierId     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // `Restrict` EXPLICITO nos dois lados, mesmo padrao de StockPositionBalance e
+  // StockMovement: apagar produto ou fornecedor nao pode evaporar a
+  // rastreabilidade de um lote que ja circulou no armazem.
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  supplier Supplier? @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  positionBalances StockPositionBalance[]
+  movements        StockMovement[]
+  warehouseTasks   WarehouseTask[]
+
+  @@unique([productId, lotNumber])
+  // O indice do FEFO: `planPickingFromPositions()` ordena os candidatos por
+  // `expiresAt` ascendente.
+  @@index([expiresAt])
+  @@index([supplierId])
+  @@map("lots")
 }
 
 // Saldo de estoque persistido por produto. Antes, o saldo era somado em memoria
@@ -369,14 +435,37 @@ model StockPositionBalance {
   id                String   @id @default(uuid())
   productId         String
   storagePositionId String
+  // Fase 5 — A TERCEIRA DIMENSAO. NULL para produto sem `lotTracked` (e para
+  // todo saldo que ja existia antes desta fase, que a migration deixa
+  // intocado): a coluna nao muda nada para quem nao controla lote.
+  lotId             String?
   quantity          Decimal  @default(0) @db.Decimal(18, 4)
   version           Int      @default(0) // lock otimista, mesmo padrao de StockBalance
   updatedAt         DateTime @updatedAt
 
   product         Product         @relation(fields: [productId], references: [id])
   storagePosition StoragePosition @relation(fields: [storagePositionId], references: [id])
+  // `Restrict` EXPLICITO — o default do Prisma para relacao OPCIONAL seria
+  // `SetNull`, que aqui seria destrutivo: apagar um lote transformaria saldo
+  // rastreado em saldo anonimo na mesma posicao, silenciosamente, e ainda
+  // colidiria com a linha sem lote que talvez ja exista ali.
+  lot             Lot?            @relation(fields: [lotId], references: [id], onDelete: Restrict)
 
-  @@unique([productId, storagePositionId])
+  // Fase 5 — a chave passou de (produto, posicao) para (produto, posicao, lote).
+  // No MySQL, NULL e DISTINTO num indice unico: produto sem lote continua com
+  // exatamente UMA linha por posicao (todas com `lotId` NULL, que o indice nao
+  // conflita), e produto com lote ganha uma linha por lote naquela posicao. E a
+  // mesma tecnica ja usada em `CountingItem` (Fase 3) e no par
+  // `fromPositionId`/`toPositionId` de `StockMovement` (Fase 2).
+  //
+  // CONSEQUENCIA que precisa ficar registrada: por NULL ser distinto, o banco
+  // deixa de garantir sozinho que existe no maximo UMA linha sem lote por
+  // (produto, posicao). Quem garante isso e o lock de `stock_balances` que
+  // `applyMovement()` adquire ANTES de tocar em qualquer linha desta tabela —
+  // todas as escritas de saldo de um produto sao serializadas por ele, entao
+  // duas insercoes concorrentes da mesma linha sem lote nao podem acontecer.
+  // Mexer nessa ordem de lock reabre este buraco; ver a nota em `applyMovement`.
+  @@unique([productId, storagePositionId, lotId])
   // Um indice dedicado por `productId` NAO e declarado: no MySQL/InnoDB o indice
   // unico composto acima ja atende qualquer busca por `productId` (e a coluna
   // mais a esquerda). Criar um segundo indice com o mesmo prefixo so adicionaria
@@ -385,6 +474,10 @@ model StockPositionBalance {
   // nao ha prefixo que o cubra ("o que tem nesta posicao?" e "quais posicoes
   // deste armazem estao ocupadas?").
   @@index([storagePositionId])
+  // "Onde esta este lote?" — a pergunta do recall e do descarte de vencido. Nao
+  // ha prefixo do unico composto que a cubra (`lotId` e a coluna mais a
+  // direita).
+  @@index([lotId])
   @@map("stock_position_balances")
 }
 
@@ -650,6 +743,15 @@ model StockMovement {
   // poderia ficar orfao pela metade.
   fromPositionId    String?
   toPositionId      String?
+  // Fase 5 — LOTE. Campo UNICO, e nao um par `from`/`to` como as posicoes: um
+  // lote nao "vai de A para B". A quantidade que muda de saldo e sempre do
+  // MESMO lote, inclusive num `TRANSFER` (mudar de endereco nao reetiqueta o
+  // material), entao uma coluna basta — e o mesmo desenho que `positionId`
+  // tinha na Fase 1, antes de F2.1 precisar distinguir origem de destino.
+  //
+  // NULL para produto sem `lotTracked` e para toda movimentacao anterior a esta
+  // fase.
+  lotId             String?
   createdAt         DateTime          @default(now())
 
   product         Product          @relation(fields: [productId], references: [id])
@@ -665,6 +767,9 @@ model StockMovement {
   // destino.)
   fromPosition    StoragePosition? @relation("StockMovementFrom", fields: [fromPositionId], references: [id], onDelete: Restrict)
   toPosition      StoragePosition? @relation("StockMovementTo", fields: [toPositionId], references: [id], onDelete: Restrict)
+  // `Restrict` explicito pelo mesmo motivo das posicoes: o historico e trilha de
+  // auditoria e apagar um lote nao pode zerar silenciosamente qual lote saiu.
+  lot             Lot?             @relation(fields: [lotId], references: [id], onDelete: Restrict)
 
   @@index([productId])
   @@index([productId, createdAt])
@@ -678,6 +783,8 @@ model StockMovement {
   // (fromPositionId, toPositionId) nao atenderia a segunda metade da condicao.
   @@index([fromPositionId])
   @@index([toPositionId])
+  // Fase 5 — "todo o historico deste lote", a consulta de recall.
+  @@index([lotId])
   @@map("stock_movements")
 }
 
@@ -835,6 +942,23 @@ model PurchaseReceiptItem {
   acceptedQty Float
   rejectedQty Float   @default(0)
   notes       String?
+
+  // --- Lote capturado na CONFERENCIA (WMS Fase 5) --------------------------
+  // Os tres campos sao preenchidos no MESMO momento e pelo MESMO formulario
+  // conceitual que `acceptedQty`: a conferencia e quando alguem tem a caixa na
+  // mao e le a etiqueta do fabricante. Capturar depois (na alocacao) obrigaria
+  // o operador a reabrir o palete.
+  //
+  // Sao dados do RECEBIMENTO, nao o lote em si: o `Lot` (entidade com saldo
+  // pendurado) so nasce na conclusao da tarefa de ALOCACAO, quando o material
+  // de fato entra no estoque enderecado. Ate la isto e o que foi LIDO na doca.
+  //
+  // Obrigatoriedade de `lotNumber` e por PRODUTO (`Product.lotTracked`),
+  // validada em purchase-receipt.service.ts::create() com AppError — o banco
+  // nao tem como expressar "obrigatorio se a FK apontar para produto com flag".
+  lotNumber      String?
+  manufacturedAt DateTime?
+  expiresAt      DateTime?
 
   receipt   PurchaseReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   orderItem PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
@@ -1529,6 +1653,14 @@ model WarehouseTask {
   productId String?
   quantity  Decimal? @db.Decimal(18, 4) // decisao D2: quantidade nasce Decimal
 
+  // Fase 5 — o LOTE que a tarefa movimenta. Preenchido pelo FEFO na criacao da
+  // tarefa de PICKING (o mesmo momento em que `fromPositionId` e decidido: o
+  // planejamento escolhe de qual endereco E de qual lote tirar) e pela
+  // reposicao, que herda o lote da linha de saldo de origem. NULL para tarefa
+  // de produto sem `lotTracked` e para toda a cadeia de recebimento, onde o
+  // lote mora em `PurchaseReceiptItem` ate a alocacao acontecer.
+  lotId     String?
+
   priority   Int     @default(0)
   assignedTo String?
   // Ordem de execucao dentro da cadeia do MESMO `reference`. Duas tarefas
@@ -1546,6 +1678,8 @@ model WarehouseTask {
   toPosition   StoragePosition? @relation("WarehouseTaskTo", fields: [toPositionId], references: [id], onDelete: Restrict)
   product      Product?         @relation(fields: [productId], references: [id], onDelete: Restrict)
   assignee     User?            @relation("WarehouseTaskAssignee", fields: [assignedTo], references: [id], onDelete: Restrict)
+  // `Restrict` explicito, mesmo motivo das posicoes acima.
+  lot          Lot?             @relation(fields: [lotId], references: [id], onDelete: Restrict)
   putaways     ReceiptPutaway[]
 
   // "As tarefas deste recebimento, em ordem" - a consulta de F4.5.
@@ -1557,6 +1691,7 @@ model WarehouseTask {
   @@index([fromPositionId])
   @@index([toPositionId])
   @@index([productId])
+  @@index([lotId])
   @@map("warehouse_tasks")
 }
 

@@ -34,9 +34,15 @@ import { createTestProduct, createTestUser, createTestPositions } from '../helpe
  * entrada de `applyMovement`; ambos são exercitados.
  */
 
+/**
+ * Fase 5: a chave única virou (produto, posição, LOTE), e o input de chave
+ * composta do Prisma não aceita `lotId: null`. A leitura passa a ser um
+ * `findFirst` filtrando `lotId: null` — que é exatamente "a linha SEM lote
+ * desta posição", a única que existe para os produtos destes testes.
+ */
 const balanceAt = async (productId: string, storagePositionId: string) => {
-  const row = await testPrisma.stockPositionBalance.findUnique({
-    where: { productId_storagePositionId: { productId, storagePositionId } },
+  const row = await testPrisma.stockPositionBalance.findFirst({
+    where: { productId, storagePositionId, lotId: null },
   });
   return row ? Number(row.quantity) : null;
 };

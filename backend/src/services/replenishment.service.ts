@@ -118,6 +118,9 @@ export const detectReplenishmentNeeds = async (): Promise<ReplenishmentNeed[]> =
           minStock: true,
           safetyStock: true,
           maxStock: true,
+          // Fase 5 — decide se a ORIGEM (pulmão) é escolhida por FEFO ou pelo
+          // FIFO de sempre.
+          lotTracked: true,
         },
       },
     },
@@ -188,18 +191,49 @@ export const detectReplenishmentNeeds = async (): Promise<ReplenishmentNeed[]> =
     // de F4.8 e pelo mesmo motivo — consistência entre "de onde sai material"
     // no picking e na reposição; um FIFO no picking alimentado por um LIFO na
     // reposição não seria FIFO nenhum.
-    const source = await prisma.stockPositionBalance.findFirst({
+    //
+    // ✅ FASE 5 — para produto com `lotTracked`, a origem passa a ser escolhida
+    // por FEFO, pelo MESMO argumento de consistência acima: se o picking sai
+    // pelo que vence primeiro, o pulmão tem de alimentar o picking pelo que
+    // vence primeiro — repor com o lote mais longevo enquanto o mais curto
+    // envelhece no pulmão é o oposto do que a fase inteira existe para fazer.
+    //
+    // Lote JÁ VENCIDO é excluído da origem: `applyMovement` recusa `TRANSFER` de
+    // lote vencido, então uma tarefa criada a partir dele nasceria impossível de
+    // executar — e "a tarefa nasce executável ou não nasce" é a regra que este
+    // service já aplica logo abaixo ao limitar a quantidade ao saldo do pulmão.
+    const sourceCandidates = await prisma.stockPositionBalance.findMany({
       where: {
         productId: balance.product.id,
         quantity: { gt: 0 },
         storagePosition: { isPickingArea: false, blocked: false },
+        ...(balance.product.lotTracked
+          ? { OR: [{ lotId: null }, { lot: { OR: [{ expiresAt: null }, { expiresAt: { gte: new Date() } }] } }] }
+          : {}),
       },
       select: {
         quantity: true,
+        lotId: true,
+        lot: { select: { expiresAt: true } },
         storagePosition: { select: { id: true, code: true } },
       },
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      // Sem lote, a query original respondia com `findFirst` e o primeiro do
+      // FIFO já era a resposta; com lote é preciso reordenar em memória (o
+      // MySQL põe NULL primeiro no ASC e "lote sem validade" tem de ficar por
+      // ÚLTIMO — mesmo raciocínio de `planPickingFromPositions`). O teto existe
+      // para essa reordenação não ler o armazém inteiro: o pulmão de um SKU não
+      // tem centenas de endereços, e o FIFO da query já traz os mais antigos.
+      take: balance.product.lotTracked ? 50 : 1,
     });
+
+    const source = balance.product.lotTracked
+      ? [...sourceCandidates].sort((a, b) => {
+          const aExpiry = a.lot?.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY;
+          const bExpiry = b.lot?.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY;
+          return aExpiry - bExpiry;
+        })[0]
+      : sourceCandidates[0];
 
     if (!source) {
       // Sem pulmão: não há tarefa a criar, mas HÁ o que notificar — é o caso em
@@ -234,6 +268,10 @@ export const detectReplenishmentNeeds = async (): Promise<ReplenishmentNeed[]> =
         reference: balance.storagePosition.id,
         referenceType: REPLENISHMENT_TASK_REFERENCE_TYPE,
         productId: balance.product.id,
+        // Fase 5 — o lote HERDADO da linha de saldo de origem. A reposição não
+        // escolhe lote como o picking escolhe: ela move o que está no pulmão, e
+        // qual lote é isso já está decidido pela linha de onde o material sai.
+        lotId: source.lotId,
         quantity,
         fromPositionId: source.storagePosition.id,
         toPositionId: balance.storagePosition.id,

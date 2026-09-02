@@ -25,9 +25,14 @@ import { createTestProduct, createTestUser, createTestPositions } from '../helpe
  *     previne.
  */
 
+/**
+ * Fase 5: a chave única virou (produto, posição, LOTE) e o input de chave
+ * composta do Prisma não aceita `lotId: null` — a leitura da linha SEM lote
+ * passa a ser um `findFirst` com `lotId: null`.
+ */
 const balanceAt = async (productId: string, storagePositionId: string) => {
-  const row = await testPrisma.stockPositionBalance.findUnique({
-    where: { productId_storagePositionId: { productId, storagePositionId } },
+  const row = await testPrisma.stockPositionBalance.findFirst({
+    where: { productId, storagePositionId, lotId: null },
   });
   return row ? Number(row.quantity) : null;
 };
@@ -276,15 +281,11 @@ describe('transferência interna — TRANSFER (F2.3/F2.4)', () => {
       userId: user.id,
     });
 
-    const origemRow = await testPrisma.stockPositionBalance.findUnique({
-      where: {
-        productId_storagePositionId: { productId: product.id, storagePositionId: origem.id },
-      },
+    const origemRow = await testPrisma.stockPositionBalance.findFirst({
+      where: { productId: product.id, storagePositionId: origem.id, lotId: null },
     });
-    const destinoRow = await testPrisma.stockPositionBalance.findUnique({
-      where: {
-        productId_storagePositionId: { productId: product.id, storagePositionId: destino.id },
-      },
+    const destinoRow = await testPrisma.stockPositionBalance.findFirst({
+      where: { productId: product.id, storagePositionId: destino.id, lotId: null },
     });
 
     expect(origemRow!.quantity.toString()).toBe('0.7');
