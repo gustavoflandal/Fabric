@@ -99,7 +99,7 @@ Implicação prática: `requireModule('COMPRAS')` no ponto de montagem das três
 1. Fases 4 e 5 fundidas em uma única fase de "recebimento e separação orientados a tarefa", condicionada a WMS licenciado.
 2. Extensão de `Product` com os campos de armazenagem (peso, volume, embalagem, empilhamento, segregação) como pré-requisito da Fase 4 (`StorageRule` já dependia de capacidade — agora depende também desses campos).
 3. Nota explícita de que, sem WMS licenciado, `PurchaseReceipt` mantém o fluxo linear atual — a ramificação de processo é condicional, não uma migração forçada.
-4. ~~Fases 4 e 5 fundidas~~, ~~extensão de Product~~ e ~~nota sobre fluxo linear~~ — **já incorporados na revisão v2.1** de `WMS_IMPLEMENTATION_ANALYSIS.md`. Pendente ainda: quando o item F4.10 (reposição) for implementado, seguir a seção 3.4 deste documento (categoria `WAREHOUSE`, checagem de `isModuleEnabled('WMS')` antes do detector rodar).
+4. ~~Fases 4 e 5 fundidas~~, ~~extensão de Product~~ e ~~nota sobre fluxo linear~~ — **já incorporados na revisão v2.1** de `WMS_IMPLEMENTATION_ANALYSIS.md`. ~~Pendente ainda: quando o item F4.10 (reposição) for implementado, seguir a seção 3.4 deste documento (categoria `WAREHOUSE`, checagem de `isModuleEnabled('WMS')` antes do detector rodar).~~ — **feito na Fase 4b (02/09/2026)**: `notification-detector.service.ts::checkReplenishmentNeeded()` é o primeiro detector WMS-only do sistema e segue a seção 3.4 nos três pontos (categoria `WAREHOUSE` nova em `CreateNotificationDto`, `isModuleEnabled('WMS')` como primeira linha do método, `NotificationRule`/`NotificationPreference` intocados). A regra em si mora em `replenishment.service.ts` e o agendamento em `jobs/replenishment.job.ts`, que também checa a licença antes de chamar.
 
 ---
 

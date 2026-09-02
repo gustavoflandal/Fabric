@@ -5,6 +5,10 @@ import { eventBus, SystemEvents } from '../events/event-bus';
 import { AppError } from '../middleware/error.middleware';
 import { isModuleEnabled } from './licensed-module.service';
 import {
+  SEQUENCE_PREFIXES,
+  nextDocumentNumber,
+} from './document-sequence.service';
+import {
   RECEIPT_TASK_REFERENCE_TYPE,
   assertChainOrderResolved,
   assertTaskIsOpen,
@@ -113,12 +117,24 @@ export class PurchaseReceiptService {
     // instalação, não filtro por request), então isto não é uma query a mais.
     const wmsEnabled = await isModuleEnabled('WMS');
 
-    // Gerar número do recebimento
-    const count = await prisma.purchaseReceipt.count();
-    const receiptNumber = `REC-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
-
     // Criar recebimento em transação
     const receipt = await prisma.$transaction(async (tx) => {
+      // ✅ F4.7 — NUMERAÇÃO ATÔMICA. Antes era
+      //
+      //     const count = await prisma.purchaseReceipt.count();
+      //     const receiptNumber = `REC-${ano}-${pad(count + 1)}`;
+      //
+      // FORA da transação, com três defeitos (não atômico, reaproveita número
+      // após cancelamento, não reinicia por ano) detalhados em
+      // `document-sequence.service.ts`. A geração passa para DENTRO da
+      // transação e para o primeiro lugar dela: a sequência é o lock mais
+      // externo (ver a nota de ordem de lock naquele arquivo), e segurá-la
+      // enquanto se espera por lock de saldo faria da numeração um gargalo.
+      const receiptNumber = await nextDocumentNumber(
+        tx,
+        SEQUENCE_PREFIXES.PURCHASE_RECEIPT
+      );
+
       // Criar recebimento
       const newReceipt = await tx.purchaseReceipt.create({
         data: {

@@ -4,6 +4,8 @@ import { eventBus, SystemEvents } from '../events/event-bus';
 import notificationDetector from './notification-detector.service';
 import { AppError } from '../middleware/error.middleware';
 import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
+import { isModuleEnabled } from './licensed-module.service';
+import { createPickingTasks } from './warehouse-task.service';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -996,10 +998,141 @@ export class StockServiceRefactored {
   }
 
   /**
+   * F4.8 do plano do WMS — ESCOLHA DA POSIÇÃO DE SAÍDA POR FIFO.
+   *
+   * Devolve, para um componente, DE QUAIS ENDEREÇOS tirar a quantidade pedida.
+   *
+   * CRITÉRIO DE ANTIGUIDADE: `StockPositionBalance.updatedAt` ASC — a linha de
+   * saldo cujo último movimento é o mais antigo sai primeiro. É o que o item do
+   * plano pede e, mais importante, é o melhor sinal de idade que EXISTE no dado
+   * de hoje. As alternativas foram consideradas e são piores:
+   *
+   *   * `StockMovement` mais antigo com `toPositionId = X` seria a data de
+   *     ENTRADA naquele endereço — mais próximo do FIFO ideal, mas exige varrer
+   *     o histórico por posição a cada reserva (o padrão O(n) que a Fase 1
+   *     eliminou) e mesmo assim erra quando a posição recebeu duas entradas em
+   *     datas diferentes: não há como saber qual unidade sai.
+   *   * FEFO (por validade) é o critério certo para quem tem lote/validade —
+   *     e é exatamente por isso que a Decisão D6 do plano deixou lote/validade
+   *     para uma fase condicional posterior. Sem `StockLot`, não há data de
+   *     validade para ordenar. O GANCHO para ela é este método: quando
+   *     `StockLot` existir, é aqui que o `orderBy` muda, e nada mais no fluxo
+   *     de picking precisa saber.
+   *
+   * A honestidade sobre a limitação está registrada de propósito: `updatedAt`
+   * muda a cada movimento na posição, então uma posição que recebeu material
+   * novo "rejuvenesce". É um FIFO POR ENDEREÇO, não por unidade — que é o que
+   * um WMS sem controle de lote consegue prometer.
+   *
+   * DESEMPATE por `id` ASC: duas linhas de saldo com o mesmo `updatedAt`
+   * (perfeitamente possível — duas posições atualizadas na mesma transação)
+   * precisam sair sempre na mesma ordem, senão duas chamadas idênticas geram
+   * planos de separação diferentes.
+   */
+  private async planPickingFromPositions(
+    tx: TransactionClient,
+    productId: string,
+    productCode: string,
+    requiredQty: number
+  ) {
+    const required = new Prisma.Decimal(requiredQty);
+
+    const balances = await tx.stockPositionBalance.findMany({
+      where: {
+        productId,
+        quantity: { gt: 0 },
+        // Posição bloqueada não fornece material: `blocked` é interdição
+        // física (avaria, bloqueio de qualidade), e mandar o operador tirar
+        // material de lá é exatamente o que a flag existe para impedir.
+        storagePosition: { blocked: false },
+      },
+      select: { storagePositionId: true, quantity: true },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    const allocations: {
+      productId: string;
+      storagePositionId: string;
+      quantity: Prisma.Decimal;
+    }[] = [];
+    let remaining = required;
+
+    for (const balance of balances) {
+      if (remaining.lessThanOrEqualTo(0)) break;
+
+      const take = Prisma.Decimal.min(remaining, balance.quantity);
+      allocations.push({
+        productId,
+        storagePositionId: balance.storagePositionId,
+        quantity: take,
+      });
+      remaining = remaining.minus(take);
+    }
+
+    if (remaining.greaterThan(0)) {
+      // Este erro é ESPECÍFICO do modo WMS e não existe no modo sem WMS, onde
+      // só o saldo agregado importa. Ele aparece quando há saldo do produto mas
+      // ele NÃO ESTÁ ENDEREÇADO — o estado normal de uma instalação que
+      // acabou de licenciar o WMS e ainda não endereçou o estoque legado (a
+      // diferença que o job de reconciliação da Fase 1 já reporta como
+      // legítima). A mensagem diz o que fazer, não só que falhou.
+      const addressed = required.minus(remaining);
+      throw new AppError(
+        400,
+        `Saldo endereçado insuficiente para ${productCode}: necessário ` +
+          `${required.toString()}, endereçado ${addressed.toString()}. ` +
+          'Enderece o material antes de separar (o saldo existe, mas não está em nenhuma posição).'
+      );
+    }
+
+    return allocations;
+  }
+
+  /**
    * Reserva estoque para uma ordem de produção
    * ✅ CORREÇÃO RACE CONDITION: Usa transação para garantir atomicidade
+   *
+   * ✅ F4.8 do plano do WMS — este método tem DOIS comportamentos, decididos por
+   * um único branch (`isModuleEnabled('WMS')`), exatamente como
+   * `purchase-receipt.service.ts::create()` faz na entrada. É a mesma disciplina
+   * da Fase 4a aplicada à SAÍDA:
+   *
+   *   SEM WMS licenciado → INALTERADO. Valida o saldo agregado de todos os
+   *     componentes (fail-fast, com lock) e registra as saídas `OUT` sem
+   *     posição. Nenhuma linha deste caminho mudou.
+   *
+   *   COM WMS licenciado → nenhum saldo é debitado. Para cada componente da
+   *     BOM, o FIFO escolhe DE ONDE tirar (`planPickingFromPositions`) e a
+   *     reserva gera tarefas de `PICKING` com `fromPositionId` já definido. O
+   *     débito acontece quando o operador conclui a tarefa
+   *     (`warehouse-task-execution.service.ts`), com `applyMovement` tipo `OUT`
+   *     + `fromPositionId`, na transação da conclusão.
+   *
+   * POR QUE NÃO DEBITAR NA CRIAÇÃO DA TAREFA — é o mesmo argumento de F4.3, do
+   * outro lado do fluxo: o material continua fisicamente na posição até alguém
+   * ir lá tirá-lo. Um saldo que já debitou é um saldo que a próxima contagem
+   * cíclica desmente, e a divergência recai sobre o endereço, que é justamente o
+   * dado que o WMS existe para tornar confiável.
+   *
+   * SOBRE-ALOCAÇÃO CONCORRENTE (limitação conhecida e deliberada): duas ordens
+   * reservadas ao mesmo tempo podem planejar picking da MESMA posição, porque a
+   * criação de tarefa não trava saldo de posição — ela não o altera. As duas
+   * tarefas nascem; a primeira CONCLUSÃO debita e a segunda falha com "estoque
+   * insuficiente na posição", sob o lock de `applyMovement`. Travar as posições
+   * já na reserva seria segurar lock de saldo pelo tempo de vida de um plano de
+   * separação (minutos ou horas até o operador executar) — trocaria uma
+   * exceção rara e recuperável por contenção garantida no armazém inteiro.
+   * O saldo NUNCA fica negativo em nenhum dos casos; o que pode acontecer é uma
+   * tarefa precisar ser replanejada, que é uma decisão de armazém, não um bug de
+   * consistência.
    */
   async reserveForOrder(orderId: string, userId: string) {
+    // F4.8 — O BRANCH. Lido uma vez, ANTES da transação, mesmo padrão de
+    // `purchase-receipt.service.ts::create()`: `isModuleEnabled` bate num cache
+    // em memória carregado no boot, então não é uma query a mais dentro da
+    // transação.
+    const wmsEnabled = await isModuleEnabled('WMS');
+
     return await prisma.$transaction(async (tx) => {
       const order = await tx.productionOrder.findUnique({
         where: { id: orderId },
@@ -1058,6 +1191,51 @@ export class StockServiceRefactored {
         }
       }
 
+      // ✅ F4.8 — CAMINHO COM WMS: nenhum débito aqui. A FASE 1 acima continua
+      // valendo e é útil nos dois modos (não adianta planejar separação de
+      // material que o produto inteiro não tem); o que muda é o que se faz
+      // depois de validar.
+      if (wmsEnabled) {
+        const allocations: {
+          productId: string;
+          storagePositionId: string;
+          quantity: Prisma.Decimal;
+        }[] = [];
+
+        for (const item of requiredItems) {
+          const planned = await this.planPickingFromPositions(
+            tx,
+            item.componentId,
+            item.componentCode,
+            item.requiredQty
+          );
+          allocations.push(...planned);
+        }
+
+        // As tarefas nascem na MESMA transação do planejamento: uma reserva que
+        // "deu certo" sem tarefa nenhuma seria uma ordem que ninguém consegue
+        // separar — mesmo raciocínio da cadeia de recebimento em F4.3.
+        await createPickingTasks(tx, order.id, allocations);
+
+        return {
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          // `mode` explícito para o cliente não ter de inferir o modo pela
+          // ausência de `reservations` — o frontend precisa mostrar telas
+          // diferentes ("material reservado" vs. "separação gerada").
+          mode: 'WMS_PICKING' as const,
+          reservations: [] as unknown[],
+          pickingTasks: allocations.map((allocation) => ({
+            productId: allocation.productId,
+            storagePositionId: allocation.storagePositionId,
+            // Decisão D2: quantidade `Decimal` sai como STRING nos contratos
+            // novos, igual ao resto do WMS.
+            quantity: allocation.quantity.toString(),
+          })),
+          totalItems: allocations.length,
+        };
+      }
+
       // ✅ FASE 2: Todos os estoques validados e travados, agora registrar TODAS as saídas
       const reservations = [];
 
@@ -1078,6 +1256,7 @@ export class StockServiceRefactored {
       return {
         orderId: order.id,
         orderNumber: order.orderNumber,
+        mode: 'DIRECT' as const,
         reservations,
         totalItems: reservations.length,
       };

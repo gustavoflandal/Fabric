@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { CountingPlanStatus, Prisma } from '@prisma/client';
+import { CountingPlanStatus, PositionType, Prisma } from '@prisma/client';
 import { testPrisma } from './db';
 
 let unitCounter = 0;
@@ -13,7 +13,28 @@ export async function createTestUnit() {
   });
 }
 
-export async function createTestProduct(overrides: Partial<{ minStock: number; safetyStock: number }> = {}) {
+/**
+ * F4.6/F4.10 (Fase 4b): os campos de armazenagem da F0.9 (`weight`,
+ * `maxStackQty`, `segregationGroup`, dimensões) e `maxStock` entraram nos
+ * overrides — são exatamente as entradas da regra de sugestão de endereço e da
+ * regra de reposição. Continuam OPCIONAIS: todo teste anterior a esta fase
+ * segue criando o mesmo produto sem nenhum dado físico, que é também o cenário
+ * de quem acabou de licenciar o WMS.
+ */
+export async function createTestProduct(
+  overrides: Partial<{
+    minStock: number;
+    safetyStock: number;
+    maxStock: number;
+    categoryId: string;
+    weight: number;
+    width: number;
+    height: number;
+    depth: number;
+    maxStackQty: number;
+    segregationGroup: string;
+  }> = {}
+) {
   productCounter += 1;
   const unit = await createTestUnit();
   return testPrisma.product.create({
@@ -24,8 +45,77 @@ export async function createTestProduct(overrides: Partial<{ minStock: number; s
       unitId: unit.id,
       minStock: overrides.minStock ?? 0,
       safetyStock: overrides.safetyStock ?? 0,
+      maxStock: overrides.maxStock ?? null,
+      categoryId: overrides.categoryId ?? null,
+      weight: overrides.weight ?? null,
+      width: overrides.width ?? null,
+      height: overrides.height ?? null,
+      depth: overrides.depth ?? null,
+      maxStackQty: overrides.maxStackQty ?? null,
+      segregationGroup: overrides.segregationGroup ?? null,
     },
   });
+}
+
+let categoryCounter = 0;
+
+/** F4.6: categoria de produto — o outro escopo possível de uma `StorageRule`. */
+export async function createTestCategory() {
+  categoryCounter += 1;
+  return testPrisma.productCategory.create({
+    data: { code: `CAT-TEST-${categoryCounter}`, name: `Categoria de Teste ${categoryCounter}` },
+  });
+}
+
+let bomCounter = 0;
+
+/**
+ * F4.8: ordem de produção com BOM ativa — o gatilho de
+ * `stock.service.ts::reserveForOrder()` nos dois modos (com e sem WMS).
+ *
+ * `scrapFactor` fica em 0 por padrão para que a quantidade necessária seja
+ * exatamente `bomQty * orderQty`: um fator de refugo faria toda asserção de
+ * quantidade dos testes carregar uma multiplicação que não é o que está sendo
+ * verificado.
+ */
+export async function createTestProductionOrderWithBom(
+  createdBy: string,
+  components: { productId: string; quantity: number }[],
+  orderQuantity = 1
+) {
+  bomCounter += 1;
+  const finished = await createTestProduct();
+  const unit = await createTestUnit();
+
+  await testPrisma.bOM.create({
+    data: {
+      productId: finished.id,
+      version: 1,
+      active: true,
+      items: {
+        create: components.map((component, index) => ({
+          componentId: component.productId,
+          quantity: component.quantity,
+          unitId: unit.id,
+          scrapFactor: 0,
+          sequence: index + 1,
+        })),
+      },
+    },
+  });
+
+  const order = await testPrisma.productionOrder.create({
+    data: {
+      orderNumber: `OP-TEST-${bomCounter}`,
+      productId: finished.id,
+      quantity: orderQuantity,
+      scheduledStart: new Date(),
+      scheduledEnd: new Date(Date.now() + 86400000),
+      createdBy,
+    },
+  });
+
+  return { finished, order };
 }
 
 export async function createTestUser() {
@@ -130,7 +220,24 @@ let warehouseCounter = 0;
  * `buildPositionCode()` (F0.1) — aqui em linha, e não importando o service, para
  * que a fixture não dependa da implementação que alguns testes verificam.
  */
-export async function createTestPositions(count = 2, options: { floors?: number; streetCode?: string } = {}) {
+export async function createTestPositions(
+  count = 2,
+  options: {
+    floors?: number;
+    streetCode?: string;
+    /**
+     * F4.10: marca as posições geradas como ÁREA DE PICKING. Default `false` —
+     * o mesmo default da coluna, então toda fixture anterior a esta fase
+     * continua gerando exatamente as posições de pulmão que sempre gerou e
+     * nenhum teste antigo passa a disparar reposição.
+     */
+    isPickingArea?: boolean;
+    /** F4.6: a regra de sugestão filtra candidatas por tipo de posição. */
+    positionType?: PositionType;
+    /** F4.6: capacidade de peso da posição (checagem de capacidade). */
+    weightCapacity?: number;
+  } = {}
+) {
   warehouseCounter += 1;
   const warehouseCode = `WH${warehouseCounter}`;
   // F3.3: `floors` permite montar a rota serpentina (a direção de leitura das
@@ -138,6 +245,9 @@ export async function createTestPositions(count = 2, options: { floors?: number;
   // o andar 1 e os testes delas continuam vendo exatamente a mesma árvore.
   const floors = options.floors ?? 1;
   const streetCode = options.streetCode ?? 'R01';
+  const positionType = options.positionType ?? 'PORTA_PALETES';
+  const weightCapacity = options.weightCapacity ?? 1000;
+  const isPickingArea = options.isPickingArea ?? false;
 
   const warehouse = await testPrisma.warehouse.create({
     data: { code: warehouseCode, name: `Armazém de Teste ${warehouseCounter}` },
@@ -149,8 +259,8 @@ export async function createTestPositions(count = 2, options: { floors?: number;
       streetCode,
       floors,
       positions: count,
-      positionType: 'PORTA_PALETES',
-      weightCapacity: 1000,
+      positionType,
+      weightCapacity,
       height: 2,
       width: 1.2,
       depth: 1.1,
@@ -170,12 +280,13 @@ export async function createTestPositions(count = 2, options: { floors?: number;
             streetCode,
             floor,
             position,
-            positionType: 'PORTA_PALETES',
-            weightCapacity: 1000,
+            positionType,
+            weightCapacity,
             height: 2,
             width: 1.2,
             depth: 1.1,
             maxHeight: 1.8,
+            isPickingArea,
           },
         })
       );

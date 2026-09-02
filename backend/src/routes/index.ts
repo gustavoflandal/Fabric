@@ -29,6 +29,7 @@ import warehouseStructureRoutes from './warehouse-structure.routes';
 import storagePositionRoutes from './storage-position.routes';
 import stockPositionRoutes from './stock-position.routes';
 import warehouseTaskRoutes from './warehouse-task.routes';
+import storageRuleRoutes from './storage-rule.routes';
 import systemRoutes from './system.routes';
 import { requireModule } from '../middleware/module.middleware';
 
@@ -83,6 +84,9 @@ router.use('/stock-positions', requireModule('WMS'), stockPositionRoutes);
 // dispararia o processo (seção 3.5), e o resto da superfície de tarefa (PICKING
 // na Fase 4b) não depende de compras.
 router.use('/warehouse-tasks', requireModule('WMS'), warehouseTaskRoutes);
+// F4.6: regras de armazenagem e sugestão de endereço. Mesmo requireModule('WMS')
+// — uma regra sobre QUAL endereço usar não significa nada sem endereço.
+router.use('/storage-rules', requireModule('WMS'), storageRuleRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);

@@ -122,6 +122,18 @@ async function main() {
     { resource: 'estruturas_armazem', action: 'excluir_posicoes', description: 'Excluir posições de armazenagem' },
     { resource: 'storage_positions', action: 'update', description: 'Editar posições de armazenagem' },
 
+    // Tarefas de Armazém (WMS - Fase 4b, F4.9/F4.11)
+    // Recurso NOVO, e não reaproveitamento de `recebimentos_compra` como na
+    // Fase 4a: tarefa de PICKING nasce de ordem de produção e tarefa de
+    // REPLENISHMENT não nasce de documento nenhum - exigir permissão de
+    // COMPRAS de um operador de separação obrigaria a instalação a dar acesso
+    // a um módulo que ela pode nem ter licenciado.
+    // Três ações porque são três poderes distintos: ver a fila, executar o
+    // trabalho, e distribuir trabalho para os outros (supervisor).
+    { resource: 'tarefas_armazem', action: 'visualizar', description: 'Visualizar tarefas de armazém' },
+    { resource: 'tarefas_armazem', action: 'executar', description: 'Executar tarefas de armazém (iniciar, conferir leitura, concluir)' },
+    { resource: 'tarefas_armazem', action: 'atribuir', description: 'Atribuir tarefas de armazém a operadores' },
+
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
     { resource: 'suppliers', action: 'read', description: 'Visualizar fornecedores' },
@@ -321,6 +333,9 @@ async function main() {
     armazens: ['visualizar', 'criar', 'editar'],
     estruturas_armazem: ['visualizar', 'criar', 'editar', 'gerar_posicoes'],
     storage_positions: ['update'],
+    // F4.9: o MANAGER é quem distribui trabalho no armazém (`atribuir`), além
+    // de ver e poder executar.
+    tarefas_armazem: ['visualizar', 'executar', 'atribuir'],
     planos_contagem: ['visualizar', 'criar', 'editar', 'ativar', 'pausar'],
     sessoes_contagem: ['visualizar', 'criar', 'iniciar', 'completar', 'cancelar'],
     contagem: ['executar', 'recontar', 'aprovar_divergencia'],
@@ -349,6 +364,10 @@ async function main() {
     armazens: ['visualizar'],
     estruturas_armazem: ['visualizar'],
     storage_positions: ['update'],
+    // F4.9: o OPERATOR vê a fila e executa; NÃO atribui (mesmo critério que já
+    // separa `contagem:executar` de `contagem:aprovar_divergencia` - distribuir
+    // trabalho é decisão de supervisão, não de execução).
+    tarefas_armazem: ['visualizar', 'executar'],
     planos_contagem: ['visualizar'],
     sessoes_contagem: ['visualizar', 'iniciar'],
     contagem: ['executar', 'recontar'],

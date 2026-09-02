@@ -319,6 +319,7 @@ model Product {
   stockBalance          StockBalance?
   stockPositionBalances StockPositionBalance[]
   warehouseTasks        WarehouseTask[]
+  storageRules          StorageRule[]
 
   @@index([type])
   @@index([active])
@@ -397,6 +398,8 @@ model ProductCategory {
   parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children ProductCategory[] @relation("CategoryHierarchy")
   products Product[]
+  // F4.6: regra de armazenagem por CATEGORIA (ver `StorageRule`).
+  storageRules StorageRule[]
 
   @@map("product_categories")
 }
@@ -1288,6 +1291,22 @@ model StoragePosition {
   // nenhum codigo jamais escrevia; mante-la seria criar uma fonte de divergencia
   // com o saldo real. Ocupacao passa a ser derivada da existencia de saldo na
   // posicao (StockPositionBalance, Fase 1).
+  //
+  // F4.10 (Fase 4b) - AREA DE PICKING vs. PULMAO. Ate aqui o schema nao tinha
+  // como distinguir as duas coisas, e a reposicao e exatamente a regra que
+  // precisa dessa distincao ("o saldo da posicao de picking caiu abaixo do
+  // minimo -> traga material do pulmao").
+  //
+  // Um BOOLEAN, e nao um `PositionRole` enum de tres valores
+  // (PICKING/PULMAO/AMBOS): a decisao de reposicao so pergunta "esta posicao e
+  // de picking?" (destino) e "esta NAO e de picking?" (origem candidata). Um
+  // terceiro valor nao mudaria nenhuma das duas respostas e criaria estado que
+  // nenhum codigo le. Tambem NAO virou campo de `WarehouseStructure` (com
+  // propagacao na geracao de posicoes): area de picking e recorte fisico do
+  // endereco - e comum uma mesma rua ter o nivel do chao como picking e os
+  // niveis superiores como pulmao -, entao herdar da estrutura estaria errado
+  // no caso mais comum. Editavel em PUT /storage-positions/position/:id.
+  isPickingArea  Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -1312,6 +1331,10 @@ model StoragePosition {
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])
   @@index([blocked])
+  // F4.10: "quais posicoes de picking existem?" - a varredura do detector de
+  // reposicao. Composto com `blocked` porque posicao bloqueada nunca e
+  // candidata (nem a receber reposicao, nem a fornece-la).
+  @@index([isPickingArea, blocked])
   @@map("storage_positions")
 }
 
@@ -1341,22 +1364,96 @@ enum PositionType {
 }
 
 // ============================================
+// REGRAS DE ARMAZENAGEM (WMS - Fase 4b)
+// ============================================
+
+// F4.6 do plano do WMS (WMS_IMPLEMENTATION_ANALYSIS.md, secao 5, Fase 4).
+//
+// Regra de SUGESTAO de endereco. Substitui a ideia de `ProductLocation`
+// (endereco fixo por produto), descartada na secao 6 do plano: endereco fixo
+// conflita com saldo por posicao e nao sabe responder "e se essa posicao estiver
+// cheia?".
+//
+// ESCOPO DA REGRA - `productId` XOR `categoryId`:
+//   * regra de PRODUTO ganha da regra de CATEGORIA (mais especifica);
+//   * dentro do mesmo escopo, `priority` DESC decide;
+//   * os dois preenchidos ao mesmo tempo, ou nenhum dos dois, e recusado em
+//     `storage-rule.service.ts` e no validator Joi. A invariante NAO virou
+//     CHECK constraint no banco de proposito: o Prisma 5 nao modela CHECK, e
+//     uma constraint que existe no banco mas nao no `schema.prisma` e
+//     exatamente o tipo de coisa que faz `prisma migrate dev` reportar drift
+//     numa fase futura. E o mesmo criterio ja usado em `ReceiptPutaway`
+//     (`SUM <= acceptedQty` garantido por lock, nao por constraint) e na
+//     obrigatoriedade condicional de dimensao por `positionType` (validator).
+//
+// `positionType` NULO = "qualquer tipo de posicao serve". Nao e um filtro
+// obrigatorio porque a maioria das regras reais e sobre O QUE armazenar junto
+// (segregacao) e nao sobre o tipo de rack.
+model StorageRule {
+  id           String        @id @default(uuid())
+  productId    String?
+  categoryId   String?
+  positionType PositionType?
+  priority     Int           @default(0)
+
+  // F4.6 - resolve o `// TODO Fase 4b` deixado em `warehouse-task.service.ts`:
+  // ate aqui a tarefa de QUARENTENA era gerada SEMPRE, porque nao existia
+  // nenhum lugar onde declarar que um produto/categoria exige (ou dispensa)
+  // inspecao antes de enderecar. Este e esse lugar.
+  //
+  // Default `false` com um fallback SEGURO na ausencia de regra: sem nenhuma
+  // regra aplicavel ao produto, a cadeia continua gerando QUARENTENA (o
+  // comportamento da Fase 4a, inalterado para quem nao configurou nada). O
+  // campo so DISPENSA a etapa quando alguem escreveu uma regra dizendo isso -
+  // ou a exige quando a regra e `true` e o default do sistema mudar um dia.
+  // Ver `resolveQuarantineRequirement()` em `storage-rule.service.ts`.
+  requiresQuarantine Boolean @default(false)
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // RESTRICT explicito nas DUAS FKs opcionais, pelo mesmo motivo de
+  // `WarehouseTask.fromPositionId`: o default do Prisma para relacao opcional e
+  // `SetNull`, que transformaria silenciosamente uma regra de produto numa
+  // regra orfa - sem escopo nenhum e, portanto, aplicavel a nada (ou, pior, a
+  // tudo, dependendo de como a consulta fosse escrita).
+  product  Product?         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  category ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  // Os dois indices que a resolucao de regra usa, na ordem em que ela consulta:
+  // primeiro a regra do produto, depois a da categoria - as duas filtrando por
+  // `active` e ordenando por `priority`.
+  @@index([productId, active, priority])
+  @@index([categoryId, active, priority])
+  @@map("storage_rules")
+}
+
+// ============================================
 // TAREFAS DE ARMAZEM (WMS - Fase 4a)
 // ============================================
 
 // F4.1 do plano do WMS (WMS_IMPLEMENTATION_ANALYSIS.md, secao 5, Fase 4) +
 // secao 3.3 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md.
 //
-// So os CINCO tipos da cadeia de RECEBIMENTO nesta metade da fase. PICKING,
-// TRANSFER, REPLENISHMENT e COUNTING chegam na Fase 4b (F4.6+) - o enum e
-// aditivo, adicionar valor depois e uma migration trivial, e declarar valor que
-// nenhum codigo produz seria enum morto no banco.
+// Os CINCO primeiros sao a cadeia de RECEBIMENTO (Fase 4a).
+//
+// Fase 4b acrescenta DOIS, e so dois: `PICKING` (F4.8 - saida de material para
+// ordem de producao, com posicao de origem escolhida por FIFO) e
+// `REPLENISHMENT` (F4.10 - reposicao do pulmao para a area de picking).
+// `TRANSFER` e `COUNTING` continuam FORA pela mesma regra da Fase 4a: nenhum
+// codigo os produz. Transferencia entre enderecos ja e um caso resolvido de
+// `stock.service.ts::transfer()` (F2.3) sem tarefa nenhuma, e a contagem
+// ciclica tem seu proprio ciclo de vida (`CountingSession`/`CountingItem`, Fase
+// 3) - declarar os dois aqui seria enum morto no banco.
 enum WarehouseTaskType {
   DESCARGA
   CONFERENCIA
   ETIQUETAGEM
   QUARENTENA
   ALOCACAO
+  PICKING
+  REPLENISHMENT
 }
 
 // DECISAO DE DESENHO (F4.1) - por que exatamente estes quatro valores:
@@ -1398,13 +1495,26 @@ model WarehouseTask {
   // Nesta fase o unico par produzido e
   // (`reference` = PurchaseReceipt.id, `referenceType` = 'PURCHASE_RECEIPT').
   reference     String?
-  referenceType String? // PURCHASE_RECEIPT (Fase 4a); PICKING/SHIPPING na 4b
+  // PURCHASE_RECEIPT (Fase 4a, `reference` = PurchaseReceipt.id)
+  // PRODUCTION_ORDER (F4.8, `reference` = ProductionOrder.id)
+  // REPLENISHMENT (F4.10, `reference` = StoragePosition.id da posicao de
+  //   picking que disparou a reposicao - a tarefa nao tem documento por tras,
+  //   o "documento" e o proprio endereco que ficou abaixo do minimo)
+  referenceType String?
 
   // Posicoes de origem/destino OPCIONAIS: na cadeia de recebimento nenhuma
   // tarefa nasce com posicao. Em particular a de ALOCACAO NAO tem
   // `toPositionId` - quem aloca escolhe o endereco ao CONCLUIR a tarefa (e o
   // resultado vira `ReceiptPutaway`, que suporta mais de um endereco por item;
   // uma coluna unica aqui nem conseguiria representar isso).
+  //
+  // F4.8/F4.10 (Fase 4b) invertem essa assimetria, e e proposital: a tarefa de
+  // PICKING nasce com `fromPositionId` JA definido (o FIFO escolhe de onde
+  // tirar no momento em que a ordem e reservada; o destino e a producao, que
+  // nao e endereco) e a de REPLENISHMENT nasce com os DOIS (pulmao -> picking).
+  // Ou seja: na entrada o destino fica em aberto, na saida a origem ja esta
+  // fechada. Sao os dois lados do mesmo principio - a posicao e definida
+  // no momento em que ha informacao para decidi-la.
   // `Restrict` EXPLICITO nos dois lados - o default do Prisma para relacao
   // opcional e `SetNull`, que apagaria silenciosamente o endereco de uma
   // trilha de execucao. Mesmo motivo detalhado em `StockMovement`.
@@ -1488,6 +1598,45 @@ model ReceiptPutaway {
   @@index([taskId])
   @@index([userId])
   @@map("receipt_putaways")
+}
+
+// ============================================
+// NUMERACAO DE DOCUMENTOS (Fase 4b - F4.7)
+// ============================================
+
+// F4.7 do plano do WMS ("qualquer numero sequencial novo, e de quebra
+// `receiptNumber`, sai do padrao `count() + 1`").
+//
+// O QUE ESTAVA ERRADO no `count() + 1` (dois bugs, nao um):
+//   1. NAO E ATOMICO. Dois recebimentos simultaneos contavam a mesma coisa e
+//      geravam o MESMO `REC-2026-0007`. Como `receiptNumber` nao tem unique
+//      constraint, o banco aceitava os dois e o sistema ficava com dois
+//      documentos de mesmo numero - divergencia silenciosa, do tipo que so
+//      aparece na conciliacao fiscal.
+//   2. REAPROVEITA NUMERO. `count()` conta linhas EXISTENTES: cancelar o
+//      recebimento 7 fazia o proximo nascer 7 de novo. Numero de documento nao
+//      pode ser reciclado.
+//
+// COMO ESTA TABELA RESOLVE: `nextValue` e um contador que so ANDA PARA FRENTE,
+// nunca conta linhas. O incremento e um `UPDATE ... SET nextValue = nextValue+1
+// WHERE code = ?` dentro da transacao do chamador - o UPDATE pega lock
+// exclusivo da linha e o segura ate o COMMIT, entao a segunda transacao
+// concorrente ESPERA e le o valor ja incrementado. Nao ha janela de
+// read-then-write. Ver `document-sequence.service.ts`.
+//
+// `code` e a PK (nao ha `id` uuid): a chave natural E o identificador, e usa-la
+// como PK e o que torna o `INSERT ... ON DUPLICATE KEY UPDATE` de criacao
+// preguicosa da sequencia uma operacao unica e sem corrida.
+model DocumentSequence {
+  // Uma sequencia por PREFIXO E ANO (`REC-2026`, `PC-2026`) - a numeracao
+  // reinicia a cada ano, que e o que o formato `REC-AAAA-NNNN` ja prometia e o
+  // `count()` nunca cumpriu (ele contava o historico inteiro, entao o primeiro
+  // documento de 2027 nascia com o numero do ultimo de 2026 + 1).
+  code      String   @id
+  nextValue Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  @@map("document_sequences")
 }
 
 // ============================================

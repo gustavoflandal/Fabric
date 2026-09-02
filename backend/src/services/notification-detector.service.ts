@@ -1,12 +1,31 @@
 import { prisma } from '../config/database';
 import notificationService from './notification.service';
 import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
+import { isModuleEnabled } from './licensed-module.service';
+import { detectReplenishmentNeeds } from './replenishment.service';
 
 /**
  * Service responsável por detectar eventos e criar notificações automaticamente
+ *
+ * F4.10 / seção 3.4 de `04_ARQUITETURA_MODULAR_LICENCIAMENTO.md` — NOTIFICAÇÃO
+ * MÓDULO-AWARE. `checkReplenishmentNeeded()` é o PRIMEIRO detector de um evento
+ * que só existe com um módulo opcional licenciado, e por isso é ele que
+ * estabelece o padrão aqui:
+ *
+ *   1. categoria dedicada `WAREHOUSE` (nunca `STOCK` — ver a nota no método);
+ *   2. `isModuleEnabled('WMS')` ANTES da consulta, não depois de gerar a
+ *      notificação e descartar (fail-closed, mesma semântica de
+ *      `requireModule`);
+ *   3. `NotificationRule`/`NotificationPreference` continuam valendo por cima —
+ *      a checagem de módulo é uma camada anterior, não um substituto.
+ *
+ * Os detectores que já existiam (produção, estoque, qualidade) NÃO ganharam
+ * checagem de módulo: todos são do núcleo PCP, que está sempre habilitado, e
+ * `requireModule('PCP')` é explicitamente algo que o projeto decidiu não fazer
+ * em lugar nenhum.
  */
 export class NotificationDetectorService {
-  
+
   /**
    * Detectar ordens de produção atrasadas
    */
@@ -358,6 +377,113 @@ export class NotificationDetectorService {
         }
       }
     }
+  }
+
+  /**
+   * F4.10 — REPOSIÇÃO NECESSÁRIA (primeiro detector WMS-only do sistema).
+   *
+   * `isModuleEnabled('WMS')` é a PRIMEIRA linha, antes de qualquer consulta:
+   * uma instalação só-PCP não tem posição de picking, não teria o que
+   * encontrar, e não deve gastar uma varredura de `stock_position_balances`
+   * para descobrir isso a cada 30 minutos.
+   *
+   * CATEGORIA `WAREHOUSE`, NÃO `STOCK` — a seção 3.4 do documento de
+   * licenciamento pede isso, e o motivo prático aparece do lado do usuário:
+   * `NotificationPreference` é POR CATEGORIA. Enfiar reposição em `STOCK`
+   * obrigaria o comprador que quer alerta de estoque baixo a receber também
+   * tarefa de armazém, e o operador de armazém que só quer reposição a receber
+   * o alerta de compras. São públicos diferentes; categoria é justamente o
+   * mecanismo que os separa.
+   *
+   * DEDUPE EM DUAS CAMADAS, uma por natureza de problema:
+   *   * a TAREFA é deduplicada em `replenishment.service.ts` (não cria uma nova
+   *     enquanto houver reposição aberta para o mesmo produto/posição);
+   *   * a NOTIFICAÇÃO é deduplicada por `checkRecentNotification` em 6h, o mesmo
+   *     intervalo de `BOTTLENECK_DETECTED` — reposição é operacional e urgente,
+   *     as 24h do estoque baixo deixariam o supervisor sem aviso durante um
+   *     turno inteiro.
+   *
+   * Notifica MANAGER: é o mesmo público de todos os outros detectores, e o
+   * projeto já registrou (correções de 01/09/2026) que inventar `roleCode` que
+   * não existe no seed produz notificação sem nenhum destinatário. Um perfil
+   * `WAREHOUSE_SUPERVISOR` seria o alvo certo no dia em que existir — e o
+   * operador que vai executar já é alcançado pelo caminho que importa, a
+   * própria tarefa aparecendo em `GET /warehouse-tasks/my`.
+   */
+  async checkReplenishmentNeeded() {
+    if (!(await isModuleEnabled('WMS'))) {
+      return [];
+    }
+
+    const needs = await detectReplenishmentNeeds();
+
+    if (needs.length === 0) {
+      return needs;
+    }
+
+    const recipients = await this.getUsersByRole('MANAGER');
+
+    if (recipients.length === 0) {
+      return needs;
+    }
+
+    for (const need of needs) {
+      // Reposição já pendente não é notícia nova: a notificação anterior segue
+      // válida e o supervisor já sabe.
+      if (need.status === 'TASK_ALREADY_OPEN') {
+        continue;
+      }
+
+      const alreadyNotified = await notificationService.checkRecentNotification(
+        'REPLENISHMENT_NEEDED',
+        need.pickingPositionId,
+        6
+      );
+
+      if (alreadyNotified) {
+        continue;
+      }
+
+      // `NO_SOURCE` é mais grave que a reposição normal: não há material no
+      // armazém para repor, então nem tarefa foi gerada. Sai como ERROR e
+      // prioridade crítica, com mensagem diferente — é o supervisor que precisa
+      // agir (comprar, transferir de outro armazém), não o operador.
+      const noSource = need.status === 'NO_SOURCE';
+
+      await notificationService.createBulk(
+        recipients.map((u) => u.id),
+        {
+          type: noSource ? 'ERROR' : 'WARNING',
+          category: 'WAREHOUSE',
+          eventType: 'REPLENISHMENT_NEEDED',
+          title: noSource
+            ? 'Reposição sem material no pulmão'
+            : 'Reposição de área de picking necessária',
+          message: noSource
+            ? `${need.productName} na posição ${need.pickingPositionCode}: ` +
+              `${need.currentQuantity} (mínimo ${need.threshold}) e nenhum saldo no pulmão para repor`
+            : `${need.productName} na posição ${need.pickingPositionCode}: ` +
+              `${need.currentQuantity} (mínimo ${need.threshold}). ` +
+              `Tarefa de reposição gerada a partir de ${need.sourcePositionCode}`,
+          data: {
+            productCode: need.productCode,
+            productName: need.productName,
+            pickingPosition: need.pickingPositionCode,
+            currentQuantity: need.currentQuantity,
+            threshold: need.threshold,
+            sourcePosition: need.sourcePositionCode,
+            quantity: need.quantity,
+            taskId: need.taskId,
+          },
+          link: `/wms/storage-positions/${need.pickingPositionId}`,
+          resourceType: 'StoragePosition',
+          resourceId: need.pickingPositionId,
+          priority: noSource ? 4 : 3,
+        }
+      );
+    }
+
+    return needs;
   }
 
   /**
