@@ -53,6 +53,11 @@ model User {
   purchaseOrdersApproved     PurchaseOrder[]     @relation("PurchaseOrderApprover")
   purchaseReceiptsReceived   PurchaseReceipt[]   @relation("PurchaseReceiptReceiver")
 
+  // F4.1/F4.4 do plano do WMS: tarefas de armazem atribuidas e enderecamentos
+  // de recebimento executados por este usuario.
+  warehouseTasksAssigned WarehouseTask[]  @relation("WarehouseTaskAssignee")
+  receiptPutaways        ReceiptPutaway[] @relation("ReceiptPutawayUser")
+
   @@map("users")
 }
 
@@ -313,6 +318,7 @@ model Product {
   countingPlanProducts  CountingPlanProduct[]
   stockBalance          StockBalance?
   stockPositionBalances StockPositionBalance[]
+  warehouseTasks        WarehouseTask[]
 
   @@index([type])
   @@index([active])
@@ -791,7 +797,20 @@ model PurchaseReceipt {
   receiptDate   DateTime @default(now())
   receivedBy    String
   notes         String?  @db.Text
-  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  // F4.2 do plano do WMS: `CONFERIDO` e o estado INTERMEDIARIO novo - quantidade
+  // ja conferida (os itens existem com `acceptedQty`), material ainda NAO
+  // enderecado, logo ainda NAO entrou no saldo. E o status inicial de todo
+  // recebimento criado com WMS licenciado; ele avanca para `COMPLETED` quando a
+  // ultima `ReceiptPutaway` cobre o `acceptedQty` de todos os itens
+  // (warehouse-task.service.ts::completePutaway).
+  //
+  // Continua `String` livre, e nao enum, deliberadamente: e o padrao do resto do
+  // modulo de compras (PurchaseOrder.status, PurchaseQuotation.status) e migrar
+  // um dos tres para enum criaria inconsistencia pior do que a que resolve.
+  // `PENDING` continua sendo o valor de quem nasce SEM WMS (fluxo linear, o
+  // estoque ja entrou na criacao) - nada no caminho sem WMS mudou.
+  // `APPROVED`/`REJECTED` seguem vestigiais: nunca existiu fluxo de aprovacao.
+  status        String   @default("PENDING") // PENDING, CONFERIDO, COMPLETED, APPROVED, REJECTED
   createdAt     DateTime @default(now())
 
   order    PurchaseOrder         @relation(fields: [orderId], references: [id])
@@ -817,6 +836,8 @@ model PurchaseReceiptItem {
   receipt   PurchaseReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   orderItem PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
   product   Product           @relation(fields: [productId], references: [id])
+  // F4.4: um item conferido pode ser enderecado em VARIAS posicoes.
+  putaways  ReceiptPutaway[]
 
   @@index([receiptId])
   @@index([orderItemId])
@@ -1016,9 +1037,9 @@ model CountingSession {
 
 // Item de Contagem
 model CountingItem {
-  id        String @id @default(uuid())
-  sessionId String
-  productId String
+  id                String  @id @default(uuid())
+  sessionId         String
+  productId         String
   // F3.1 do plano do WMS: `locationId` (FK para o model `Location`, congelado na
   // F0.6) virou `storagePositionId` - a unidade enderecavel atomica do WMS
   // (decisao 4.1 do WMS_IMPLEMENTATION_ANALYSIS.md). A migracao de dados foi
@@ -1039,7 +1060,7 @@ model CountingItem {
   // (SELECT ... FOR UPDATE) ja adicionado em count()/recount() na Fase 3;
   // esse cobre chamadas concorrentes na MESMA requisicao logica, este cobre
   // o cliente que ficou com dados desatualizados na tela por mais tempo
-  version    Int     @default(0)
+  version           Int     @default(0)
 
   // Quantidades
   systemQty  Decimal  @db.Decimal(10, 2)
@@ -1077,8 +1098,8 @@ model CountingItem {
   updatedAt DateTime @updatedAt
 
   // Relações
-  session CountingSession @relation(fields: [sessionId], references: [id])
-  product Product         @relation(fields: [productId], references: [id])
+  session         CountingSession  @relation(fields: [sessionId], references: [id])
+  product         Product          @relation(fields: [productId], references: [id])
   // `Restrict` EXPLICITO, mesmo padrao de StockMovement.fromPositionId/
   // toPositionId (F2.1): o default do Prisma para relacao OPCIONAL e `SetNull`,
   // que NAO serve aqui. Um item de contagem e registro historico de inventario -
@@ -1282,6 +1303,11 @@ model StoragePosition {
   // F3.1: o inventario ciclico passou a contar POR ENDERECO. Tambem RESTRICT
   // (ver o comentario em CountingItem.storagePosition).
   countingItems         CountingItem[]
+  // F4.1/F4.4: tarefa de armazem (origem/destino) e enderecamento de
+  // recebimento. Todas RESTRICT, pelo mesmo motivo das demais.
+  warehouseTasksFrom    WarehouseTask[]        @relation("WarehouseTaskFrom")
+  warehouseTasksTo      WarehouseTask[]        @relation("WarehouseTaskTo")
+  receiptPutaways       ReceiptPutaway[]
 
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])
@@ -1312,6 +1338,156 @@ enum PositionType {
   QUARENTENA
   BLOQUEIO
   EXPEDICAO
+}
+
+// ============================================
+// TAREFAS DE ARMAZEM (WMS - Fase 4a)
+// ============================================
+
+// F4.1 do plano do WMS (WMS_IMPLEMENTATION_ANALYSIS.md, secao 5, Fase 4) +
+// secao 3.3 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md.
+//
+// So os CINCO tipos da cadeia de RECEBIMENTO nesta metade da fase. PICKING,
+// TRANSFER, REPLENISHMENT e COUNTING chegam na Fase 4b (F4.6+) - o enum e
+// aditivo, adicionar valor depois e uma migration trivial, e declarar valor que
+// nenhum codigo produz seria enum morto no banco.
+enum WarehouseTaskType {
+  DESCARGA
+  CONFERENCIA
+  ETIQUETAGEM
+  QUARENTENA
+  ALOCACAO
+}
+
+// DECISAO DE DESENHO (F4.1) - por que exatamente estes quatro valores:
+//
+//   PENDING     tarefa criada, ninguem comecou.
+//   IN_PROGRESS alguem comecou (startedAt preenchido).
+//   COMPLETED   concluida; para ALOCACAO e o momento em que o estoque entra.
+//   CANCELLED   encerrada sem executar (ex.: recebimento cancelado, ou etapa
+//               dispensada). Conta como RESOLVIDA para o gate de sequencia.
+//
+// O que NAO virou status, de proposito:
+//   * `ASSIGNED` - atribuicao e ORTOGONAL ao ciclo de vida: uma tarefa pode
+//     estar atribuida (`assignedTo != null`) e ainda PENDING. Fundir as duas
+//     dimensoes num enum so criaria estados impossiveis de representar
+//     (atribuida-e-em-andamento vs. em-andamento-sem-dono).
+//   * `BLOCKED`/`FAILED` - sem caso de uso nesta fase. Uma tarefa impedida
+//     continua PENDING (ninguem a concluiu) ou vira CANCELLED. Estado novo sem
+//     transicao que o produza e estado morto.
+enum WarehouseTaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// F4.1 - unidade de trabalho rastreavel do armazem.
+//
+// Com WMS licenciado, o recebimento deixa de ser uma acao sincrona de tela e
+// vira a cadeia DESCARGA -> CONFERENCIA -> ETIQUETAGEM -> QUARENTENA ->
+// ALOCACAO (purchase-receipt.service.ts::create()). Sem WMS licenciado nenhuma
+// linha desta tabela e criada e o recebimento segue linear como sempre foi.
+model WarehouseTask {
+  id     String              @id @default(uuid())
+  type   WarehouseTaskType
+  status WarehouseTaskStatus @default(PENDING)
+
+  // Referencia POLIMORFICA, mesmo precedente de `StockMovement.reference` /
+  // `referenceType` (sem FK: o alvo muda de tabela conforme o tipo da tarefa).
+  // Nesta fase o unico par produzido e
+  // (`reference` = PurchaseReceipt.id, `referenceType` = 'PURCHASE_RECEIPT').
+  reference     String?
+  referenceType String? // PURCHASE_RECEIPT (Fase 4a); PICKING/SHIPPING na 4b
+
+  // Posicoes de origem/destino OPCIONAIS: na cadeia de recebimento nenhuma
+  // tarefa nasce com posicao. Em particular a de ALOCACAO NAO tem
+  // `toPositionId` - quem aloca escolhe o endereco ao CONCLUIR a tarefa (e o
+  // resultado vira `ReceiptPutaway`, que suporta mais de um endereco por item;
+  // uma coluna unica aqui nem conseguiria representar isso).
+  // `Restrict` EXPLICITO nos dois lados - o default do Prisma para relacao
+  // opcional e `SetNull`, que apagaria silenciosamente o endereco de uma
+  // trilha de execucao. Mesmo motivo detalhado em `StockMovement`.
+  fromPositionId String?
+  toPositionId   String?
+
+  // Opcionais porque nem toda tarefa e sobre um produto/quantidade especifica:
+  // DESCARGA, CONFERENCIA, ETIQUETAGEM, QUARENTENA e ALOCACAO sao, nesta fase,
+  // sobre o RECEBIMENTO INTEIRO (o detalhe por item mora em
+  // PurchaseReceiptItem/ReceiptPutaway). Os campos existem para as tarefas da
+  // Fase 4b (PICKING/REPLENISHMENT), que sao por produto.
+  productId String?
+  quantity  Decimal? @db.Decimal(18, 4) // decisao D2: quantidade nasce Decimal
+
+  priority   Int     @default(0)
+  assignedTo String?
+  // Ordem de execucao dentro da cadeia do MESMO `reference`. Duas tarefas
+  // podem compartilhar a mesma `sequence` (etapas paralelas); o gate de ordem
+  // em warehouse-task.service.ts exige que toda tarefa de sequencia MENOR
+  // esteja resolvida (COMPLETED/CANCELLED) antes de concluir esta.
+  sequence   Int?
+  version    Int     @default(0) // lock otimista, mesmo padrao do resto do projeto
+
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  fromPosition StoragePosition? @relation("WarehouseTaskFrom", fields: [fromPositionId], references: [id], onDelete: Restrict)
+  toPosition   StoragePosition? @relation("WarehouseTaskTo", fields: [toPositionId], references: [id], onDelete: Restrict)
+  product      Product?         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  assignee     User?            @relation("WarehouseTaskAssignee", fields: [assignedTo], references: [id], onDelete: Restrict)
+  putaways     ReceiptPutaway[]
+
+  // "As tarefas deste recebimento, em ordem" - a consulta de F4.5.
+  @@index([referenceType, reference])
+  // "A fila do operador" e "a fila aberta do armazem" (F4.9, Fase 4b).
+  @@index([assignedTo, status])
+  @@index([status, priority])
+  @@index([type, status])
+  @@index([fromPositionId])
+  @@index([toPositionId])
+  @@index([productId])
+  @@map("warehouse_tasks")
+}
+
+// F4.4 - ENDERECAMENTO de um item conferido.
+//
+// Tabela separada de `PurchaseReceiptItem` porque a relacao e 1:N: 100 unidades
+// conferidas podem ir 60 para uma posicao e 40 para outra. Guardar um
+// `storagePositionId` no proprio item so representaria o caso trivial.
+//
+// Invariante, validada em warehouse-task.service.ts com o item travado
+// (`SELECT ... FOR UPDATE`): SUM(quantity) por item NUNCA excede
+// `PurchaseReceiptItem.acceptedQty`. O banco nao tem como expressar isso
+// (constraint de agregacao), entao a garantia e o lock pessimista - nao um
+// read-then-write otimista.
+model ReceiptPutaway {
+  id                String   @id @default(uuid())
+  receiptItemId     String
+  storagePositionId String
+  quantity          Decimal  @db.Decimal(18, 4) // decisao D2
+  userId            String
+  putawayAt         DateTime @default(now())
+  // A tarefa de ALOCACAO que originou este enderecamento - a trilha de "quem
+  // mandou guardar isso aqui". Obrigatoria: nao existe putaway sem tarefa.
+  taskId            String
+
+  // Todas as FKs sao RESTRICT (inclusive as obrigatorias, onde e o default do
+  // Prisma - aqui explicito para nao depender do default): endereçamento e
+  // trilha de auditoria de entrada de estoque, apagar o item de recebimento, a
+  // posicao ou a tarefa por baixo nao pode evaporar essa linha. Quem precisa
+  // desfazer um recebimento passa por purchase-receipt.service.ts::cancel(),
+  // que estorna o estoque ANTES de apagar - nao por DELETE em cascata.
+  receiptItem     PurchaseReceiptItem @relation(fields: [receiptItemId], references: [id], onDelete: Restrict)
+  storagePosition StoragePosition     @relation(fields: [storagePositionId], references: [id], onDelete: Restrict)
+  user            User                @relation("ReceiptPutawayUser", fields: [userId], references: [id], onDelete: Restrict)
+  task            WarehouseTask       @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  @@index([receiptItemId])
+  @@index([storagePositionId])
+  @@index([taskId])
+  @@index([userId])
+  @@map("receipt_putaways")
 }
 
 // ============================================
