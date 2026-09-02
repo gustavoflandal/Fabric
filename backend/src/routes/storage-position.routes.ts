@@ -17,6 +17,17 @@ router.post(
   storagePositionController.generatePositions
 );
 
+// F0.2: buscar posição pelo endereço (ARM-RUA-AA-PP). Declarada ANTES de
+// '/:structureId' de propósito: apesar de ter dois segmentos (o que já a
+// diferencia da rota de estrutura), manter a rota específica acima da
+// paramétrica evita que uma futura mudança em '/:structureId' a capture.
+// Mesmo RBAC das demais leituras de posição deste arquivo.
+router.get(
+  '/by-code/:code',
+  requirePermission('estruturas_armazem', 'visualizar'),
+  storagePositionController.getPositionByCode
+);
+
 // Listar posições de uma estrutura
 router.get(
   '/:structureId',

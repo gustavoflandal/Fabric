@@ -31,6 +31,32 @@ export const createProductSchema = Joi.object({
   standardCost: Joi.number().min(0).precision(2).allow(null),
   lastCost: Joi.number().min(0).precision(2).allow(null),
   averageCost: Joi.number().min(0).precision(2).allow(null),
+
+  // --- Dados para Armazenagem (WMS) ---------------------------------------
+  // F0.9 do plano do WMS + seção 3.2 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md.
+  // TODOS opcionais: um cliente só-PCP nunca preenche nada disto e não pode ser
+  // obrigado a preencher. Não há checagem de módulo licenciado aqui — a seção
+  // "Dados para Armazenagem" simplesmente não aparece no formulário quando o
+  // WMS não está licenciado (guard de UI, tarefa de frontend separada), e
+  // aceitar os campos no backend independentemente mantém o validator simples
+  // e a API idempotente entre instalações.
+  // Unidades: weight em kg; width/height/depth em metros; volume em m³.
+  weight: Joi.number().positive().allow(null).messages({
+    'number.positive': 'Peso deve ser maior que zero',
+  }),
+  width: Joi.number().positive().allow(null),
+  height: Joi.number().positive().allow(null),
+  depth: Joi.number().positive().allow(null),
+  // Pode ser informado explicitamente (embalagem irregular) ou omitido — nesse
+  // caso product.service deriva de width × height × depth quando as três
+  // dimensões existirem.
+  volume: Joi.number().positive().allow(null),
+  packagingType: Joi.string().trim().max(50).allow(null, ''),
+  maxStackQty: Joi.number().integer().greater(0).allow(null).messages({
+    'number.greater': 'Empilhamento máximo deve ser de pelo menos 1 unidade',
+  }),
+  segregationGroup: Joi.string().trim().max(50).allow(null, ''),
+
   active: Joi.boolean().default(true),
 }).with('maxStock', 'minStock');
 

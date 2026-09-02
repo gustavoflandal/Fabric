@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import countingPlanProductController from '../controllers/counting-plan-product.controller';
 import { requirePermission } from '../middleware/permission.middleware';
+// ✅ F0.7: validators do módulo de contagem.
+import { validate } from '../middleware/validation.middleware';
+import {
+  addCountingPlanProductSchema,
+  updateCountingPlanProductSchema,
+} from '../validators/counting.validator';
 
 const router = Router();
 
@@ -9,7 +15,7 @@ const router = Router();
 // plano de contagem, sem recurso próprio seedado.
 
 // Adicionar produto ao plano
-router.post('/plans/:planId/products', requirePermission('planos_contagem', 'editar'), countingPlanProductController.addProduct);
+router.post('/plans/:planId/products', requirePermission('planos_contagem', 'editar'), validate(addCountingPlanProductSchema), countingPlanProductController.addProduct);
 
 // Remover produto do plano
 router.delete('/plans/:planId/products/:productId', requirePermission('planos_contagem', 'editar'), countingPlanProductController.removeProduct);
@@ -18,6 +24,6 @@ router.delete('/plans/:planId/products/:productId', requirePermission('planos_co
 router.get('/plans/:planId/products', requirePermission('planos_contagem', 'visualizar'), countingPlanProductController.listProducts);
 
 // Atualizar prioridade do produto
-router.patch('/plans/:planId/products/:productId', requirePermission('planos_contagem', 'editar'), countingPlanProductController.updatePriority);
+router.patch('/plans/:planId/products/:productId', requirePermission('planos_contagem', 'editar'), validate(updateCountingPlanProductSchema), countingPlanProductController.updatePriority);
 
 export default router;

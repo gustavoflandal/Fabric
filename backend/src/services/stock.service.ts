@@ -183,13 +183,24 @@ export class StockServiceRefactored {
     const quantity = balanceRow.quantity;
     const lastMovement = lastMovementRow?.createdAt;
 
+    return this.toBalance(product, quantity, lastMovement);
+  }
+
+  /**
+   * Monta o DTO de saldo (limiares + status derivado) a partir do produto e da
+   * quantidade já lida. Extraído de getBalance() para ser o ponto único da
+   * regra de status, compartilhado com getAllBalances() — que passou a ler
+   * produto, saldo e última movimentação em lote (ver F0.5 abaixo) e não pode
+   * chamar getBalance() por produto.
+   */
+  private toBalance(product: any, quantity: number, lastMovement?: Date): StockBalance {
     const minStock = product.minStock || 0;
     const maxStock = product.maxStock || 1000;
     const safetyStock = product.safetyStock || 0;
 
     // Determinar status
     let status: 'OK' | 'LOW' | 'CRITICAL' | 'EXCESS' = 'OK';
-    
+
     if (quantity < safetyStock) {
       status = 'CRITICAL';
     } else if (quantity < minStock) {
@@ -212,6 +223,26 @@ export class StockServiceRefactored {
 
   /**
    * Lista todos os saldos de estoque
+   *
+   * ✅ F0.5 do plano do WMS (docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md):
+   * antes este método iterava os produtos ativos chamando `getBalance()` um a
+   * um — 3 queries por produto (produto + saldo + última movimentação), ou seja
+   * N+1 clássico, e o produto ainda era buscado duas vezes (aqui e lá dentro).
+   * Com uma base de milhares de SKUs isso já é lento; com saldo POR POSIÇÃO
+   * (Fase 1) o mesmo padrão viraria N×M queries. Agora são 2 queries fixas,
+   * independentemente do número de produtos:
+   *   1) produtos + categoria + unidade + saldo (join via include);
+   *   2) MAX(createdAt) das movimentações agrupado por produto.
+   *
+   * O contrato de retorno é idêntico ao anterior (mesmo shape de StockBalance,
+   * mesma regra de status via `toBalance`), para não quebrar
+   * getSummary/getStockConsolidation/getLowStockProducts/getExcessStockProducts
+   * nem os consumidores de `GET /stock/balances`.
+   *
+   * Única diferença de comportamento, deliberada: este caminho de LEITURA não
+   * cria mais linha de `stock_balances` para produto que ainda não tem saldo —
+   * produto sem linha é lido como quantidade 0. Quem cria a linha é o caminho
+   * de escrita (`applyMovement`, dentro da transação com lock) e `getBalance()`.
    */
   async getAllBalances(filters?: {
     status?: 'OK' | 'LOW' | 'CRITICAL' | 'EXCESS';
@@ -233,13 +264,36 @@ export class StockServiceRefactored {
       include: {
         category: true,
         unit: true,
+        stockBalance: true,
       },
     });
+
+    if (products.length === 0) {
+      return [];
+    }
+
+    const lastMovements = await prisma.stockMovement.groupBy({
+      by: ['productId'],
+      where: { productId: { in: products.map((p) => p.id) } },
+      _max: { createdAt: true },
+    });
+
+    const lastMovementByProduct = new Map(
+      lastMovements.map((m) => [m.productId, m._max.createdAt ?? undefined])
+    );
 
     const balances: StockBalance[] = [];
 
     for (const product of products) {
-      const balance = await this.getBalance(product.id);
+      // `stockBalance` é detalhe da consulta, não faz parte do contrato de
+      // `product` que os consumidores já recebiam - removido do objeto exposto.
+      const { stockBalance, ...productData } = product;
+
+      const balance = this.toBalance(
+        productData,
+        stockBalance?.quantity ?? 0,
+        lastMovementByProduct.get(product.id)
+      );
 
       // Filtrar por status se especificado
       if (filters?.status && balance.status !== filters.status) {

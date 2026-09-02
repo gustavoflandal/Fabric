@@ -32,6 +32,23 @@ export const getPositionsByStructure = async (req: Request, res: Response, next:
   }
 };
 
+// F0.2: busca de posição pelo endereço (`ARM-RUA-AA-PP`), pré-requisito de
+// leitura por coletor/scanner.
+export const getPositionByCode = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.params;
+
+    const position = await storagePositionService.getPositionByCode(code);
+
+    res.json({
+      success: true,
+      data: position
+    });
+  } catch (error: any) {
+    next(error);
+  }
+};
+
 export const deletePositions = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { structureId } = req.params;

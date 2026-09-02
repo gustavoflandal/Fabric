@@ -4,6 +4,18 @@ import countingSessionController from '../controllers/counting-session.controlle
 import countingItemController from '../controllers/counting-item.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
+// ✅ F0.7 do plano do WMS (pendência da Fase 2 item 2.2): validators Joi para o
+// módulo de contagem, que até então era o último conjunto de endpoints mutantes
+// do backend sem nenhuma validação de entrada.
+import { validate } from '../middleware/validation.middleware';
+import {
+  createCountingPlanSchema,
+  updateCountingPlanSchema,
+  createCountingSessionSchema,
+  countItemSchema,
+  recountItemSchema,
+  itemReasonSchema,
+} from '../validators/counting.validator';
 // Importar novos controllers
 import countingPlanProductRouter from './counting-plan-product.routes';
 import countingAssignmentRouter from './counting-assignment.routes';
@@ -29,10 +41,10 @@ router.get('/plans', requirePermission('planos_contagem', 'visualizar'), countin
 router.get('/plans/:id', requirePermission('planos_contagem', 'visualizar'), countingPlanController.show);
 
 // Criar plano
-router.post('/plans', requirePermission('planos_contagem', 'criar'), countingPlanController.create);
+router.post('/plans', requirePermission('planos_contagem', 'criar'), validate(createCountingPlanSchema), countingPlanController.create);
 
 // Atualizar plano
-router.put('/plans/:id', requirePermission('planos_contagem', 'editar'), countingPlanController.update);
+router.put('/plans/:id', requirePermission('planos_contagem', 'editar'), validate(updateCountingPlanSchema), countingPlanController.update);
 
 // Deletar plano
 router.delete('/plans/:id', requirePermission('planos_contagem', 'excluir'), countingPlanController.delete);
@@ -63,7 +75,7 @@ router.get('/sessions', requirePermission('sessoes_contagem', 'visualizar'), cou
 router.get('/sessions/:id', requirePermission('sessoes_contagem', 'visualizar'), countingSessionController.show);
 
 // Criar sessão
-router.post('/sessions', requirePermission('sessoes_contagem', 'criar'), countingSessionController.create);
+router.post('/sessions', requirePermission('sessoes_contagem', 'criar'), validate(createCountingSessionSchema), countingSessionController.create);
 
 // Iniciar sessão
 router.post('/sessions/:id/start', requirePermission('sessoes_contagem', 'iniciar'), countingSessionController.start);
@@ -94,16 +106,16 @@ router.get('/items', requirePermission('contagem', 'executar'), countingItemCont
 router.get('/items/:id', requirePermission('contagem', 'executar'), countingItemController.show);
 
 // Contar item
-router.post('/items/:id/count', requirePermission('contagem', 'executar'), countingItemController.count);
+router.post('/items/:id/count', requirePermission('contagem', 'executar'), validate(countItemSchema), countingItemController.count);
 
 // Recontar item
-router.post('/items/:id/recount', requirePermission('contagem', 'recontar'), countingItemController.recount);
+router.post('/items/:id/recount', requirePermission('contagem', 'recontar'), validate(recountItemSchema), countingItemController.recount);
 
 // Aceitar contagem
-router.post('/items/:id/accept', requirePermission('contagem', 'aprovar_divergencia'), countingItemController.accept);
+router.post('/items/:id/accept', requirePermission('contagem', 'aprovar_divergencia'), validate(itemReasonSchema), countingItemController.accept);
 
 // Cancelar item
-router.post('/items/:id/cancel', requirePermission('contagem', 'executar'), countingItemController.cancel);
+router.post('/items/:id/cancel', requirePermission('contagem', 'executar'), validate(itemReasonSchema), countingItemController.cancel);
 
 // Itens pendentes do usuário
 router.get('/items/pending/me', requirePermission('contagem', 'executar'), countingItemController.getPendingByUser);
