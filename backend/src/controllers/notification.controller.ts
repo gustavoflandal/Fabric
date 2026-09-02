@@ -151,6 +151,29 @@ export class NotificationController {
   }
 
   /**
+   * Dashboard de métricas agregadas (escopado ao usuário logado).
+   *
+   * `days` já vem validado por `validateQuery(notificationDashboardQuerySchema)`
+   * na rota — o `parseInt` aqui só converte a string da query string, sem
+   * precisar tratar entrada inválida.
+   */
+  async getDashboard(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.userId!;
+      const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
+
+      const dashboard = await notificationService.getDashboard(userId, days);
+
+      return res.status(200).json({
+        status: 'success',
+        data: dashboard,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /**
    * Obter métricas de notificações
    */
   async getMetrics(req: AuthRequest, res: Response, next: NextFunction) {
