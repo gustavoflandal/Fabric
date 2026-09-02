@@ -15,43 +15,43 @@ datasource db {
 // ============================================
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  password      String
-  name          String
-  active        Boolean   @default(true)
-  lastLogin     DateTime?
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  password            String
+  name                String
+  active              Boolean   @default(true)
+  lastLogin           DateTime?
   // ✅ Fase 2 item 2.4 do cronograma: bloqueio de conta por tentativas de
   // login falhas (nao existia nenhum controle por conta, so rate limit por IP)
-  failedLoginAttempts Int  @default(0)
-  lockedUntil   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  roles         UserRole[]
-  auditLogs     AuditLog[]
-  productionPointings ProductionPointing[]
-  stockMovements StockMovement[]
-  notifications Notification[]
+  roles                   UserRole[]
+  auditLogs               AuditLog[]
+  productionPointings     ProductionPointing[]
+  stockMovements          StockMovement[]
+  notifications           Notification[]
   notificationPreferences NotificationPreference[]
-  countingAssignments CountingAssignment[]
-  refreshTokens RefreshToken[]
+  countingAssignments     CountingAssignment[]
+  refreshTokens           RefreshToken[]
 
   // Contagem de Estoque
-  countingPlansCreated CountingPlan[] @relation("CountingPlanCreator")
-  sessionsAssigned CountingSession[] @relation("SessionAssignedTo")
-  sessionsCompleted CountingSession[] @relation("SessionCompletedBy")
-  itemsCounted CountingItem[] @relation("ItemCountedBy")
-  itemsRecounted CountingItem[] @relation("ItemRecountedBy")
+  countingPlansCreated CountingPlan[]    @relation("CountingPlanCreator")
+  sessionsAssigned     CountingSession[] @relation("SessionAssignedTo")
+  sessionsCompleted    CountingSession[] @relation("SessionCompletedBy")
+  itemsCounted         CountingItem[]    @relation("ItemCountedBy")
+  itemsRecounted       CountingItem[]    @relation("ItemRecountedBy")
 
   // ✅ Fase 4 item 4.5 do cronograma: FKs de auditoria (antes eram String
   // solta, sem integridade referencial nenhuma)
-  productionOrdersCreated ProductionOrder[] @relation("ProductionOrderCreator")
-  purchaseQuotationsCreated PurchaseQuotation[] @relation("PurchaseQuotationCreator")
+  productionOrdersCreated    ProductionOrder[]   @relation("ProductionOrderCreator")
+  purchaseQuotationsCreated  PurchaseQuotation[] @relation("PurchaseQuotationCreator")
   purchaseQuotationsApproved PurchaseQuotation[] @relation("PurchaseQuotationApprover")
-  purchaseOrdersCreated PurchaseOrder[] @relation("PurchaseOrderCreator")
-  purchaseOrdersApproved PurchaseOrder[] @relation("PurchaseOrderApprover")
-  purchaseReceiptsReceived PurchaseReceipt[] @relation("PurchaseReceiptReceiver")
+  purchaseOrdersCreated      PurchaseOrder[]     @relation("PurchaseOrderCreator")
+  purchaseOrdersApproved     PurchaseOrder[]     @relation("PurchaseOrderApprover")
+  purchaseReceiptsReceived   PurchaseReceipt[]   @relation("PurchaseReceiptReceiver")
 
   @@map("users")
 }
@@ -70,7 +70,7 @@ model RefreshToken {
   revokedAt DateTime?
   createdAt DateTime  @default(now())
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -78,81 +78,81 @@ model RefreshToken {
 }
 
 model Role {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  description   String?
-  active        Boolean   @default(true)
-  
-  users         UserRole[]
-  permissions   RolePermission[]
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  description String?
+  active      Boolean @default(true)
+
+  users             UserRole[]
+  permissions       RolePermission[]
   notificationRules NotificationRule[]
-  
+
   @@map("roles")
 }
 
 model Permission {
-  id            String    @id @default(uuid())
-  resource      String
-  action        String
-  description   String?
-  
-  roles         RolePermission[]
-  
+  id          String  @id @default(uuid())
+  resource    String
+  action      String
+  description String?
+
+  roles RolePermission[]
+
   @@unique([resource, action])
   @@map("permissions")
 }
 
 model UserRole {
-  userId        String
-  roleId        String
-  assignedAt    DateTime  @default(now())
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role          Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
   @@id([userId, roleId])
   @@map("user_roles")
 }
 
 model RolePermission {
-  roleId        String
-  permissionId  String
-  
-  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission    Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
   @@id([roleId, permissionId])
   @@map("role_permissions")
 }
 
 model AuditLog {
-  id            String    @id @default(uuid())
-  userId        String?
-  action        String    @db.VarChar(100)
-  resource      String    @db.VarChar(100)
-  resourceId    String?
-  description   String?   @db.Text
-  
+  id          String  @id @default(uuid())
+  userId      String?
+  action      String  @db.VarChar(100)
+  resource    String  @db.VarChar(100)
+  resourceId  String?
+  description String? @db.Text
+
   // Dados da requisição HTTP
-  ipAddress     String?   @db.VarChar(45)
-  userAgent     String?   @db.Text
-  method        String?   @db.VarChar(10)
-  endpoint      String?   @db.VarChar(500)
-  statusCode    Int?
-  
+  ipAddress  String? @db.VarChar(45)
+  userAgent  String? @db.Text
+  method     String? @db.VarChar(10)
+  endpoint   String? @db.VarChar(500)
+  statusCode Int?
+
   // Dados de auditoria
-  requestBody   Json?
-  responseBody  Json?
-  oldValues     Json?
-  newValues     Json?
-  errorMessage  String?   @db.Text
-  durationMs    Int?
-  
-  createdAt     DateTime  @default(now())
-  
-  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  
+  requestBody  Json?
+  responseBody Json?
+  oldValues    Json?
+  newValues    Json?
+  errorMessage String? @db.Text
+  durationMs   Int?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
   @@index([userId])
   @@index([userId, createdAt])
   @@index([resource])
@@ -168,86 +168,86 @@ model AuditLog {
 // ============================================
 
 model WorkCenter {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  description   String?
-  type          String
-  capacity      Float?
-  efficiency    Float     @default(1.0)
-  costPerHour   Float?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  operations    RoutingOperation[]
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  type        String
+  capacity    Float?
+  efficiency  Float    @default(1.0)
+  costPerHour Float?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  operations           RoutingOperation[]
   productionOperations ProductionOrderOperation[]
-  productionPointings ProductionPointing[]
+  productionPointings  ProductionPointing[]
 
   @@map("work_centers")
 }
 
 model UnitOfMeasure {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  type          String    // length, weight, volume, quantity, time
-  symbol        String?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  products      Product[]
-  bomItems      BOMItem[]
-  
+  id        String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  type      String // length, weight, volume, quantity, time
+  symbol    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+  bomItems BOMItem[]
+
   @@map("units_of_measure")
 }
 
 model Supplier {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  legalName     String?
-  document      String?   @unique
-  email         String?
-  phone         String?
-  address       String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String    @default("BR")
-  paymentTerms  String?
-  leadTime      Int?
-  rating        Float?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  quotations    PurchaseQuotation[]
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  legalName    String?
+  document     String?  @unique
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String   @default("BR")
+  paymentTerms String?
+  leadTime     Int?
+  rating       Float?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  quotations     PurchaseQuotation[]
   purchaseOrders PurchaseOrder[]
-  
+
   @@map("suppliers")
 }
 
 model Customer {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  legalName     String?
-  document      String?   @unique
-  email         String?
-  phone         String?
-  address       String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String    @default("BR")
-  paymentTerms  String?
-  creditLimit   Float?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  id           String   @id @default(uuid())
+  code         String   @unique
+  name         String
+  legalName    String?
+  document     String?  @unique
+  email        String?
+  phone        String?
+  address      String?
+  city         String?
+  state        String?
+  zipCode      String?
+  country      String   @default("BR")
+  paymentTerms String?
+  creditLimit  Float?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   @@map("customers")
 }
 
@@ -256,25 +256,25 @@ model Customer {
 // ============================================
 
 model Product {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  description   String?   @db.Text
-  type          String
-  unitId        String
-  categoryId    String?
-  
-  leadTime      Int       @default(0)
-  lotSize       Float?
-  
-  minStock      Float     @default(0)
-  maxStock      Float?
-  safetyStock   Float     @default(0)
-  reorderPoint  Float?
-  
-  standardCost  Float?
-  lastCost      Float?
-  averageCost   Float?
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  description String? @db.Text
+  type        String
+  unitId      String
+  categoryId  String?
+
+  leadTime Int    @default(0)
+  lotSize  Float?
+
+  minStock     Float  @default(0)
+  maxStock     Float?
+  safetyStock  Float  @default(0)
+  reorderPoint Float?
+
+  standardCost Float?
+  lastCost     Float?
+  averageCost  Float?
 
   // --- Dados para Armazenagem (WMS) ---------------------------------------
   // F0.9 do plano do WMS (docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md)
@@ -285,33 +285,34 @@ model Product {
   // da posicao. Unidades: weight em kg; width/height/depth em metros;
   // volume em m3 (derivado de width*height*depth em product.service quando as
   // tres dimensoes existem e volume nao foi informado explicitamente).
-  weight           Float?  // peso unitario (kg)
-  width            Float?  // largura (m)
-  height           Float?  // altura (m)
-  depth            Float?  // profundidade (m)
-  volume           Float?  // volume unitario (m3) - derivado ou informado
+  weight           Float? // peso unitario (kg)
+  width            Float? // largura (m)
+  height           Float? // altura (m)
+  depth            Float? // profundidade (m)
+  volume           Float? // volume unitario (m3) - derivado ou informado
   packagingType    String? // tipo de embalagem (CAIXA, PALLET, FARDO, ...)
-  maxStackQty      Int?    // quantas unidades podem ser empilhadas
+  maxStackQty      Int? // quantas unidades podem ser empilhadas
   segregationGroup String? // grupo de incompatibilidade de armazenagem
 
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
-  category      ProductCategory? @relation(fields: [categoryId], references: [id])
-  
-  boms          BOM[]
-  bomItems      BOMItem[]
-  routings      Routing[]
-  productionOrders ProductionOrder[]
-  stockMovements StockMovement[]
-  quotationItems PurchaseQuotationItem[]
-  purchaseOrderItems PurchaseOrderItem[]
-  receiptItems  PurchaseReceiptItem[]
-  countingItems CountingItem[]
-  countingPlanProducts CountingPlanProduct[]
-  stockBalance  StockBalance?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit     UnitOfMeasure    @relation(fields: [unitId], references: [id])
+  category ProductCategory? @relation(fields: [categoryId], references: [id])
+
+  boms                  BOM[]
+  bomItems              BOMItem[]
+  routings              Routing[]
+  productionOrders      ProductionOrder[]
+  stockMovements        StockMovement[]
+  quotationItems        PurchaseQuotationItem[]
+  purchaseOrderItems    PurchaseOrderItem[]
+  receiptItems          PurchaseReceiptItem[]
+  countingItems         CountingItem[]
+  countingPlanProducts  CountingPlanProduct[]
+  stockBalance          StockBalance?
+  stockPositionBalances StockPositionBalance[]
 
   @@index([type])
   @@index([active])
@@ -331,100 +332,144 @@ model StockBalance {
   version   Int      @default(0) // lock otimista para leituras fora de transacao
   updatedAt DateTime @updatedAt
 
-  product   Product  @relation(fields: [productId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
 
   @@map("stock_balances")
 }
 
+// F1.1 do plano do WMS (docs/fase-2026-09-modernizacao/WMS_IMPLEMENTATION_ANALYSIS.md,
+// secao 5, Fase 1) - o nucleo do WMS: saldo por PRODUTO x POSICAO.
+//
+// Decisao D1 (secao 4.4): `stock_balances` (agregado por produto) PERMANECE e
+// continua sendo a fonte consumida por MRP, dashboards, notificacoes e
+// relatorios. Esta tabela e a dimensao nova; o agregado passa a ser o roll-up,
+// mantido na MESMA transacao por stock.service.ts::applyMovement().
+//
+// Decisao D2 (secao 4.4): quantidade nasce `Decimal(18,4)`, NAO `Float`. O item
+// 4.1 do cronograma (Float -> Decimal) foi adiado com justificativa; tabela nova
+// nao deve herdar a divida. Consequencia pratica: `Prisma.Decimal` nao e um
+// number JS - o service faz aritmetica com Decimal e os endpoints novos
+// serializam como STRING (ver stock-position.service.ts).
+//
+// FKs SEM `onDelete: Cascade` de proposito, nos DOIS lados: apagar produto ou
+// posicao nao pode evaporar saldo silenciosamente. O comportamento default do
+// Prisma para relacao obrigatoria e RESTRICT, ou seja, a exclusao e BARRADA
+// enquanto houver saldo - que e exatamente o desejado. Note que
+// storage_positions.structureId TEM cascade (estrutura -> posicao); com esta FK
+// no caminho, apagar uma estrutura com saldo passa a falhar, e
+// storage-position.service.ts traduz isso em AppError legivel.
+model StockPositionBalance {
+  id                String   @id @default(uuid())
+  productId         String
+  storagePositionId String
+  quantity          Decimal  @default(0) @db.Decimal(18, 4)
+  version           Int      @default(0) // lock otimista, mesmo padrao de StockBalance
+  updatedAt         DateTime @updatedAt
+
+  product         Product         @relation(fields: [productId], references: [id])
+  storagePosition StoragePosition @relation(fields: [storagePositionId], references: [id])
+
+  @@unique([productId, storagePositionId])
+  // Um indice dedicado por `productId` NAO e declarado: no MySQL/InnoDB o indice
+  // unico composto acima ja atende qualquer busca por `productId` (e a coluna
+  // mais a esquerda). Criar um segundo indice com o mesmo prefixo so adicionaria
+  // custo de escrita numa tabela que e escrita a cada movimentacao, sem ganho de
+  // leitura. O indice por `storagePositionId` abaixo, esse sim, e necessario -
+  // nao ha prefixo que o cubra ("o que tem nesta posicao?" e "quais posicoes
+  // deste armazem estao ocupadas?").
+  @@index([storagePositionId])
+  @@map("stock_position_balances")
+}
+
 model ProductCategory {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  description   String?
-  parentId      String?
-  
-  parent        ProductCategory? @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children      ProductCategory[] @relation("CategoryHierarchy")
-  products      Product[]
-  
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  description String?
+  parentId    String?
+
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
+
   @@map("product_categories")
 }
 
 model BOM {
-  id            String    @id @default(uuid())
-  productId     String
-  version       Int       @default(1)
-  description   String?
-  validFrom     DateTime  @default(now())
-  validTo       DateTime?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  product       Product   @relation(fields: [productId], references: [id])
-  items         BOMItem[]
-  
+  id          String    @id @default(uuid())
+  productId   String
+  version     Int       @default(1)
+  description String?
+  validFrom   DateTime  @default(now())
+  validTo     DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  product Product   @relation(fields: [productId], references: [id])
+  items   BOMItem[]
+
   @@unique([productId, version])
   @@index([productId, active])
   @@map("boms")
 }
 
 model BOMItem {
-  id            String    @id @default(uuid())
-  bomId         String
-  componentId   String
-  quantity      Float
-  unitId        String
-  scrapFactor   Float     @default(0)
-  sequence      Int
-  notes         String?
-  
-  bom           BOM       @relation(fields: [bomId], references: [id], onDelete: Cascade)
-  component     Product   @relation(fields: [componentId], references: [id])
-  unit          UnitOfMeasure @relation(fields: [unitId], references: [id])
-  
-  @@index([bomId])
+  id          String  @id @default(uuid())
+  bomId       String
+  componentId String
+  quantity    Float
+  unitId      String
+  scrapFactor Float   @default(0)
+  sequence    Int
+  notes       String?
+
+  bom       BOM           @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  component Product       @relation(fields: [componentId], references: [id])
+  unit      UnitOfMeasure @relation(fields: [unitId], references: [id])
+
   @@unique([bomId, componentId])
   @@unique([bomId, sequence])
+  @@index([bomId])
   @@map("bom_items")
 }
 
 model Routing {
-  id            String    @id @default(uuid())
-  productId     String
-  version       Int       @default(1)
-  description   String?
-  validFrom     DateTime  @default(now())
-  validTo       DateTime?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  product       Product   @relation(fields: [productId], references: [id])
-  operations    RoutingOperation[]
-  
+  id          String    @id @default(uuid())
+  productId   String
+  version     Int       @default(1)
+  description String?
+  validFrom   DateTime  @default(now())
+  validTo     DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  product    Product            @relation(fields: [productId], references: [id])
+  operations RoutingOperation[]
+
   @@unique([productId, version])
   @@index([productId, active])
   @@map("routings")
 }
 
 model RoutingOperation {
-  id            String    @id @default(uuid())
-  routingId     String
-  sequence      Int
-  workCenterId  String
-  description   String
-  setupTime     Float
-  runTime       Float
-  queueTime     Float     @default(0)
-  moveTime      Float     @default(0)
-  notes         String?
-  
-  routing       Routing   @relation(fields: [routingId], references: [id], onDelete: Cascade)
-  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
-  
-  @@index([routingId])
+  id           String  @id @default(uuid())
+  routingId    String
+  sequence     Int
+  workCenterId String
+  description  String
+  setupTime    Float
+  runTime      Float
+  queueTime    Float   @default(0)
+  moveTime     Float   @default(0)
+  notes        String?
+
+  routing    Routing    @relation(fields: [routingId], references: [id], onDelete: Cascade)
+  workCenter WorkCenter @relation(fields: [workCenterId], references: [id])
+
   @@unique([routingId, sequence])
+  @@index([routingId])
   @@map("routing_operations")
 }
 
@@ -433,38 +478,38 @@ model RoutingOperation {
 // ============================================
 
 model ProductionOrder {
-  id            String    @id @default(uuid())
-  orderNumber   String    @unique
-  productId     String
-  quantity      Float
-  producedQty   Float     @default(0)
-  scrapQty      Float     @default(0)
-  priority      Int       @default(5)
-  status        String    @default("PLANNED")
+  id          String @id @default(uuid())
+  orderNumber String @unique
+  productId   String
+  quantity    Float
+  producedQty Float  @default(0)
+  scrapQty    Float  @default(0)
+  priority    Int    @default(5)
+  status      String @default("PLANNED")
   // ✅ Fase 4 item 4.2 do cronograma: lock otimista (evita "lost update" quando
   // dois usuarios editam a mesma ordem em telas abertas ao mesmo tempo -
   // diferente dos locks pessimistas ja adicionados nas Fases 1/3 para as
   // race conditions especificas ja encontradas, este cobre o caso geral de
   // edicao concorrente via formulario)
-  version       Int       @default(0)
-  
-  scheduledStart DateTime
-  scheduledEnd  DateTime
-  actualStart   DateTime?
-  actualEnd     DateTime?
-  
-  plannedCost   Float?
-  actualCost    Float?
-  
-  notes         String?   @db.Text
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  createdBy     String
+  version     Int    @default(0)
 
-  product       Product   @relation(fields: [productId], references: [id])
-  creator       User      @relation("ProductionOrderCreator", fields: [createdBy], references: [id])
-  operations    ProductionOrderOperation[]
-  pointings     ProductionPointing[]
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+  actualStart    DateTime?
+  actualEnd      DateTime?
+
+  plannedCost Float?
+  actualCost  Float?
+
+  notes     String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+
+  product    Product                    @relation(fields: [productId], references: [id])
+  creator    User                       @relation("ProductionOrderCreator", fields: [createdBy], references: [id])
+  operations ProductionOrderOperation[]
+  pointings  ProductionPointing[]
 
   @@index([status])
   @@index([scheduledStart])
@@ -475,33 +520,33 @@ model ProductionOrder {
 }
 
 model ProductionOrderOperation {
-  id            String    @id @default(uuid())
+  id                String @id @default(uuid())
   productionOrderId String
-  sequence      Int
-  workCenterId  String
-  description   String
+  sequence          Int
+  workCenterId      String
+  description       String
   // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder)
-  version       Int       @default(0)
+  version           Int    @default(0)
 
-  plannedQty    Float
-  completedQty  Float     @default(0)
-  scrapQty      Float     @default(0)
-  
-  setupTime     Float
-  runTime       Float
+  plannedQty   Float
+  completedQty Float @default(0)
+  scrapQty     Float @default(0)
+
+  setupTime        Float
+  runTime          Float
   totalPlannedTime Float
-  actualTime    Float     @default(0)
-  
-  status        String    @default("PENDING")
+  actualTime       Float @default(0)
+
+  status         String    @default("PENDING")
   scheduledStart DateTime?
-  scheduledEnd  DateTime?
-  actualStart   DateTime?
-  actualEnd     DateTime?
-  
-  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
-  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
-  pointings     ProductionPointing[]
-  
+  scheduledEnd   DateTime?
+  actualStart    DateTime?
+  actualEnd      DateTime?
+
+  productionOrder ProductionOrder      @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  workCenter      WorkCenter           @relation(fields: [workCenterId], references: [id])
+  pointings       ProductionPointing[]
+
   @@index([productionOrderId])
   @@index([workCenterId])
   @@index([status])
@@ -509,28 +554,28 @@ model ProductionOrderOperation {
 }
 
 model ProductionPointing {
-  id            String    @id @default(uuid())
+  id                String @id @default(uuid())
   productionOrderId String
-  operationId   String
-  workCenterId  String
-  userId        String
+  operationId       String
+  workCenterId      String
+  userId            String
 
   quantityGood  Float
-  quantityScrap Float     @default(0)
+  quantityScrap Float @default(0)
 
-  setupTime     Float     @default(0)
-  runTime       Float
+  setupTime Float @default(0)
+  runTime   Float
 
-  startTime     DateTime
-  endTime       DateTime
+  startTime DateTime
+  endTime   DateTime
 
-  notes         String?
-  createdAt     DateTime  @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
 
-  productionOrder ProductionOrder @relation(fields: [productionOrderId], references: [id])
-  operation     ProductionOrderOperation @relation(fields: [operationId], references: [id])
-  workCenter    WorkCenter @relation(fields: [workCenterId], references: [id])
-  user          User      @relation(fields: [userId], references: [id])
+  productionOrder ProductionOrder          @relation(fields: [productionOrderId], references: [id])
+  operation       ProductionOrderOperation @relation(fields: [operationId], references: [id])
+  workCenter      WorkCenter               @relation(fields: [workCenterId], references: [id])
+  user            User                     @relation(fields: [userId], references: [id])
 
   @@index([productionOrderId])
   @@index([operationId])
@@ -547,28 +592,55 @@ model ProductionPointing {
 // ============================================
 
 model StockMovement {
-  id            String    @id @default(uuid())
-  productId     String
-  type          String    // IN, OUT, ADJUSTMENT
-  quantity      Float
-  reason        String
-  reference     String?   // ID da OP, Pedido, etc (sem FK - campo polimorfico, ver referenceType)
-  referenceType String?   // PRODUCTION, PURCHASE, ADJUSTMENT, MANUAL, COUNTING
+  id                String   @id @default(uuid())
+  productId         String
+  type              String // IN, OUT, ADJUSTMENT
+  quantity          Float
+  reason            String
+  reference         String? // ID da OP, Pedido, etc (sem FK - campo polimorfico, ver referenceType)
+  referenceType     String? // PRODUCTION, PURCHASE, ADJUSTMENT, MANUAL, COUNTING
   countingSessionId String? // FK dedicada, preenchida apenas quando referenceType = COUNTING
-  userId        String
-  notes         String?
-  createdAt     DateTime  @default(now())
+  userId            String
+  notes             String?
+  // F1.2 do plano do WMS: posicao de armazenagem envolvida na movimentacao.
+  // Semantica NESTA fase (so existem IN/OUT/ADJUSTMENT):
+  //   IN         -> a posicao onde a quantidade ENTROU
+  //   OUT        -> a posicao de onde a quantidade SAIU
+  //   ADJUSTMENT -> a posicao sendo corrigida
+  // NULL = movimentacao nao enderecada (todo o fluxo atual: recebimento,
+  // contagem, reserva de producao, entrada/saida manual). Esse caminho continua
+  // funcionando exatamente como antes - ver applyMovement().
+  //
+  // EVOLUCAO PLANEJADA (F2.1, Fase 2 - transferencia interna): quando o tipo
+  // `TRANSFER` for introduzido, este campo unico vira o par
+  // `fromPositionId`/`toPositionId`, e a migration deve REAPROVEITAR os valores
+  // ja gravados aqui em vez de descarta-los:
+  //   type IN         -> toPositionId   = positionId
+  //   type OUT        -> fromPositionId = positionId
+  //   type ADJUSTMENT -> um dos dois, conforme o sinal do ajuste
+  // O nome/semantica ja nascem alinhados a isso justamente para que a Fase 2
+  // seja um RENAME + backfill, e nao uma remodelagem.
+  positionId        String?
+  createdAt         DateTime @default(now())
 
-  product       Product   @relation(fields: [productId], references: [id])
-  user          User      @relation(fields: [userId], references: [id])
+  product         Product          @relation(fields: [productId], references: [id])
+  user            User             @relation(fields: [userId], references: [id])
   countingSession CountingSession? @relation("CountingAdjustments", fields: [countingSessionId], references: [id])
-  
+  // `Restrict` EXPLICITO - o default do Prisma para relacao OPCIONAL seria
+  // `SetNull`, que NAO serve aqui: historico de movimentacao e trilha de
+  // auditoria, e apagar uma posicao nao pode zerar silenciosamente o endereco
+  // onde o material esteve. A forma correta de aposentar um endereco que ja foi
+  // usado e `blocked = true`, nao DELETE - storage-position.service.ts traduz a
+  // violacao de FK em AppError explicando isso.
+  position        StoragePosition? @relation(fields: [positionId], references: [id], onDelete: Restrict)
+
   @@index([productId])
   @@index([productId, createdAt])
   @@index([type])
   @@index([createdAt])
   @@index([reference])
   @@index([referenceType, reference])
+  @@index([positionId])
   @@map("stock_movements")
 }
 
@@ -577,24 +649,24 @@ model StockMovement {
 // ============================================
 
 model PurchaseQuotation {
-  id            String    @id @default(uuid())
-  quotationNumber String  @unique
-  supplierId    String
-  requestDate   DateTime  @default(now())
-  dueDate       DateTime
-  status        String    @default("PENDING") // PENDING, SENT, RECEIVED, APPROVED, REJECTED, EXPIRED
-  notes         String?   @db.Text
-  totalValue    Float     @default(0)
-  createdBy     String
-  approvedBy    String?
-  approvedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  supplier      Supplier  @relation(fields: [supplierId], references: [id])
-  creator       User      @relation("PurchaseQuotationCreator", fields: [createdBy], references: [id])
-  approver      User?     @relation("PurchaseQuotationApprover", fields: [approvedBy], references: [id])
-  items         PurchaseQuotationItem[]
+  id              String    @id @default(uuid())
+  quotationNumber String    @unique
+  supplierId      String
+  requestDate     DateTime  @default(now())
+  dueDate         DateTime
+  status          String    @default("PENDING") // PENDING, SENT, RECEIVED, APPROVED, REJECTED, EXPIRED
+  notes           String?   @db.Text
+  totalValue      Float     @default(0)
+  createdBy       String
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  supplier       Supplier                @relation(fields: [supplierId], references: [id])
+  creator        User                    @relation("PurchaseQuotationCreator", fields: [createdBy], references: [id])
+  approver       User?                   @relation("PurchaseQuotationApprover", fields: [approvedBy], references: [id])
+  items          PurchaseQuotationItem[]
   purchaseOrders PurchaseOrder[]
 
   @@index([supplierId])
@@ -605,19 +677,19 @@ model PurchaseQuotation {
 }
 
 model PurchaseQuotationItem {
-  id            String    @id @default(uuid())
-  quotationId   String
-  productId     String
-  quantity      Float
-  unitPrice     Float
-  discount      Float     @default(0)
-  totalPrice    Float
-  deliveryDays  Int?
-  notes         String?
-  
-  quotation     PurchaseQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
-  product       Product   @relation(fields: [productId], references: [id])
-  
+  id           String  @id @default(uuid())
+  quotationId  String
+  productId    String
+  quantity     Float
+  unitPrice    Float
+  discount     Float   @default(0)
+  totalPrice   Float
+  deliveryDays Int?
+  notes        String?
+
+  quotation PurchaseQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product   Product           @relation(fields: [productId], references: [id])
+
   @@index([quotationId])
   @@index([productId])
   @@map("purchase_quotation_items")
@@ -643,13 +715,13 @@ model PurchaseOrder {
   approvedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
-  supplier      Supplier  @relation(fields: [supplierId], references: [id])
-  quotation     PurchaseQuotation? @relation(fields: [quotationId], references: [id])
-  creator       User      @relation("PurchaseOrderCreator", fields: [createdBy], references: [id])
-  approver      User?     @relation("PurchaseOrderApprover", fields: [approvedBy], references: [id])
-  items         PurchaseOrderItem[]
-  receipts      PurchaseReceipt[]
+
+  supplier  Supplier            @relation(fields: [supplierId], references: [id])
+  quotation PurchaseQuotation?  @relation(fields: [quotationId], references: [id])
+  creator   User                @relation("PurchaseOrderCreator", fields: [createdBy], references: [id])
+  approver  User?               @relation("PurchaseOrderApprover", fields: [approvedBy], references: [id])
+  items     PurchaseOrderItem[]
+  receipts  PurchaseReceipt[]
 
   @@index([supplierId])
   @@index([quotationId])
@@ -660,43 +732,43 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id            String    @id @default(uuid())
-  orderId       String
-  productId     String
-  quantity      Float
-  receivedQty   Float     @default(0)
-  unitPrice     Float
-  discount      Float     @default(0)
-  totalPrice    Float
-  notes         String?
+  id          String  @id @default(uuid())
+  orderId     String
+  productId   String
+  quantity    Float
+  receivedQty Float   @default(0)
+  unitPrice   Float
+  discount    Float   @default(0)
+  totalPrice  Float
+  notes       String?
   // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder) -
   // protege receivedQty contra "lost update" quando dois recebimentos do
   // mesmo item de pedido são processados perto um do outro sem estarem
   // dentro da mesma transação
-  version       Int       @default(0)
-  
-  order         PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product       Product   @relation(fields: [productId], references: [id])
-  receiptItems  PurchaseReceiptItem[]
-  
+  version     Int     @default(0)
+
+  order        PurchaseOrder         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product               @relation(fields: [productId], references: [id])
+  receiptItems PurchaseReceiptItem[]
+
   @@index([orderId])
   @@index([productId])
   @@map("purchase_order_items")
 }
 
 model PurchaseReceipt {
-  id            String    @id @default(uuid())
-  receiptNumber String    @unique
+  id            String   @id @default(uuid())
+  receiptNumber String   @unique
   orderId       String
-  receiptDate   DateTime  @default(now())
+  receiptDate   DateTime @default(now())
   receivedBy    String
-  notes         String?   @db.Text
-  status        String    @default("PENDING") // PENDING, APPROVED, REJECTED
-  createdAt     DateTime  @default(now())
-  
-  order         PurchaseOrder @relation(fields: [orderId], references: [id])
-  receiver      User      @relation("PurchaseReceiptReceiver", fields: [receivedBy], references: [id])
-  items         PurchaseReceiptItem[]
+  notes         String?  @db.Text
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt     DateTime @default(now())
+
+  order    PurchaseOrder         @relation(fields: [orderId], references: [id])
+  receiver User                  @relation("PurchaseReceiptReceiver", fields: [receivedBy], references: [id])
+  items    PurchaseReceiptItem[]
 
   @@index([orderId])
   @@index([receiptDate])
@@ -705,19 +777,19 @@ model PurchaseReceipt {
 }
 
 model PurchaseReceiptItem {
-  id            String    @id @default(uuid())
-  receiptId     String
-  orderItemId   String
-  productId     String
-  quantity      Float
-  acceptedQty   Float
-  rejectedQty   Float     @default(0)
-  notes         String?
-  
-  receipt       PurchaseReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
-  orderItem     PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
-  product       Product   @relation(fields: [productId], references: [id])
-  
+  id          String  @id @default(uuid())
+  receiptId   String
+  orderItemId String
+  productId   String
+  quantity    Float
+  acceptedQty Float
+  rejectedQty Float   @default(0)
+  notes       String?
+
+  receipt   PurchaseReceipt   @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  orderItem PurchaseOrderItem @relation(fields: [orderItemId], references: [id])
+  product   Product           @relation(fields: [productId], references: [id])
+
   @@index([receiptId])
   @@index([orderItemId])
   @@index([productId])
@@ -729,34 +801,34 @@ model PurchaseReceiptItem {
 // ============================================
 
 model Notification {
-  id            String    @id @default(uuid())
-  userId        String
-  type          String    // INFO, WARNING, ERROR, SUCCESS
-  category      String    // PRODUCTION, STOCK, PURCHASE, QUALITY, CAPACITY
-  eventType     String    // PRODUCTION_DELAYED, STOCK_BELOW_SAFETY, etc
-  title         String
-  message       String    @db.Text
-  data          Json?     // Dados contextuais adicionais
-  
+  id        String @id @default(uuid())
+  userId    String
+  type      String // INFO, WARNING, ERROR, SUCCESS
+  category  String // PRODUCTION, STOCK, PURCHASE, QUALITY, CAPACITY
+  eventType String // PRODUCTION_DELAYED, STOCK_BELOW_SAFETY, etc
+  title     String
+  message   String @db.Text
+  data      Json? // Dados contextuais adicionais
+
   // Navegação
-  link          String?   // URL para ir direto ao recurso
-  resourceType  String?   // ProductionOrder, Product, PurchaseOrder, etc
-  resourceId    String?
-  
+  link         String? // URL para ir direto ao recurso
+  resourceType String? // ProductionOrder, Product, PurchaseOrder, etc
+  resourceId   String?
+
   // Estado
-  read          Boolean   @default(false)
-  readAt        DateTime?
-  archived      Boolean   @default(false)
-  archivedAt    DateTime?
-  
+  read       Boolean   @default(false)
+  readAt     DateTime?
+  archived   Boolean   @default(false)
+  archivedAt DateTime?
+
   // Prioridade
-  priority      Int       @default(1) // 1=baixa, 2=média, 3=alta, 4=crítica
-  expiresAt     DateTime?
-  
-  createdAt     DateTime  @default(now())
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  priority  Int       @default(1) // 1=baixa, 2=média, 3=alta, 4=crítica
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, read])
   @@index([userId, archived])
   @@index([category])
@@ -768,48 +840,48 @@ model Notification {
 }
 
 model NotificationRule {
-  id            String    @id @default(uuid())
-  roleId        String
-  eventType     String    // Tipo de evento que dispara a notificação
-  
+  id        String @id @default(uuid())
+  roleId    String
+  eventType String // Tipo de evento que dispara a notificação
+
   // Configurações
-  enabled       Boolean   @default(true)
-  minPriority   Int       @default(1)
-  
+  enabled     Boolean @default(true)
+  minPriority Int     @default(1)
+
   // Canais de entrega
-  inApp         Boolean   @default(true)
-  email         Boolean   @default(false)
-  
+  inApp Boolean @default(true)
+  email Boolean @default(false)
+
   // Condições adicionais (JSON)
-  conditions    Json?     // Ex: { "workCenterId": "xxx", "assignedOnly": true }
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  role          Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  
+  conditions Json? // Ex: { "workCenterId": "xxx", "assignedOnly": true }
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
   @@unique([roleId, eventType])
   @@map("notification_rules")
 }
 
 model NotificationPreference {
-  id            String    @id @default(uuid())
-  userId        String
-  category      String    // PRODUCTION, STOCK, PURCHASE, QUALITY, CAPACITY
-  
+  id       String @id @default(uuid())
+  userId   String
+  category String // PRODUCTION, STOCK, PURCHASE, QUALITY, CAPACITY
+
   // Canais habilitados por categoria
-  inApp         Boolean   @default(true)
-  email         Boolean   @default(false)
-  
+  inApp Boolean @default(true)
+  email Boolean @default(false)
+
   // Filtros
-  minPriority   Int       @default(1)
-  enabled       Boolean   @default(true)
-  
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  minPriority Int     @default(1)
+  enabled     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, category])
   @@map("notification_preferences")
 }
@@ -830,19 +902,19 @@ model NotificationPreference {
 /// O seed `prisma/seed-locations.ts` foi tirado da cadeia de seed (o arquivo
 /// continua no repo apenas como historico).
 model Location {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  type          LocationType
-  parentId      String?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  parent        Location?  @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children      Location[] @relation("LocationHierarchy")
+  id        String       @id @default(uuid())
+  code      String       @unique
+  name      String
+  type      LocationType
+  parentId  String?
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  parent        Location?      @relation("LocationHierarchy", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children      Location[]     @relation("LocationHierarchy")
   countingItems CountingItem[]
-  
+
   @@index([parentId])
   @@index([type, active])
   @@map("locations")
@@ -850,41 +922,41 @@ model Location {
 
 // Plano de Contagem
 model CountingPlan {
-  id                String              @id @default(uuid())
-  code              String              @unique
-  name              String
-  description       String?             @db.Text
-  type              CountingType
-  frequency         CountingFrequency?
-  status            CountingPlanStatus  @default(DRAFT)
-  
+  id          String             @id @default(uuid())
+  code        String             @unique
+  name        String
+  description String?            @db.Text
+  type        CountingType
+  frequency   CountingFrequency?
+  status      CountingPlanStatus @default(DRAFT)
+
   // Critérios de seleção (JSON)
-  criteria          Json?
-  
+  criteria Json?
+
   // Configurações
-  allowBlindCount   Boolean             @default(true)
-  requireRecount    Boolean             @default(true)
-  tolerancePercent  Decimal?            @db.Decimal(5, 2)
-  toleranceQty      Int?
-  priority          Int                 @default(5)
-  
+  allowBlindCount  Boolean  @default(true)
+  requireRecount   Boolean  @default(true)
+  tolerancePercent Decimal? @db.Decimal(5, 2)
+  toleranceQty     Int?
+  priority         Int      @default(5)
+
   // Datas
-  startDate         DateTime
-  endDate           DateTime?
-  nextExecution     DateTime?
-  
+  startDate     DateTime
+  endDate       DateTime?
+  nextExecution DateTime?
+
   // Responsável
-  createdBy         String
-  
+  createdBy String
+
   // Auditoria
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relações
-  creator           User                @relation("CountingPlanCreator", fields: [createdBy], references: [id])
-  sessions          CountingSession[]
-  products          CountingPlanProduct[]
-  
+  creator  User                  @relation("CountingPlanCreator", fields: [createdBy], references: [id])
+  sessions CountingSession[]
+  products CountingPlanProduct[]
+
   @@index([status, nextExecution])
   @@index([type, frequency])
   @@index([createdBy])
@@ -893,143 +965,143 @@ model CountingPlan {
 
 // Sessão de Contagem (Execução do plano)
 model CountingSession {
-  id                String              @id @default(uuid())
-  code              String              @unique
-  planId            String
-  status            SessionStatus       @default(SCHEDULED)
+  id      String        @id @default(uuid())
+  code    String        @unique
+  planId  String
+  status  SessionStatus @default(SCHEDULED)
   // ✅ Fase 4 item 4.2: lock otimista (ver comentário em ProductionOrder)
-  version           Int                 @default(0)
+  version Int           @default(0)
 
   // Datas
-  scheduledDate     DateTime
-  startedAt         DateTime?
-  completedAt       DateTime?
-  
+  scheduledDate DateTime
+  startedAt     DateTime?
+  completedAt   DateTime?
+
   // Responsáveis
-  assignedTo        String?
-  completedBy       String?
-  
+  assignedTo  String?
+  completedBy String?
+
   // Estatísticas
-  totalItems        Int                 @default(0)
-  countedItems      Int                 @default(0)
-  itemsWithDiff     Int                 @default(0)
-  accuracyPercent   Decimal?            @db.Decimal(5, 2)
-  
+  totalItems      Int      @default(0)
+  countedItems    Int      @default(0)
+  itemsWithDiff   Int      @default(0)
+  accuracyPercent Decimal? @db.Decimal(5, 2)
+
   // Auditoria
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relações
-  plan              CountingPlan        @relation(fields: [planId], references: [id])
-  assignedUser      User?               @relation("SessionAssignedTo", fields: [assignedTo], references: [id])
-  completedUser     User?               @relation("SessionCompletedBy", fields: [completedBy], references: [id])
-  items             CountingItem[]
-  adjustments       StockMovement[]     @relation("CountingAdjustments")
-  assignments       CountingAssignment[]
-  
+  plan          CountingPlan         @relation(fields: [planId], references: [id])
+  assignedUser  User?                @relation("SessionAssignedTo", fields: [assignedTo], references: [id])
+  completedUser User?                @relation("SessionCompletedBy", fields: [completedBy], references: [id])
+  items         CountingItem[]
+  adjustments   StockMovement[]      @relation("CountingAdjustments")
+  assignments   CountingAssignment[]
+
+  @@unique([planId, scheduledDate])
   @@index([planId])
   @@index([status, scheduledDate])
   @@index([assignedTo])
-  @@unique([planId, scheduledDate])
   @@map("counting_sessions")
 }
 
 // Item de Contagem
 model CountingItem {
-  id                String              @id @default(uuid())
-  sessionId         String
-  productId         String
-  locationId        String?
+  id         String  @id @default(uuid())
+  sessionId  String
+  productId  String
+  locationId String?
   // ✅ Fase 4 item 4.2: lock otimista - camada extra alem do lock pessimista
   // (SELECT ... FOR UPDATE) ja adicionado em count()/recount() na Fase 3;
   // esse cobre chamadas concorrentes na MESMA requisicao logica, este cobre
   // o cliente que ficou com dados desatualizados na tela por mais tempo
-  version           Int                 @default(0)
+  version    Int     @default(0)
 
   // Quantidades
-  systemQty         Decimal             @db.Decimal(10, 2)
-  countedQty        Decimal?            @db.Decimal(10, 2)
-  recountQty        Decimal?            @db.Decimal(10, 2)
-  finalQty          Decimal?            @db.Decimal(10, 2)
-  
+  systemQty  Decimal  @db.Decimal(10, 2)
+  countedQty Decimal? @db.Decimal(10, 2)
+  recountQty Decimal? @db.Decimal(10, 2)
+  finalQty   Decimal? @db.Decimal(10, 2)
+
   // Divergência
-  difference        Decimal?            @db.Decimal(10, 2)
-  differencePercent Decimal?            @db.Decimal(5, 2)
-  hasDifference     Boolean             @default(false)
-  
+  difference        Decimal? @db.Decimal(10, 2)
+  differencePercent Decimal? @db.Decimal(5, 2)
+  hasDifference     Boolean  @default(false)
+
   // Status
-  status            CountingItemStatus  @default(PENDING)
-  
+  status CountingItemStatus @default(PENDING)
+
   // Observações
-  notes             String?             @db.Text
-  reason            String?             @db.Text
-  
+  notes  String? @db.Text
+  reason String? @db.Text
+
   // Contadores
-  countedBy         String?
-  countedAt         DateTime?
-  recountedBy       String?
-  recountedAt       DateTime?
-  
+  countedBy   String?
+  countedAt   DateTime?
+  recountedBy String?
+  recountedAt DateTime?
+
   // Sequência para ordenação
-  sequence          Int?               @default(0)
-  
+  sequence Int? @default(0)
+
   // Auditoria
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relações
-  session           CountingSession     @relation(fields: [sessionId], references: [id])
-  product           Product             @relation(fields: [productId], references: [id])
-  location          Location?           @relation(fields: [locationId], references: [id])
-  counter           User?               @relation("ItemCountedBy", fields: [countedBy], references: [id])
-  recounter         User?               @relation("ItemRecountedBy", fields: [recountedBy], references: [id])
-  
+  session   CountingSession @relation(fields: [sessionId], references: [id])
+  product   Product         @relation(fields: [productId], references: [id])
+  location  Location?       @relation(fields: [locationId], references: [id])
+  counter   User?           @relation("ItemCountedBy", fields: [countedBy], references: [id])
+  recounter User?           @relation("ItemRecountedBy", fields: [recountedBy], references: [id])
+
+  @@unique([sessionId, productId, locationId])
   @@index([sessionId, status])
   @@index([productId])
   @@index([hasDifference])
   @@index([countedBy])
-  @@unique([sessionId, productId, locationId])
   @@map("counting_items")
 }
 
 // Relação de produtos em planos de contagem
 model CountingPlanProduct {
-  id                String        @id @default(uuid())
-  planId            String
-  productId         String
-  priority          Int           @default(0)
-  
-  plan              CountingPlan  @relation(fields: [planId], references: [id])
-  product           Product       @relation(fields: [productId], references: [id])
-  
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
+  id        String @id @default(uuid())
+  planId    String
+  productId String
+  priority  Int    @default(0)
+
+  plan    CountingPlan @relation(fields: [planId], references: [id])
+  product Product      @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([planId, productId])
   @@map("counting_plan_products")
 }
 
 // Atribuição de contadores a sessões
 model CountingAssignment {
-  id                String            @id @default(uuid())
-  sessionId         String
-  userId            String
-  role              CounterRole
-  assignedAt        DateTime          @default(now())
-  
-  session           CountingSession   @relation(fields: [sessionId], references: [id])
-  user              User              @relation(fields: [userId], references: [id])
-  
+  id         String      @id @default(uuid())
+  sessionId  String
+  userId     String
+  role       CounterRole
+  assignedAt DateTime    @default(now())
+
+  session CountingSession @relation(fields: [sessionId], references: [id])
+  user    User            @relation(fields: [userId], references: [id])
+
   @@unique([sessionId, userId])
   @@map("counting_assignments")
 }
 
 // Papéis de contador
 enum CounterRole {
-  PRIMARY     // Contador principal
-  SECONDARY   // Recontador
-  VALIDATOR   // Validador final
-  SUPERVISOR  // Supervisor
+  PRIMARY // Contador principal
+  SECONDARY // Recontador
+  VALIDATOR // Validador final
+  SUPERVISOR // Supervisor
 }
 
 // ============================================
@@ -1090,86 +1162,90 @@ enum CountingItemStatus {
 }
 
 model Warehouse {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  name          String
-  legalName     String?
-  document      String?
-  email         String?
-  phone         String?
-  address       String?
-  city          String?
-  state         String?
-  zipCode       String?
-  country       String    @default("BR")
-  managerName   String?
-  capacity      Float?
-  description   String?   @db.Text
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  legalName   String?
+  document    String?
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  country     String   @default("BR")
+  managerName String?
+  capacity    Float?
+  description String?  @db.Text
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  structures      WarehouseStructure[]
+  structures WarehouseStructure[]
 
   @@map("warehouses")
 }
 
 model WarehouseStructure {
-  id              String   @id @default(uuid())
-  warehouseId     String
-  streetCode      String
-  floors          Int
-  positions       Int
+  id             String       @id @default(uuid())
+  warehouseId    String
+  streetCode     String
+  floors         Int
+  positions      Int
   // F0.3: campos dimensionais passaram a ser opcionais. Um tipo de AREA
   // (PISO, DOCA, QUARENTENA, BLOQUEIO, EXPEDICAO) nao tem paletizacao, entao
   // exigir peso/dimensao nao faz sentido. Continuam OBRIGATORIOS para os
   // tipos de rack - regra aplicada nos validators (Joi .when/positionType),
   // nao no banco, porque a obrigatoriedade e condicional ao tipo.
-  weightCapacity  Float?
-  height          Float?
-  width           Float?
-  depth           Float?
-  maxHeight       Float?
-  blocked         Boolean  @default(false)
-  positionType    PositionType
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  weightCapacity Float?
+  height         Float?
+  width          Float?
+  depth          Float?
+  maxHeight      Float?
+  blocked        Boolean      @default(false)
+  positionType   PositionType
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+  warehouse        Warehouse         @relation(fields: [warehouseId], references: [id])
   storagePositions StoragePosition[]
 
   @@map("warehouse_structures")
 }
 
 model StoragePosition {
-  id              String   @id @default(uuid())
-  structureId     String
+  id             String       @id @default(uuid())
+  structureId    String
   // F0.1: endereco persistido no formato `ARM-RUA-AA-PP` (warehouseCode,
   // streetCode, floor e position com 2 digitos). Antes era concatenado em
   // memoria a cada leitura em getPositionsByStructure() - nao dava para buscar
   // por codigo, indexar nem pendurar saldo/movimento/etiqueta nele. E a unidade
   // enderecavel atomica do WMS (decisao 4.1 do WMS_IMPLEMENTATION_ANALYSIS.md).
-  code            String   @unique
-  warehouseCode   String
-  streetCode      String
-  floor           Int
-  position        Int
-  positionType    PositionType
+  code           String       @unique
+  warehouseCode  String
+  streetCode     String
+  floor          Int
+  position       Int
+  positionType   PositionType
   // F0.3: opcionais - ver o comentario equivalente em WarehouseStructure.
-  weightCapacity  Float?
-  height          Float?
-  width           Float?
-  depth           Float?
-  maxHeight       Float?
-  blocked         Boolean  @default(false)
+  weightCapacity Float?
+  height         Float?
+  width          Float?
+  depth          Float?
+  maxHeight      Float?
+  blocked        Boolean      @default(false)
   // F0.4 (decisao D3): `occupied` foi REMOVIDO. Era uma flag denormalizada que
   // nenhum codigo jamais escrevia; mante-la seria criar uma fonte de divergencia
   // com o saldo real. Ocupacao passa a ser derivada da existencia de saldo na
   // posicao (StockPositionBalance, Fase 1).
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  structure       WarehouseStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  structure             WarehouseStructure     @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  // F1.1/F1.2: saldo e movimentacao pendurados no endereco. Ambas as relacoes
+  // sao RESTRICT (default) - ver o comentario em StockPositionBalance.
+  stockPositionBalances StockPositionBalance[]
+  stockMovements        StockMovement[]
 
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])

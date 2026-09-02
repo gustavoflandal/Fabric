@@ -131,7 +131,81 @@ export const getPositionByCode = async (code: string) => {
   return position;
 };
 
+/**
+ * F1.1 do plano do WMS: guarda de exclusão de endereço.
+ *
+ * A partir da Fase 1, `stock_position_balances` e `stock_movements.positionId`
+ * apontam para `storage_positions` com FK RESTRICT (nenhuma cascata — perder
+ * saldo ou reescrever trilha de auditoria por deleção em cascata seria um bug
+ * grave e silencioso). Sem esta checagem, tentar excluir um endereço em uso
+ * vazaria um `P2003` cru do Prisma como erro 500.
+ *
+ * A checagem cobre DUAS coisas diferentes de propósito:
+ *   * saldo (`stock_position_balances`): estado atual. É reversível — zere o
+ *     saldo movimentando o material para outro endereço e a exclusão passa.
+ *   * histórico (`stock_movements`): trilha de auditoria. Não é reversível, e
+ *     não deve ser: um endereço por onde passou material não se apaga, se
+ *     BLOQUEIA (`blocked = true`, que já existe desde a Fase 0).
+ *
+ * `deletePositionsByStructure` e `deletePosition` chamam isto ANTES do delete.
+ * Isso não é uma garantia transacional (uma movimentação concorrente entre a
+ * checagem e o delete ainda cairia na FK), é o que transforma o caso comum em
+ * uma mensagem útil; a FK continua sendo a garantia real.
+ */
+export const assertPositionsDeletable = async (
+  where: { structureId: string } | { id: string }
+) => {
+  const positions = await prisma.storagePosition.findMany({
+    where,
+    select: { id: true, code: true }
+  });
+
+  if (positions.length === 0) {
+    return;
+  }
+
+  const positionIds = positions.map((p) => p.id);
+  const codeById = new Map(positions.map((p) => [p.id, p.code]));
+
+  const withBalance = await prisma.stockPositionBalance.findMany({
+    where: { storagePositionId: { in: positionIds } },
+    select: { storagePositionId: true },
+    distinct: ['storagePositionId'],
+    take: 5
+  });
+
+  if (withBalance.length > 0) {
+    const codes = withBalance.map((b) => codeById.get(b.storagePositionId)).join(', ');
+    throw new AppError(
+      409,
+      `Não é possível excluir: há saldo de estoque registrado nas posições ${codes}. ` +
+        'Movimente o material para outro endereço antes de excluir.'
+    );
+  }
+
+  const withMovements = await prisma.stockMovement.findMany({
+    where: { positionId: { in: positionIds } },
+    select: { positionId: true },
+    distinct: ['positionId'],
+    take: 5
+  });
+
+  if (withMovements.length > 0) {
+    const codes = withMovements
+      .map((m) => (m.positionId ? codeById.get(m.positionId) : null))
+      .filter(Boolean)
+      .join(', ');
+    throw new AppError(
+      409,
+      `Não é possível excluir: há histórico de movimentação nas posições ${codes}. ` +
+        'Para aposentar um endereço que já foi usado, bloqueie-o (blocked) em vez de excluí-lo.'
+    );
+  }
+};
+
 export const deletePositionsByStructure = async (structureId: string) => {
+  await assertPositionsDeletable({ structureId });
+
   const result = await prisma.storagePosition.deleteMany({
     where: { structureId }
   });
@@ -147,6 +221,8 @@ export const updatePosition = async (positionId: string, data: any) => {
 };
 
 export const deletePosition = async (positionId: string) => {
+  await assertPositionsDeletable({ id: positionId });
+
   return await prisma.storagePosition.delete({
     where: { id: positionId }
   });
