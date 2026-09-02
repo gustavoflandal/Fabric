@@ -7,6 +7,7 @@ import notificationScheduler from './services/notification-scheduler.service';
 import logCleanupJob from './jobs/log-cleanup.job';
 import stockPositionReconciliationJob from './jobs/stock-position-reconciliation.job';
 import replenishmentJob from './jobs/replenishment.job';
+import lotExpiryJob from './jobs/lot-expiry.job';
 import { loadLicensedModules } from './services/licensed-module.service';
 
 const startServer = async () => {
@@ -46,6 +47,10 @@ const startServer = async () => {
     // job acima — sai cedo sem WMS licenciado.
     replenishmentJob.start();
 
+    // Fase 5: alerta de validade de lote (a vencer e já vencido com saldo).
+    // Mesmo padrão dos dois jobs acima — sai cedo sem WMS licenciado.
+    lotExpiryJob.start();
+
     // Start server
     app.listen(config.port, () => {
       logger.info(`🚀 Server running on port ${config.port}`);
@@ -65,6 +70,7 @@ process.on('SIGTERM', async () => {
   logCleanupJob.stop();
   stockPositionReconciliationJob.stop();
   replenishmentJob.stop();
+  lotExpiryJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
@@ -75,6 +81,7 @@ process.on('SIGINT', async () => {
   logCleanupJob.stop();
   stockPositionReconciliationJob.stop();
   replenishmentJob.stop();
+  lotExpiryJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

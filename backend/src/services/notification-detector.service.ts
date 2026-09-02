@@ -1,7 +1,42 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
+import { config } from '../config/env';
 import notificationService from './notification.service';
 import { isModuleEnabled } from './licensed-module.service';
 import { detectReplenishmentNeeds } from './replenishment.service';
+
+/**
+ * Um lote com validade próxima (ou já vencida) e saldo parado em alguma posição.
+ * Devolvido por `checkExpiringLots()` para o job poder logar sem reconsultar.
+ */
+export interface LotExpiryFinding {
+  lotId: string;
+  lotNumber: string;
+  productId: string;
+  productCode: string;
+  productName: string;
+  expiresAt: Date;
+  /** Dias INTEIROS até vencer (`EXPIRING_SOON`) ou desde que venceu (`EXPIRED`). */
+  days: number;
+  /** Soma do saldo do lote em todas as posições, como string (Decimal). */
+  totalQuantity: string;
+  positions: { positionId: string; positionCode: string; quantity: string }[];
+  status: 'EXPIRING_SOON' | 'EXPIRED';
+  /** `false` quando o dedupe de 24h barrou a notificação nesta execução. */
+  notified: boolean;
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * Janela de dedupe dos dois eventos de validade. Ver a nota extensa em
+ * `checkExpiringLots()` sobre por que 24h (e não as 6h da reposição), e sobre a
+ * chave ser (eventType, lotId) e não só o lote.
+ */
+const LOT_EXPIRY_DEDUPE_HOURS = 24;
+
+/** Endereços mostrados na MENSAGEM; a lista completa vai sempre em `data`. */
+const MAX_POSITIONS_IN_MESSAGE = 3;
 
 /**
  * Service responsável por detectar eventos e criar notificações automaticamente
@@ -759,6 +794,237 @@ export class NotificationDetectorService {
     }
 
     return needs;
+  }
+
+  /**
+   * FASE 5 (complemento) — VALIDADE DE LOTE. Dois eventos, um detector.
+   *
+   *   * `LOT_EXPIRING_SOON` — `Lot.expiresAt` dentro da janela de antecedência
+   *     (`config.wms.lotExpiryAlertDays`, default 7 dias) e o lote ainda com
+   *     saldo em alguma posição. `WARNING`, prioridade 3.
+   *   * `LOT_EXPIRED` — `expiresAt` no passado e o lote AINDA com saldo.
+   *     `ERROR`, prioridade 4.
+   *
+   * POR QUE ESTE DETECTOR EXISTE, dado que a Fase 5 já bloqueia a saída de lote
+   * vencido (`stock.service.ts::assertLotNotExpiredForOutbound()`): aquele
+   * bloqueio é o "depois". Ele impede que material vencido saia, mas não impede
+   * que ele CONTINUE ALI — o FEFO deixa de escolhê-lo, o picking recusa, e o
+   * lote simplesmente some do fluxo, ocupando um endereço, contando no saldo
+   * agregado e sem ninguém ser avisado, até alguém tropeçar nele numa contagem.
+   * Só o `ADJUSTMENT` de baixa resolve, e o `ADJUSTMENT` só acontece se alguém
+   * souber. Este detector é quem conta.
+   *
+   * "AINDA COM SALDO" É A CONDIÇÃO QUE DEFINE OS DOIS EVENTOS. Lote sem saldo em
+   * posição nenhuma já foi consumido, expedido ou baixado — ele continua na
+   * tabela porque é rastreabilidade histórica (`Restrict` nas FKs justamente
+   * para isso), e alertar sobre a validade de um lote que não existe mais no
+   * armazém é ruído garantido, crescente e permanente: a cada dia que passa a
+   * base tem mais lotes vencidos que já foram tratados.
+   *
+   * PRIORIDADE 3 PARA O "VAI VENCER", e não 2. O critério que o resto do sistema
+   * já usa: prioridade 2 é diagnóstico (`CAPACITY_LOW` — nada se perde se ficar
+   * dias sem leitura), prioridade 3 é prazo com consequência
+   * (`STOCK_BELOW_SAFETY`, `PRODUCTION_DELAYED`, `REPLENISHMENT_NEEDED`). Lote a
+   * vencer é a forma mais dura de prazo que existe aqui: a janela é curta, não
+   * renovável, e o custo de perdê-la é a perda física do material. Fica no mesmo
+   * degrau de `STOCK_BELOW_SAFETY` — os dois dizem "aja nos próximos dias ou vai
+   * faltar material", um por falta, outro por vencimento.
+   *
+   * PRIORIDADE 4 PARA O "JÁ VENCEU": é o mesmo degrau de `MATERIAL_UNAVAILABLE`
+   * e do `NO_SOURCE` da reposição, e pelo mesmo motivo — não é mais um aviso
+   * sobre o futuro, é um estado errado do armazém agora. O saldo já é
+   * inutilizável, já está preso num endereço que outra coisa poderia ocupar, e o
+   * agregado (`stock_balances`) ainda o conta como se fosse material disponível
+   * para o MRP.
+   *
+   * DEDUPE DE 24H, POR EVENTO. As 6h de `REPLENISHMENT_NEEDED` existem porque
+   * reposição muda dentro de um turno; validade não muda em uma hora nem em
+   * seis. 24h é o mesmo intervalo de `STOCK_BELOW_SAFETY` e é o que casa com a
+   * periodicidade diária do job: uma execução, uma notificação por lote.
+   *
+   *   ⚠️ A chave do dedupe é (eventType, lotId), então os DOIS eventos são
+   *   deduplicados independentemente. Isso é o que garante que a virada de
+   *   `EXPIRING_SOON` para `EXPIRED` seja notificada: o alerta crítico do dia do
+   *   vencimento não é suprimido pelo aviso de véspera do dia anterior. Uma
+   *   chave só por lote engoliria justamente a notificação que mais importa.
+   *
+   * SEM SERVICE SEPARADO (diferente de F4.10, que tem
+   * `replenishment.service.ts`): a reposição CRIA tarefa — tem regra de negócio,
+   * escrita e dedupe próprios, e é chamável de fora da notificação. Isto aqui é
+   * leitura pura: uma consulta e duas mensagens. Um service só para embrulhar um
+   * `findMany` seria uma camada sem conteúdo.
+   *
+   * Posição BLOQUEADA não é filtrada, ao contrário de F4.10. Lá o filtro existe
+   * porque a tarefa gerada precisa ser executável; aqui não se gera tarefa, e
+   * lote vencido numa posição bloqueada continua sendo exatamente o problema que
+   * o evento descreve — estoque morto ocupando endereço.
+   */
+  async checkExpiringLots(): Promise<LotExpiryFinding[]> {
+    // Fail-closed ANTES da consulta, como em `checkReplenishmentNeeded()`: sem
+    // WMS licenciado não há recebimento endereçado, logo `Lot` não é populado
+    // por nenhum caminho real e a varredura só encontraria vazio.
+    if (!(await isModuleEnabled('WMS'))) {
+      return [];
+    }
+
+    const now = new Date();
+    const horizon = new Date(
+      now.getTime() + config.wms.lotExpiryAlertDays * MS_PER_DAY
+    );
+
+    const lots = await prisma.lot.findMany({
+      where: {
+        // UMA consulta para os dois eventos: tudo que vence antes do horizonte
+        // inclui o que já venceu. A separação é feita em memória comparando com
+        // `now`, sem uma segunda ida ao banco.
+        //
+        // Lote SEM validade (`expiresAt: null`) sai por semântica de SQL —
+        // NULL não satisfaz `<`. É o comportamento certo e não um efeito
+        // colateral: sem data não há vencimento a prever nem a constatar, e o
+        // schema deixa a coluna nula de propósito (nem todo lote tem validade).
+        expiresAt: { lt: horizon },
+        positionBalances: { some: { quantity: { gt: 0 } } },
+      },
+      select: {
+        id: true,
+        lotNumber: true,
+        expiresAt: true,
+        productId: true,
+        product: { select: { code: true, name: true } },
+        positionBalances: {
+          // O MESMO filtro do `some` acima: sem ele, um lote que tem saldo numa
+          // posição e linha zerada em outras traria as zeradas junto e a
+          // notificação apontaria endereços onde não há nada para tratar.
+          where: { quantity: { gt: 0 } },
+          select: {
+            quantity: true,
+            storagePosition: { select: { id: true, code: true } },
+          },
+        },
+      },
+      // O mais urgente primeiro — é a ordem em que o log do job sai e em que as
+      // notificações são criadas.
+      orderBy: { expiresAt: 'asc' },
+    });
+
+    if (lots.length === 0) {
+      return [];
+    }
+
+    const recipients = await this.getUsersByRole('MANAGER');
+
+    const findings: LotExpiryFinding[] = [];
+
+    for (const lot of lots) {
+      // Não-nulo garantido pelo filtro `lt` da consulta (NULL não passa por
+      // ele); o `as` só informa isso ao TypeScript, que lê a coluna como
+      // `Date | null` pelo schema.
+      const expiresAt = lot.expiresAt as Date;
+      const expired = expiresAt.getTime() < now.getTime();
+
+      const positions = lot.positionBalances.map((balance) => ({
+        positionId: balance.storagePosition.id,
+        positionCode: balance.storagePosition.code,
+        quantity: balance.quantity.toString(),
+      }));
+
+      const totalQuantity = lot.positionBalances
+        .reduce((sum, balance) => sum.plus(balance.quantity), new Prisma.Decimal(0))
+        .toString();
+
+      // Vencido conta dias INTEIROS decorridos (`floor`) — "venceu hoje" é a
+      // resposta honesta para o lote que virou há três horas. A vencer arredonda
+      // para CIMA (`ceil`): faltando 6 horas, "vence em 1 dia" é o que o
+      // supervisor precisa ler, não "em 0 dias".
+      const diffMs = expired ? now.getTime() - expiresAt.getTime() : expiresAt.getTime() - now.getTime();
+      const days = expired ? Math.floor(diffMs / MS_PER_DAY) : Math.ceil(diffMs / MS_PER_DAY);
+
+      const finding: LotExpiryFinding = {
+        lotId: lot.id,
+        lotNumber: lot.lotNumber,
+        productId: lot.productId,
+        productCode: lot.product.code,
+        productName: lot.product.name,
+        expiresAt,
+        days,
+        totalQuantity,
+        positions,
+        status: expired ? 'EXPIRED' : 'EXPIRING_SOON',
+        notified: false,
+      };
+
+      findings.push(finding);
+
+      if (recipients.length === 0) {
+        continue;
+      }
+
+      const eventType = expired ? 'LOT_EXPIRED' : 'LOT_EXPIRING_SOON';
+
+      const alreadyNotified = await notificationService.checkRecentNotification(
+        eventType,
+        lot.id,
+        LOT_EXPIRY_DEDUPE_HOURS
+      );
+
+      if (alreadyNotified) {
+        continue;
+      }
+
+      const dateLabel = expiresAt.toLocaleDateString('pt-BR');
+      // A lista completa vai em `data.positions`; a MENSAGEM mostra no máximo
+      // três endereços. Um lote espalhado por doze posições viraria uma linha
+      // ilegível no sino de notificação, e o endereço exato de cada saldo é
+      // informação de quem vai executar a baixa — que abre a notificação.
+      const positionLabel =
+        positions.length <= MAX_POSITIONS_IN_MESSAGE
+          ? positions.map((p) => p.positionCode).join(', ')
+          : `${positions
+              .slice(0, MAX_POSITIONS_IN_MESSAGE)
+              .map((p) => p.positionCode)
+              .join(', ')} e mais ${positions.length - MAX_POSITIONS_IN_MESSAGE}`;
+
+      const expiredLabel =
+        days === 0 ? 'venceu hoje' : `venceu há ${days} ${days === 1 ? 'dia' : 'dias'}`;
+
+      await notificationService.createBulk(
+        recipients.map((u) => u.id),
+        {
+          type: expired ? 'ERROR' : 'WARNING',
+          category: 'WAREHOUSE',
+          eventType,
+          title: expired ? 'Lote Vencido com Saldo' : 'Lote Próximo do Vencimento',
+          message: expired
+            ? `Lote ${lot.lotNumber} de ${lot.product.name} ${expiredLabel} (${dateLabel}) ` +
+              `e ainda tem ${totalQuantity} em ${positionLabel}`
+            : `Lote ${lot.lotNumber} de ${lot.product.name} vence em ${days} ` +
+              `${days === 1 ? 'dia' : 'dias'} (${dateLabel}): ${totalQuantity} em ${positionLabel}`,
+          data: {
+            lotNumber: lot.lotNumber,
+            productId: lot.productId,
+            productCode: lot.product.code,
+            productName: lot.product.name,
+            expiresAt,
+            days,
+            totalQuantity,
+            positions,
+            alertWindowDays: config.wms.lotExpiryAlertDays,
+          },
+          // Não existe tela de lote no frontend (a Fase 5 foi backend-only), e
+          // inventar uma rota morta seria pior que apontar para uma real: o
+          // produto é o caminho por onde se chega ao saldo do lote, e é a mesma
+          // rota que `STOCK_BELOW_SAFETY` já usa.
+          link: `/stock/products/${lot.productId}`,
+          resourceType: 'Lot',
+          resourceId: lot.id,
+          priority: expired ? 4 : 3,
+        }
+      );
+
+      finding.notified = true;
+    }
+
+    return findings;
   }
 
   /**
