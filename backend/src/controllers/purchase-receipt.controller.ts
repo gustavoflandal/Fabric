@@ -5,7 +5,7 @@ import purchaseReceiptService from '../services/purchase-receipt.service';
 export class PurchaseReceiptController {
   async create(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const receipt = await purchaseReceiptService.create(req.body, req.user!.id);
+      const receipt = await purchaseReceiptService.create(req.body, req.userId!);
       
       return res.status(201).json({
         status: 'success',
@@ -53,7 +53,7 @@ export class PurchaseReceiptController {
     try {
       const { reason } = req.body;
 
-      await purchaseReceiptService.cancel(req.params.id, req.user!.id, reason);
+      await purchaseReceiptService.cancel(req.params.id, req.userId!, reason);
 
       return res.status(200).json({
         status: 'success',

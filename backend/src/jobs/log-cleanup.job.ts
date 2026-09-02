@@ -6,10 +6,12 @@
 import cron from 'node-cron';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
+import { config } from '../config/env';
 
 export class LogCleanupJob {
   private job: cron.ScheduledTask | null = null;
-  private readonly RETENTION_DAYS = 90; // Manter logs por 90 dias
+  // ✅ Fase 5 item 5.6: configurável via AUDIT_LOG_RETENTION_DAYS (config/env.ts)
+  private readonly RETENTION_DAYS = config.audit.retentionDays;
 
   /**
    * Inicia o job de limpeza (executa diariamente às 2h da manhã)

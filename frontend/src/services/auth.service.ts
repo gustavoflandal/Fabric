@@ -23,6 +23,7 @@ export interface AuthResponse {
 
 export interface RefreshTokenResponse {
   accessToken: string
+  refreshToken: string
 }
 
 class AuthService {

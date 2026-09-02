@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateSupplierDto {
   code: string;
@@ -80,7 +81,7 @@ export class SupplierService {
 
   async toggleActive(id: string) {
     const supplier = await this.getById(id);
-    if (!supplier) throw new Error('Fornecedor não encontrado');
+    if (!supplier) throw new AppError(404, 'Fornecedor não encontrado');
     return await this.update(id, { active: !supplier.active });
   }
 }

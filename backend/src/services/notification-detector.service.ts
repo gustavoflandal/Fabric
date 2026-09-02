@@ -239,11 +239,11 @@ export class NotificationDetectorService {
       },
     });
 
-    if (!pointing || pointing.goodQty === 0) {
+    if (!pointing || pointing.quantityGood === 0) {
       return;
     }
 
-    const scrapRate = (pointing.scrapQty / (pointing.goodQty + pointing.scrapQty)) * 100;
+    const scrapRate = (pointing.quantityScrap / (pointing.quantityGood + pointing.quantityScrap)) * 100;
     const maxScrapRate = 5; // 5% - Configurável
 
     if (scrapRate > maxScrapRate) {
@@ -262,14 +262,14 @@ export class NotificationDetectorService {
           message: `Apontamento da OP ${pointing.operation.productionOrder.orderNumber} registrou ${scrapRate.toFixed(1)}% de refugo (limite: ${maxScrapRate}%)`,
           data: {
             orderNumber: pointing.operation.productionOrder.orderNumber,
-            operationName: pointing.operation.name,
+            operationName: pointing.operation.description,
             scrapRate: scrapRate.toFixed(2),
             maxScrapRate,
-            scrapQty: pointing.scrapQty,
-            goodQty: pointing.goodQty,
+            scrapQty: pointing.quantityScrap,
+            goodQty: pointing.quantityGood,
             operatorName: pointing.user.name,
           },
-          link: `/production/orders/${pointing.operation.orderId}`,
+          link: `/production/orders/${pointing.operation.productionOrderId}`,
           resourceType: 'ProductionPointing',
           resourceId: pointing.id,
           priority: 4, // Crítica
@@ -393,12 +393,12 @@ export class NotificationDetectorService {
         message: `${pointing.user.name} concluiu operação da OP ${pointing.operation.productionOrder.orderNumber}`,
         data: {
           orderNumber: pointing.operation.productionOrder.orderNumber,
-          operationName: pointing.operation.name,
+          operationName: pointing.operation.description,
           operatorName: pointing.user.name,
-          goodQty: pointing.goodQty,
-          scrapQty: pointing.scrapQty,
+          goodQty: pointing.quantityGood,
+          scrapQty: pointing.quantityScrap,
         },
-        link: `/production/orders/${pointing.operation.orderId}`,
+        link: `/production/orders/${pointing.operation.productionOrderId}`,
         resourceType: 'ProductionPointing',
         resourceId: pointing.id,
         priority: 2, // Média

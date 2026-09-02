@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 // Service para gerenciar posições de armazenagem
 export const generatePositions = async (structureId: string) => {
@@ -9,7 +10,7 @@ export const generatePositions = async (structureId: string) => {
   });
 
   if (!structure) {
-    throw new Error('Estrutura não encontrada');
+    throw new AppError(404, 'Estrutura não encontrada');
   }
 
   // Verificar se já existem posições
@@ -18,7 +19,7 @@ export const generatePositions = async (structureId: string) => {
   });
 
   if (existingPositions > 0) {
-    throw new Error('Esta estrutura já possui posições geradas. Exclua as posições existentes antes de gerar novas.');
+    throw new AppError(409, 'Esta estrutura já possui posições geradas. Exclua as posições existentes antes de gerar novas.');
   }
 
   // Gerar as posições

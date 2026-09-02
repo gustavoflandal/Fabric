@@ -144,9 +144,12 @@ import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import RoleFormModal from '@/components/roles/RoleFormModal.vue';
 import PermissionsModal from '@/components/roles/PermissionsModal.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const roles = ref<Role[]>([]);
 const loading = ref(false);
@@ -182,7 +185,7 @@ const managePermissions = (role: Role) => {
 };
 
 const deleteRole = async (role: Role) => {
-  if (!confirm(`Deseja realmente excluir o perfil "${role.name}"?\n\nEsta ação não pode ser desfeita.`)) {
+  if (!(await confirmDialog(`Deseja realmente excluir o perfil "${role.name}"?\n\nEsta ação não pode ser desfeita.`))) {
     return;
   }
 
@@ -190,7 +193,7 @@ const deleteRole = async (role: Role) => {
     await roleService.delete(role.id);
     loadRoles();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao excluir perfil');
+    toast.error(error.response?.data?.message || 'Erro ao excluir perfil');
   }
 };
 

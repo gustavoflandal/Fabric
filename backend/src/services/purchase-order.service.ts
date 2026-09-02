@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreatePurchaseOrderDto {
   supplierId: string;
@@ -105,11 +106,11 @@ export class PurchaseOrderService {
     });
 
     if (!quotation) {
-      throw new Error('Orçamento não encontrado');
+      throw new AppError(404, 'Orçamento não encontrado');
     }
 
     if (quotation.status !== 'APPROVED') {
-      throw new Error('Apenas orçamentos APROVADOS podem gerar pedidos. Status atual: ' + quotation.status);
+      throw new AppError(400, 'Apenas orçamentos APROVADOS podem gerar pedidos. Status atual: ' + quotation.status);
     }
 
     // Criar pedido a partir do orçamento
@@ -231,7 +232,7 @@ export class PurchaseOrderService {
     });
 
     if (!order) {
-      throw new Error('Pedido de compra não encontrado');
+      throw new AppError(404, 'Pedido de compra não encontrado');
     }
 
     return order;
@@ -242,7 +243,7 @@ export class PurchaseOrderService {
 
     // Verificar se pode editar
     if (order.status === 'RECEIVED' || order.status === 'CANCELLED') {
-      throw new Error('Não é possível editar pedido recebido ou cancelado');
+      throw new AppError(400, 'Não é possível editar pedido recebido ou cancelado');
     }
 
     // Recalcular total se houver itens
@@ -346,7 +347,7 @@ export class PurchaseOrderService {
     const order = await this.getById(id);
     
     if (order.status !== 'APPROVED') {
-      throw new Error('Apenas pedidos APROVADOS podem ser confirmados. Status atual: ' + order.status);
+      throw new AppError(400, 'Apenas pedidos APROVADOS podem ser confirmados. Status atual: ' + order.status);
     }
     
     return this.updateStatus(id, 'CONFIRMED');
@@ -356,7 +357,7 @@ export class PurchaseOrderService {
     const order = await this.getById(id);
 
     if (order.status === 'RECEIVED') {
-      throw new Error('Não é possível cancelar pedido já recebido');
+      throw new AppError(409, 'Não é possível cancelar pedido já recebido');
     }
 
     return this.updateStatus(id, 'CANCELLED');
@@ -366,7 +367,7 @@ export class PurchaseOrderService {
     const order = await this.getById(id);
 
     if (order.receipts && order.receipts.length > 0) {
-      throw new Error('Não é possível excluir pedido com recebimentos');
+      throw new AppError(409, 'Não é possível excluir pedido com recebimentos');
     }
 
     await prisma.purchaseOrder.delete({

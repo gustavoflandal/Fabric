@@ -176,11 +176,14 @@ import { useRouter, useRoute } from 'vue-router';
 import { useCountingStore } from '@/stores/counting.store';
 import { useAuthStore } from '@/stores/auth.store';
 import Button from '@/components/common/Button.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
 
 const router = useRouter();
 const route = useRoute();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const handleLogout = () => {
   authStore.logout();
@@ -207,21 +210,21 @@ const loadReport = async () => {
 };
 
 const exportReport = () => {
-  alert('Funcionalidade de exportação será implementada em breve.');
+  toast.info('Funcionalidade de exportação será implementada em breve.');
 };
 
 const adjustStock = async () => {
-  if (!confirm('Deseja ajustar o estoque com base nas divergências encontradas?')) {
+  if (!(await confirmDialog('Deseja ajustar o estoque com base nas divergências encontradas?'))) {
     return;
   }
 
   try {
     await countingStore.adjustStock(route.params.id as string);
-    alert('Estoque ajustado com sucesso!');
+    toast.success('Estoque ajustado com sucesso!');
     await loadReport();
   } catch (error) {
     console.error('Erro ao ajustar estoque:', error);
-    alert('Erro ao ajustar estoque. Tente novamente.');
+    toast.error('Erro ao ajustar estoque. Tente novamente.');
   }
 };
 

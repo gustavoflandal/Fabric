@@ -286,11 +286,13 @@ import ProductSelectorModal from '@/components/counting/ProductSelectorModal.vue
 import axios from 'axios';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const route = useRoute();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
+const toast = useToast();
 
 const handleLogout = () => {
   authStore.logout();
@@ -424,12 +426,12 @@ const handleSubmit = async () => {
       }
     }
 
-    alert('Plano salvo com sucesso!');
+    toast.success('Plano salvo com sucesso!');
     router.push('/counting/plans');
   } catch (error: any) {
     console.error('Erro ao salvar plano:', error);
     const errorMessage = error.response?.data?.error || error.message || 'Erro desconhecido';
-    alert(`Erro ao salvar plano: ${errorMessage}`);
+    toast.error(`Erro ao salvar plano: ${errorMessage}`);
   } finally {
     loading.value = false;
   }
@@ -592,7 +594,7 @@ const generatePDF = async () => {
     
   } catch (error) {
     console.error('Erro ao gerar PDF:', error);
-    alert('Erro ao gerar PDF. Tente novamente.');
+    toast.error('Erro ao gerar PDF. Tente novamente.');
   } finally {
     generatingPDF.value = false;
   }

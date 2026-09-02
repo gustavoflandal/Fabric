@@ -43,7 +43,7 @@
             type="text"
             placeholder="Buscar..."
             class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            @input="loadQuotations"
+            @input="debouncedLoadQuotations"
           />
           <select v-model="filters.status" @change="loadQuotations" class="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
             <option value="">Todos os Status</option>
@@ -285,11 +285,15 @@ import type { PurchaseQuotation } from '@/services/purchase-quotation.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import { generatePDF, formatCurrency as formatCurrencyPDF, formatDate as formatDatePDF } from '@/utils/pdf-generator';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const quotationStore = usePurchaseQuotationStore();
 const orderStore = usePurchaseOrderStore();
+const toast = useToast();
 
 const quotations = ref<PurchaseQuotation[]>([]);
 const loading = ref(false);
@@ -352,11 +356,12 @@ const loadQuotations = async () => {
     const response = await quotationStore.fetchQuotations(filters.value);
     quotations.value = response.data;
   } catch (error: any) {
-    alert(error.message || 'Erro ao carregar orçamentos');
+    toast.error(error.message || 'Erro ao carregar orçamentos');
   } finally {
     loading.value = false;
   }
 };
+const debouncedLoadQuotations = useDebounce(loadQuotations, 350);
 
 const loadSuppliers = async () => {
   try {
@@ -396,9 +401,9 @@ const handleSubmit = async () => {
     await quotationStore.createQuotation(form.value);
     showCreateModal.value = false;
     await loadQuotations();
-    alert('Orçamento criado com sucesso!');
+    toast.success('Orçamento criado com sucesso!');
   } catch (error: any) {
-    alert(error.message || 'Erro ao criar orçamento');
+    toast.error(error.message || 'Erro ao criar orçamento');
   } finally {
     submitting.value = false;
   }
@@ -411,30 +416,30 @@ const viewQuotation = async (quotation: PurchaseQuotation) => {
     selectedQuotation.value = response;
     showViewModal.value = true;
   } catch (error: any) {
-    alert(error.message || 'Erro ao carregar detalhes do orçamento');
+    toast.error(error.message || 'Erro ao carregar detalhes do orçamento');
   }
 };
 
 const createOrder = async (quotation: PurchaseQuotation) => {
-  if (confirm(`Gerar pedido de compra a partir do orçamento ${quotation.quotationNumber}?`)) {
+  if (await confirmDialog(`Gerar pedido de compra a partir do orçamento ${quotation.quotationNumber}?`)) {
     try {
       await orderStore.createFromQuotation(quotation.id);
-      alert('Pedido criado com sucesso!');
+      toast.success('Pedido criado com sucesso!');
       router.push('/purchases/orders');
     } catch (error: any) {
-      alert(error.message || 'Erro ao criar pedido');
+      toast.error(error.message || 'Erro ao criar pedido');
     }
   }
 };
 
 const deleteQuotation = async (id: string) => {
-  if (confirm('Deseja realmente excluir este orçamento?')) {
+  if (await confirmDialog('Deseja realmente excluir este orçamento?')) {
     try {
       await quotationStore.deleteQuotation(id);
       await loadQuotations();
-      alert('Orçamento excluído com sucesso!');
+      toast.success('Orçamento excluído com sucesso!');
     } catch (error: any) {
-      alert(error.message || 'Erro ao excluir orçamento');
+      toast.error(error.message || 'Erro ao excluir orçamento');
     }
   }
 };
@@ -478,7 +483,7 @@ const printQuotationPDF = (quotation: PurchaseQuotation) => {
     
     pdf.save(`Orcamento_${quotation.quotationNumber}.pdf`);
   } catch (error: any) {
-    alert('Erro ao gerar PDF: ' + error.message);
+    toast.error('Erro ao gerar PDF: ' + error.message);
   }
 };
 

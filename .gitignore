@@ -11,10 +11,13 @@ coverage/
 dist/
 build/
 
-# Environment (qualquer .env*, exceto o template .env.example)
+# Environment (qualquer .env*, exceto o template .env.example e o .env.test -
+# esse so tem credenciais efemeras/descartaveis do banco de teste local, ver
+# docker-compose.test.yml)
 .env
 .env.*
 !.env.example
+!.env.test
 
 # IDE
 .vscode/*

@@ -1,5 +1,7 @@
 import { PrismaClient, CountingSession, SessionStatus } from '@prisma/client';
 import countingPlanService from './counting-plan.service';
+import stockService from './stock.service';
+import { AppError } from '../middleware/error.middleware';
 
 const prisma = new PrismaClient();
 
@@ -144,11 +146,11 @@ class CountingSessionService {
   async create(data: CreateSessionDTO): Promise<CountingSession> {
     const plan = await countingPlanService.findById(data.planId);
     if (!plan) {
-      throw new Error('Plano de contagem não encontrado');
+      throw new AppError(404, 'Plano de contagem não encontrado');
     }
 
     if (plan.status !== 'ACTIVE') {
-      throw new Error('Plano de contagem não está ativo');
+      throw new AppError(400, 'Plano de contagem não está ativo');
     }
 
     // Gerar código único
@@ -189,11 +191,11 @@ class CountingSessionService {
   async start(id: string, userId: string): Promise<CountingSession> {
     const session = await this.findById(id);
     if (!session) {
-      throw new Error('Sessão não encontrada');
+      throw new AppError(404, 'Sessão não encontrada');
     }
 
     if (session.status !== 'SCHEDULED') {
-      throw new Error('Sessão não pode ser iniciada');
+      throw new AppError(400, 'Sessão não pode ser iniciada');
     }
 
     // Atualizar quantidades do sistema nos itens
@@ -240,17 +242,17 @@ class CountingSessionService {
   async complete(id: string, userId: string): Promise<CountingSession> {
     const session = await this.findById(id);
     if (!session) {
-      throw new Error('Sessão não encontrada');
+      throw new AppError(404, 'Sessão não encontrada');
     }
 
     if (session.status !== 'IN_PROGRESS') {
-      throw new Error('Sessão não está em andamento');
+      throw new AppError(400, 'Sessão não está em andamento');
     }
 
     // Verificar se todos os itens foram contados
     const pendingItems = session.items.filter((item) => item.status === 'PENDING');
     if (pendingItems.length > 0) {
-      throw new Error(`Ainda há ${pendingItems.length} itens pendentes de contagem`);
+      throw new AppError(400, `Ainda há ${pendingItems.length} itens pendentes de contagem`);
     }
 
     // Calcular estatísticas
@@ -289,7 +291,7 @@ class CountingSessionService {
   async generateReport(id: string) {
     const session = await this.findById(id);
     if (!session) {
-      throw new Error('Sessão não encontrada');
+      throw new AppError(404, 'Sessão não encontrada');
     }
 
     const itemsWithDiff = session.items.filter((item) => item.hasDifference);
@@ -361,11 +363,11 @@ class CountingSessionService {
   async adjustStock(id: string, userId: string) {
     const session = await this.findById(id);
     if (!session) {
-      throw new Error('Sessão não encontrada');
+      throw new AppError(404, 'Sessão não encontrada');
     }
 
     if (session.status !== 'COMPLETED') {
-      throw new Error('Sessão não está completa');
+      throw new AppError(400, 'Sessão não está completa');
     }
 
     const itemsToAdjust = session.items.filter(
@@ -378,18 +380,23 @@ class CountingSessionService {
       const difference = Number(item.difference);
       if (difference === 0) continue;
 
-      // Criar movimentação de ajuste
-      const movement = await prisma.stockMovement.create({
-        data: {
-          productId: item.productId,
-          type: 'ADJUSTMENT',
-          quantity: Math.abs(difference),
-          reason: `Ajuste por contagem - Sessão ${session.code}`,
-          reference: session.id,
-          referenceType: 'COUNTING',
-          userId,
-          notes: item.reason || undefined,
-        },
+      // Criar movimentação de ajuste via stockService: mantém o saldo persistido
+      // (stock_balances) sincronizado e usa o sinal correto do tipo.
+      // ✅ CORREÇÃO: antes gravava sempre type 'ADJUSTMENT' com Math.abs(difference),
+      // e o cálculo de saldo somava QUALQUER movimentação ADJUSTMENT - ou seja, uma
+      // contagem que encontrasse MENOS estoque físico (difference negativo, quebra)
+      // aumentava o saldo em vez de diminuir. difference = countedQty - systemQty,
+      // então difference > 0 é sobra (IN) e difference < 0 é quebra (OUT).
+      const movement = await stockService.registerMovement({
+        productId: item.productId,
+        type: difference > 0 ? 'IN' : 'OUT',
+        quantity: Math.abs(difference),
+        reason: `Ajuste por contagem - Sessão ${session.code}`,
+        reference: session.id,
+        referenceType: 'COUNTING',
+        countingSessionId: session.id,
+        userId,
+        notes: item.reason || undefined,
       });
 
       // Marcar item como ajustado

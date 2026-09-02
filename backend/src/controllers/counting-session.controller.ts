@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import countingSessionService from '../services/counting-session.service';
 
 class CountingSessionController {
@@ -6,7 +6,7 @@ class CountingSessionController {
    * GET /api/counting/sessions
    * Listar todas as sessões
    */
-  async index(req: Request, res: Response) {
+  async index(req: Request, res: Response, next: NextFunction) {
     try {
       const filters = {
         status: req.query.status as any,
@@ -19,7 +19,7 @@ class CountingSessionController {
       const sessions = await countingSessionService.findAll(filters);
       res.json(sessions);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -27,7 +27,7 @@ class CountingSessionController {
    * GET /api/counting/sessions/:id
    * Buscar sessão por ID
    */
-  async show(req: Request, res: Response) {
+  async show(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const session = await countingSessionService.findById(id);
@@ -38,7 +38,7 @@ class CountingSessionController {
 
       res.json(session);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -46,12 +46,12 @@ class CountingSessionController {
    * POST /api/counting/sessions
    * Criar nova sessão
    */
-  async create(req: Request, res: Response) {
+  async create(req: Request, res: Response, next: NextFunction) {
     try {
       const session = await countingSessionService.create(req.body);
       res.status(201).json(session);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -59,7 +59,7 @@ class CountingSessionController {
    * POST /api/counting/sessions/:id/start
    * Iniciar sessão
    */
-  async start(req: Request, res: Response) {
+  async start(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
@@ -71,7 +71,7 @@ class CountingSessionController {
       const session = await countingSessionService.start(id, userId);
       res.json(session);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -79,7 +79,7 @@ class CountingSessionController {
    * POST /api/counting/sessions/:id/complete
    * Completar sessão
    */
-  async complete(req: Request, res: Response) {
+  async complete(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
@@ -91,7 +91,7 @@ class CountingSessionController {
       const session = await countingSessionService.complete(id, userId);
       res.json(session);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -99,13 +99,13 @@ class CountingSessionController {
    * POST /api/counting/sessions/:id/cancel
    * Cancelar sessão
    */
-  async cancel(req: Request, res: Response) {
+  async cancel(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const session = await countingSessionService.cancel(id);
       res.json(session);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -113,13 +113,13 @@ class CountingSessionController {
    * GET /api/counting/sessions/:id/report
    * Gerar relatório de divergências
    */
-  async getReport(req: Request, res: Response) {
+  async getReport(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const report = await countingSessionService.generateReport(id);
       res.json(report);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -127,7 +127,7 @@ class CountingSessionController {
    * POST /api/counting/sessions/:id/adjust-stock
    * Ajustar estoque baseado na sessão
    */
-  async adjustStock(req: Request, res: Response) {
+  async adjustStock(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
       const userId = (req as any).user?.id;
@@ -139,7 +139,7 @@ class CountingSessionController {
       const result = await countingSessionService.adjustStock(id, userId);
       res.json(result);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      next(error);
     }
   }
 
@@ -147,12 +147,12 @@ class CountingSessionController {
    * GET /api/counting/dashboard
    * Dashboard de contagens
    */
-  async getDashboard(req: Request, res: Response) {
+  async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {
       const dashboard = await countingSessionService.getDashboard();
       res.json(dashboard);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      next(error);
     }
   }
 }

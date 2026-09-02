@@ -28,12 +28,12 @@
       <Card class="mb-6">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input v-model="filters.search" type="text" placeholder="Código ou nome..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="handleFilterChange" />
+            <label for="wc-filter-search" class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+            <input id="wc-filter-search" v-model="filters.search" type="text" placeholder="Código ou nome..." class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="debouncedFilterChange" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-            <select v-model="filters.type" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="handleFilterChange">
+            <label for="wc-filter-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+            <select id="wc-filter-type" v-model="filters.type" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="handleFilterChange">
               <option value="">Todos</option>
               <option value="machine">Máquina</option>
               <option value="manual">Manual</option>
@@ -42,8 +42,8 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select v-model="filters.active" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="handleFilterChange">
+            <label for="wc-filter-active" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select id="wc-filter-active" v-model="filters.active" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="handleFilterChange">
               <option value="">Todos</option>
               <option value="true">Ativos</option>
               <option value="false">Inativos</option>
@@ -99,18 +99,18 @@
         <div class="p-6">
           <div class="flex justify-between items-start mb-6">
             <h3 class="text-2xl font-bold text-gray-900">{{ editingWorkCenter ? 'Editar Centro de Trabalho' : 'Novo Centro de Trabalho' }}</h3>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+            <button @click="closeModal" aria-label="Fechar" class="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
           </div>
           <form @submit.prevent="handleSubmit" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
-              <div><label class="block text-sm font-medium text-gray-700 mb-1">Código *</label><input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
-              <div><label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label><input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
+              <div><label for="wc-form-code" class="block text-sm font-medium text-gray-700 mb-1">Código *</label><input id="wc-form-code" v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
+              <div><label for="wc-form-name" class="block text-sm font-medium text-gray-700 mb-1">Nome *</label><input id="wc-form-name" v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
             </div>
-            <div><label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label><textarea v-model="formData.description" rows="2" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea></div>
+            <div><label for="wc-form-description" class="block text-sm font-medium text-gray-700 mb-1">Descrição</label><textarea id="wc-form-description" v-model="formData.description" rows="2" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea></div>
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
-                <select v-model="formData.type" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+                <label for="wc-form-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo *</label>
+                <select id="wc-form-type" v-model="formData.type" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
                   <option value="">Selecione...</option>
                   <option value="machine">Máquina</option>
                   <option value="manual">Manual</option>
@@ -118,11 +118,11 @@
                   <option value="quality">Qualidade</option>
                 </select>
               </div>
-              <div><label class="block text-sm font-medium text-gray-700 mb-1">Capacidade</label><input v-model.number="formData.capacity" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
+              <div><label for="wc-form-capacity" class="block text-sm font-medium text-gray-700 mb-1">Capacidade</label><input id="wc-form-capacity" v-model.number="formData.capacity" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
             </div>
             <div class="grid grid-cols-2 gap-4">
-              <div><label class="block text-sm font-medium text-gray-700 mb-1">Eficiência (%)</label><input v-model.number="formData.efficiency" type="number" step="0.01" min="0" max="100" placeholder="100" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
-              <div><label class="block text-sm font-medium text-gray-700 mb-1">Custo por Hora (R$)</label><input v-model.number="formData.costPerHour" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
+              <div><label for="wc-form-efficiency" class="block text-sm font-medium text-gray-700 mb-1">Eficiência (%)</label><input id="wc-form-efficiency" v-model.number="formData.efficiency" type="number" step="0.01" min="0" max="100" placeholder="100" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
+              <div><label for="wc-form-cost" class="block text-sm font-medium text-gray-700 mb-1">Custo por Hora (R$)</label><input id="wc-form-cost" v-model.number="formData.costPerHour" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" /></div>
             </div>
             <div class="flex items-center"><input v-model="formData.active" type="checkbox" id="active" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" /><label for="active" class="ml-2 text-sm text-gray-700">Ativo</label></div>
             <div class="flex gap-3 pt-4">
@@ -137,17 +137,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth.store';
 import { useWorkCenterStore } from '@/stores/work-center.store';
 import type { WorkCenter } from '@/services/work-center.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const workCenterStore = useWorkCenterStore();
+const toast = useToast();
 
 const workCenters = ref<WorkCenter[]>([]);
 const loading = ref(false);
@@ -169,46 +173,55 @@ const loadWorkCenters = async () => {
 };
 
 const handleFilterChange = () => { pagination.value.page = 1; loadWorkCenters(); };
+const debouncedFilterChange = useDebounce(handleFilterChange, 350);
 const openCreateModal = () => { editingWorkCenter.value = null; formData.value = { code: '', name: '', description: '', type: '', capacity: undefined, efficiency: 1, costPerHour: undefined, active: true }; showModal.value = true; };
 const openEditModal = (wc: WorkCenter) => { editingWorkCenter.value = wc; formData.value = { ...wc, efficiency: wc.efficiency || 1 }; showModal.value = true; };
 const closeModal = () => { showModal.value = false; editingWorkCenter.value = null; };
+
+// ✅ Fase 5 item 5.3 do cronograma: fecha o modal com Esc (antes só fechava
+// clicando fora ou no botão) - achado da auditoria original de acessibilidade.
+const handleEscKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal(); };
+watch(showModal, (isOpen) => {
+  if (isOpen) window.addEventListener('keydown', handleEscKey);
+  else window.removeEventListener('keydown', handleEscKey);
+});
 
 const handleSubmit = async () => {
   try {
     const data = { ...formData.value, efficiency: (formData.value.efficiency || 100) / 100 };
     if (editingWorkCenter.value) {
       await workCenterStore.updateWorkCenter(editingWorkCenter.value.id, data);
-      alert('Centro de trabalho atualizado com sucesso!');
+      toast.success('Centro de trabalho atualizado com sucesso!');
     } else {
       await workCenterStore.createWorkCenter(data);
-      alert('Centro de trabalho criado com sucesso!');
+      toast.success('Centro de trabalho criado com sucesso!');
     }
     closeModal();
     await loadWorkCenters();
   } catch (error: any) {
-    alert(error.response?.data?.message || 'Erro ao salvar centro de trabalho');
+    toast.error(error.response?.data?.message || 'Erro ao salvar centro de trabalho');
   }
 };
 
 const handleToggleActive = async (wc: WorkCenter) => {
-  if (confirm(`Deseja ${wc.active ? 'desativar' : 'ativar'} o centro de trabalho "${wc.name}"?`)) {
+  if (await confirmDialog(`Deseja ${wc.active ? 'desativar' : 'ativar'} o centro de trabalho "${wc.name}"?`)) {
     try {
       await workCenterStore.toggleActive(wc.id);
       await loadWorkCenters();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error(error.response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
 const handleDelete = async (wc: WorkCenter) => {
-  if (confirm(`Deseja realmente excluir o centro de trabalho "${wc.name}"?`)) {
+  if (await confirmDialog(`Deseja realmente excluir o centro de trabalho "${wc.name}"?`)) {
     try {
       await workCenterStore.deleteWorkCenter(wc.id);
-      alert('Centro de trabalho excluído com sucesso!');
+      toast.success('Centro de trabalho excluído com sucesso!');
       await loadWorkCenters();
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Erro ao excluir centro de trabalho');
+      toast.error(error.response?.data?.message || 'Erro ao excluir centro de trabalho');
     }
   }
 };

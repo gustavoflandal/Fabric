@@ -43,7 +43,7 @@
             type="text"
             placeholder="Buscar..."
             class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            @input="loadOrders"
+            @input="debouncedLoadOrders"
           />
           <select v-model="filters.status" @change="loadOrders" class="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
             <option value="">Todos os Status</option>
@@ -299,10 +299,14 @@ import type { PurchaseOrder } from '@/services/purchase-order.service';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import { generatePDF, formatCurrency as formatCurrencyPDF, formatDate as formatDatePDF } from '@/utils/pdf-generator';
+import { useToast } from '@/composables/useToast';
+import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const orderStore = usePurchaseOrderStore();
+const toast = useToast();
 
 const orders = ref<PurchaseOrder[]>([]);
 const loading = ref(false);
@@ -366,11 +370,12 @@ const loadOrders = async () => {
     const response = await orderStore.fetchOrders(filters.value);
     orders.value = response.data;
   } catch (error: any) {
-    alert(error.message || 'Erro ao carregar pedidos');
+    toast.error(error.message || 'Erro ao carregar pedidos');
   } finally {
     loading.value = false;
   }
 };
+const debouncedLoadOrders = useDebounce(loadOrders, 350);
 
 const loadSuppliers = async () => {
   try {
@@ -410,9 +415,9 @@ const handleSubmit = async () => {
     await orderStore.createOrder(form.value);
     showCreateModal.value = false;
     await loadOrders();
-    alert('Pedido criado com sucesso!');
+    toast.success('Pedido criado com sucesso!');
   } catch (error: any) {
-    alert(error.message || 'Erro ao criar pedido');
+    toast.error(error.message || 'Erro ao criar pedido');
   } finally {
     submitting.value = false;
   }
@@ -425,30 +430,30 @@ const viewOrder = async (order: PurchaseOrder) => {
     selectedOrder.value = response;
     showViewModal.value = true;
   } catch (error: any) {
-    alert(error.message || 'Erro ao carregar detalhes do pedido');
+    toast.error(error.message || 'Erro ao carregar detalhes do pedido');
   }
 };
 
 const confirmOrder = async (id: string) => {
-  if (confirm('Confirmar este pedido?')) {
+  if (await confirmDialog('Confirmar este pedido?')) {
     try {
       await orderStore.confirmOrder(id);
       await loadOrders();
-      alert('Pedido confirmado com sucesso!');
+      toast.success('Pedido confirmado com sucesso!');
     } catch (error: any) {
-      alert(error.message || 'Erro ao confirmar pedido');
+      toast.error(error.message || 'Erro ao confirmar pedido');
     }
   }
 };
 
 const cancelOrder = async (id: string) => {
-  if (confirm('Cancelar este pedido?')) {
+  if (await confirmDialog('Cancelar este pedido?')) {
     try {
       await orderStore.cancelOrder(id);
       await loadOrders();
-      alert('Pedido cancelado com sucesso!');
+      toast.success('Pedido cancelado com sucesso!');
     } catch (error: any) {
-      alert(error.message || 'Erro ao cancelar pedido');
+      toast.error(error.message || 'Erro ao cancelar pedido');
     }
   }
 };
@@ -493,7 +498,7 @@ const printOrderPDF = (order: PurchaseOrder) => {
     
     pdf.save(`Pedido_${order.orderNumber}.pdf`);
   } catch (error: any) {
-    alert('Erro ao gerar PDF: ' + error.message);
+    toast.error('Erro ao gerar PDF: ' + error.message);
   }
 };
 

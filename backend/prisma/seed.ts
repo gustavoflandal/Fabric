@@ -57,7 +57,23 @@ async function main() {
     { resource: 'work_centers', action: 'read', description: 'Visualizar centros de trabalho' },
     { resource: 'work_centers', action: 'update', description: 'Editar centros de trabalho' },
     { resource: 'work_centers', action: 'delete', description: 'Excluir centros de trabalho' },
-    
+
+    // Armazéns (rotas ja existiam, mas nunca tiveram permissao seedada -
+    // ninguem, nem admin, conseguia acessar o modulo. Ver Fase 1 do cronograma)
+    { resource: 'armazens', action: 'visualizar', description: 'Visualizar armazéns' },
+    { resource: 'armazens', action: 'criar', description: 'Criar armazéns' },
+    { resource: 'armazens', action: 'editar', description: 'Editar armazéns' },
+    { resource: 'armazens', action: 'excluir', description: 'Excluir armazéns' },
+
+    // Estruturas de Armazém e Posições de Armazenagem
+    { resource: 'estruturas_armazem', action: 'visualizar', description: 'Visualizar estruturas de armazém' },
+    { resource: 'estruturas_armazem', action: 'criar', description: 'Criar estruturas de armazém' },
+    { resource: 'estruturas_armazem', action: 'editar', description: 'Editar estruturas de armazém' },
+    { resource: 'estruturas_armazem', action: 'excluir', description: 'Excluir estruturas de armazém' },
+    { resource: 'estruturas_armazem', action: 'gerar_posicoes', description: 'Gerar posições de armazenagem' },
+    { resource: 'estruturas_armazem', action: 'excluir_posicoes', description: 'Excluir posições de armazenagem' },
+    { resource: 'storage_positions', action: 'update', description: 'Editar posições de armazenagem' },
+
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
     { resource: 'suppliers', action: 'read', description: 'Visualizar fornecedores' },
@@ -70,6 +86,15 @@ async function main() {
     { resource: 'customers', action: 'update', description: 'Editar clientes' },
     { resource: 'customers', action: 'delete', description: 'Excluir clientes' },
     
+    // Unidades de Medida (Fase 2 do cronograma - RBAC estendido)
+    { resource: 'units_of_measure', action: 'create', description: 'Criar unidades de medida' },
+    { resource: 'units_of_measure', action: 'read', description: 'Visualizar unidades de medida' },
+    { resource: 'units_of_measure', action: 'update', description: 'Editar unidades de medida' },
+    { resource: 'units_of_measure', action: 'delete', description: 'Excluir unidades de medida' },
+
+    // Dashboard geral (Fase 2 do cronograma - RBAC estendido)
+    { resource: 'dashboard', action: 'read', description: 'Visualizar dashboard geral' },
+
     // Estoque
     { resource: 'stock', action: 'read', description: 'Visualizar estoque' },
     { resource: 'stock', action: 'update', description: 'Movimentar estoque' },

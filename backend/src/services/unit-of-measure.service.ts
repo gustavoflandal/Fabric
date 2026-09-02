@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreateUnitOfMeasureDto {
   code: string;
@@ -96,7 +97,7 @@ export class UnitOfMeasureService {
   async toggleActive(id: string) {
     const unit = await this.getById(id);
     if (!unit) {
-      throw new Error('Unidade de medida não encontrada');
+      throw new AppError(404, 'Unidade de medida não encontrada');
     }
 
     return await this.update(id, { active: !unit.active });

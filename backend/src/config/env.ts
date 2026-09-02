@@ -85,11 +85,19 @@ export const config = {
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   },
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    // Aceita uma lista separada por vírgula (dev usa 3 portas Vite diferentes).
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:5174,http://localhost:5175')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
   },
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
   audit: {
     mode: process.env.AUDIT_LOG_MODE || 'write_only', // all, write_only, errors_only, none
     includeReads: process.env.AUDIT_LOG_INCLUDE_READS === 'true',
+    // ✅ Fase 5 item 5.6 do cronograma: dias de retenção configuráveis via
+    // env em vez de hardcoded em log-cleanup.job.ts (o job já existia e
+    // já rodava diariamente - só não era ajustável sem editar código).
+    retentionDays: Number(process.env.AUDIT_LOG_RETENTION_DAYS) || 90,
   },
 };

@@ -12,9 +12,13 @@ const app = express();
 
 // Security middlewares
 app.use(helmet());
-app.use(cors({ 
-  origin: ['http://localhost:5173', 'http://localhost:5175', 'http://localhost:5174'],
-  credentials: true 
+app.use(cors({
+  // ✅ Fase 2 item 2.6 do cronograma: origin estava fixo no código (3 portas
+  // localhost hardcoded), ignorando CORS_ORIGIN - quebraria em qualquer
+  // deploy real. Configurável via env agora (config/env.ts já parseia lista
+  // separada por vírgula).
+  origin: config.cors.origin,
+  credentials: true
 }));
 
 // Rate limiting (aplicar antes de parsear body)

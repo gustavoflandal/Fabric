@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import stockService from './stock.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
+import { AppError } from '../middleware/error.middleware';
 
 export interface CreatePurchaseReceiptDto {
   purchaseOrderId: string;
@@ -30,25 +31,26 @@ export class PurchaseReceiptService {
     });
 
     if (!order) {
-      throw new Error('Pedido de compra não encontrado');
+      throw new AppError(404, 'Pedido de compra não encontrado');
     }
 
     if (order.status === 'CANCELLED') {
-      throw new Error('Não é possível receber pedido cancelado');
+      throw new AppError(400, 'Não é possível receber pedido cancelado');
     }
 
     // Validar itens
     for (const item of data.items) {
       const orderItem = order.items.find(oi => oi.id === item.orderItemId);
-      
+
       if (!orderItem) {
-        throw new Error(`Item ${item.orderItemId} não encontrado no pedido`);
+        throw new AppError(404, `Item ${item.orderItemId} não encontrado no pedido`);
       }
 
       const totalReceived = orderItem.receivedQty + item.quantityReceived;
-      
+
       if (totalReceived > orderItem.quantity) {
-        throw new Error(
+        throw new AppError(
+          400,
           `Quantidade recebida (${totalReceived}) excede quantidade pedida (${orderItem.quantity}) ` +
           `para o produto ${item.productId}`
         );
@@ -65,15 +67,24 @@ export class PurchaseReceiptService {
       const newReceipt = await tx.purchaseReceipt.create({
         data: {
           receiptNumber,
-          purchaseOrderId: data.purchaseOrderId,
+          orderId: data.purchaseOrderId,
           receiptDate: new Date(data.receiptDate),
-          invoiceNumber: data.invoiceNumber,
-          notes: data.notes,
+          receivedBy: userId,
+          // PurchaseReceipt não tem coluna própria para nota fiscal - guardamos
+          // junto das observações em vez de adicionar uma migration só pra isso.
+          notes: data.invoiceNumber
+            ? `NF: ${data.invoiceNumber}${data.notes ? ` - ${data.notes}` : ''}`
+            : data.notes,
           items: {
+            // O DTO só recebe uma quantidade recebida por item (sem fluxo de
+            // aceite/rejeição do lado do cliente ainda); todo o recebido entra
+            // como aceito. acceptedQty é o que de fato entra em estoque/custo.
             create: data.items.map(item => ({
               orderItemId: item.orderItemId,
               productId: item.productId,
-              quantityReceived: item.quantityReceived,
+              quantity: item.quantityReceived,
+              acceptedQty: item.quantityReceived,
+              rejectedQty: 0,
               notes: item.notes,
             })),
           },
@@ -85,7 +96,7 @@ export class PurchaseReceiptService {
               orderItem: true,
             },
           },
-          purchaseOrder: {
+          order: {
             include: {
               supplier: true,
             },
@@ -114,17 +125,17 @@ export class PurchaseReceiptService {
         await stockService.registerMovement({
           productId: item.productId,
           type: 'IN',
-          quantity: item.quantityReceived,
+          quantity: item.acceptedQty,
           reason: `Recebimento de compra - Pedido ${order.orderNumber}`,
           reference: receipt.id,
           referenceType: 'PURCHASE',
           userId,
-          notes: `Recebimento ${receipt.receiptNumber}, NF: ${receipt.invoiceNumber || 'N/A'}`,
+          notes: `Recebimento ${receipt.receiptNumber}${data.invoiceNumber ? `, NF: ${data.invoiceNumber}` : ''}`,
         });
 
         console.log(
           `[PurchaseReceipt] Entrada de estoque registrada: ` +
-          `${item.quantityReceived} un. de ${item.product.code}`
+          `${item.acceptedQty} un. de ${item.product.code}`
         );
       } catch (error: any) {
         console.error(`[PurchaseReceipt] Erro ao registrar entrada de estoque:`, error.message);
@@ -161,47 +172,55 @@ export class PurchaseReceiptService {
 
   /**
    * Atualiza custos dos produtos baseado no recebimento
-   * ✅ CORREÇÃO CRÍTICA: Calcula estoque real para custo médio correto
+   *
+   * ✅ CORREÇÃO (Fase 1, item 1.6 do cronograma):
+   * 1) Atomicidade: lia `product.averageCost` e escrevia de volta fora de
+   *    qualquer transação/lock - dois recebimentos concorrentes do mesmo
+   *    produto podiam calcular o custo médio a partir do mesmo valor
+   *    desatualizado (lost update). Agora cada produto é travado
+   *    (`SELECT ... FOR UPDATE`) dentro de uma transação por item.
+   * 2) Cálculo: usava `prisma.stockMovement.findMany` somando TODO o
+   *    histórico (o padrão O(n) que stock.service.ts já não usa mais desde
+   *    a Fase 1.1/1.2) e, pior, isso já incluía a própria entrada de
+   *    estoque deste recebimento (registrada no loop logo antes, em
+   *    `create()`) - somava `item.quantityReceived` DUAS vezes no estoque
+   *    usado para ponderar o custo médio. Agora lê o saldo persistido
+   *    (`stock_balances`, já atualizado por essa entrada) e subtrai a
+   *    quantidade deste item para achar o saldo anterior ao recebimento.
    */
   private async updateProductCosts(items: any[]) {
     for (const item of items) {
-      const product = await prisma.product.findUnique({
-        where: { id: item.productId },
+      await prisma.$transaction(async (tx) => {
+        const locked = await tx.$queryRaw<{ averageCost: number | null }[]>`
+          SELECT averageCost FROM products WHERE id = ${item.productId} FOR UPDATE
+        `;
+        if (locked.length === 0) return;
+
+        const balance = await tx.stockBalance.findUnique({ where: { productId: item.productId } });
+        // stock_balances já reflete a entrada deste recebimento (registrada antes, em create())
+        const postReceiptStock = balance?.quantity ?? item.acceptedQty;
+        const preReceiptStock = postReceiptStock - item.acceptedQty;
+
+        // Calcular novo custo médio ponderado
+        const currentValue = (locked[0].averageCost || 0) * preReceiptStock;
+        const newValue = currentValue + (item.orderItem.unitPrice * item.acceptedQty);
+        const newAverageCost = postReceiptStock > 0 ? newValue / postReceiptStock : item.orderItem.unitPrice;
+
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            lastCost: item.orderItem.unitPrice,
+            averageCost: newAverageCost,
+          },
+        });
+
+        console.log(
+          `[PurchaseReceipt] Custo atualizado para ${item.product.code}: ` +
+          `Estoque: ${preReceiptStock} → ${postReceiptStock}, ` +
+          `Último: R$ ${item.orderItem.unitPrice.toFixed(2)}, ` +
+          `Médio: R$ ${newAverageCost.toFixed(2)}`
+        );
       });
-
-      if (!product) continue;
-
-      // ✅ Buscar estoque real do produto
-      const movements = await prisma.stockMovement.findMany({
-        where: { productId: item.productId },
-      });
-
-      const currentStock = movements.reduce((sum, mov) => {
-        return mov.type === 'IN' ? sum + mov.quantity : sum - mov.quantity;
-      }, 0);
-
-      // Calcular novo custo médio ponderado
-      const currentValue = (product.averageCost || 0) * currentStock;
-      const newStock = currentStock + item.quantityReceived;
-      const newValue = currentValue + (item.orderItem.unitPrice * item.quantityReceived);
-      
-      const newAverageCost = newStock > 0 ? newValue / newStock : item.orderItem.unitPrice;
-
-      // Atualizar produto
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: {
-          lastCost: item.orderItem.unitPrice,
-          averageCost: newAverageCost,
-        },
-      });
-
-      console.log(
-        `[PurchaseReceipt] Custo atualizado para ${item.product.code}: ` +
-        `Estoque: ${currentStock} → ${newStock}, ` +
-        `Último: R$ ${item.orderItem.unitPrice.toFixed(2)}, ` +
-        `Médio: R$ ${newAverageCost.toFixed(2)}`
-      );
     }
   }
 
@@ -226,6 +245,12 @@ export class PurchaseReceiptService {
       newStatus = 'RECEIVED';
     } else if (someReceived) {
       newStatus = 'PARTIAL';
+    } else if (order.status === 'PARTIAL' || order.status === 'RECEIVED') {
+      // ✅ Achado ao testar o cancel() corrigido (Fase 1, item 1.6): esta
+      // função só avançava o status (PARTIAL/RECEIVED), nunca revertia -
+      // cancelar todos os recebimentos de um pedido deixava o status
+      // "RECEIVED" para sempre, mesmo com receivedQty voltando a 0.
+      newStatus = 'CONFIRMED';
     }
 
     if (newStatus !== order.status) {
@@ -249,7 +274,7 @@ export class PurchaseReceiptService {
     const where: any = {};
 
     if (filters?.purchaseOrderId) {
-      where.purchaseOrderId = filters.purchaseOrderId;
+      where.orderId = filters.purchaseOrderId;
     }
 
     if (filters?.startDate || filters?.endDate) {
@@ -276,7 +301,7 @@ export class PurchaseReceiptService {
             },
           },
         },
-        purchaseOrder: {
+        order: {
           select: {
             id: true,
             orderNumber: true,
@@ -306,7 +331,7 @@ export class PurchaseReceiptService {
             orderItem: true,
           },
         },
-        purchaseOrder: {
+        order: {
           include: {
             supplier: true,
             items: true,
@@ -316,7 +341,7 @@ export class PurchaseReceiptService {
     });
 
     if (!receipt) {
-      throw new Error('Recebimento não encontrado');
+      throw new AppError(404, 'Recebimento não encontrado');
     }
 
     return receipt;
@@ -324,27 +349,32 @@ export class PurchaseReceiptService {
 
   /**
    * Cancela recebimento (estorna estoque)
+   *
+   * ✅ CORREÇÃO ATOMICIDADE (Fase 1, item 1.6 do cronograma): antes, o
+   * estorno de estoque (um `registerMovement` por item, cada um em sua
+   * própria transação) rodava inteiramente FORA da transação que atualiza
+   * `purchaseOrderItem.receivedQty` e apaga o recebimento. Se a segunda
+   * parte falhasse (ou o processo caísse no meio), o estoque já tinha sido
+   * estornado sem o recebimento ser removido - estado inconsistente.
+   * Agora tudo roda em uma única transação, usando
+   * `stockService.registerMovementInTransaction` para reaproveitar o `tx`.
    */
   async cancel(id: string, userId: string, reason: string) {
     const receipt = await this.getById(id);
 
-    // Estornar estoque
-    for (const item of receipt.items) {
-      await stockService.registerMovement({
-        productId: item.productId,
-        type: 'OUT',
-        quantity: item.quantityReceived,
-        reason: `Estorno de recebimento - ${reason}`,
-        reference: receipt.id,
-        referenceType: 'PURCHASE',
-        userId,
-        notes: `Cancelamento do recebimento ${receipt.receiptNumber}`,
-      });
-    }
-
-    // Atualizar quantidade recebida nos itens do pedido
     await prisma.$transaction(async (tx) => {
       for (const item of receipt.items) {
+        await stockService.registerMovementInTransaction(tx, {
+          productId: item.productId,
+          type: 'OUT',
+          quantity: item.acceptedQty,
+          reason: `Estorno de recebimento - ${reason}`,
+          reference: receipt.id,
+          referenceType: 'PURCHASE',
+          userId,
+          notes: `Cancelamento do recebimento ${receipt.receiptNumber}`,
+        });
+
         const orderItem = await tx.purchaseOrderItem.findUnique({
           where: { id: item.orderItemId },
         });
@@ -353,7 +383,7 @@ export class PurchaseReceiptService {
           await tx.purchaseOrderItem.update({
             where: { id: item.orderItemId },
             data: {
-              receivedQty: Math.max(0, orderItem.receivedQty - item.quantityReceived),
+              receivedQty: Math.max(0, orderItem.receivedQty - item.acceptedQty),
             },
           });
         }
@@ -365,8 +395,8 @@ export class PurchaseReceiptService {
       });
     });
 
-    // Atualizar status do pedido
-    await this.updateOrderStatus(receipt.purchaseOrderId);
+    // Atualizar status do pedido (fora da transação - leitura derivada, não crítica)
+    await this.updateOrderStatus(receipt.orderId);
 
     console.log(`[PurchaseReceipt] Recebimento ${receipt.receiptNumber} cancelado`);
   }

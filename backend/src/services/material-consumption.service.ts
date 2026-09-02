@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import stockService from './stock.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
+import { AppError } from '../middleware/error.middleware';
 
 export interface MaterialConsumption {
   pointingId: string;
@@ -54,7 +55,7 @@ export class MaterialConsumptionService {
     });
 
     if (!pointing) {
-      throw new Error('Apontamento não encontrado');
+      throw new AppError(404, 'Apontamento não encontrado');
     }
 
     const order = pointing.productionOrder;
@@ -218,12 +219,12 @@ export class MaterialConsumptionService {
     });
 
     if (!order) {
-      throw new Error('Ordem de produção não encontrada');
+      throw new AppError(404, 'Ordem de produção não encontrada');
     }
 
     const bom = order.product.boms[0];
     if (!bom) {
-      throw new Error('Produto não possui BOM ativa');
+      throw new AppError(404, 'Produto não possui BOM ativa');
     }
 
     // Calcular quantidade total produzida
