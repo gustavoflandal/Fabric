@@ -28,6 +28,7 @@ import warehouseRoutes from './warehouse.routes';
 import warehouseStructureRoutes from './warehouse-structure.routes';
 import storagePositionRoutes from './storage-position.routes';
 import stockPositionRoutes from './stock-position.routes';
+import warehouseTaskRoutes from './warehouse-task.routes';
 import systemRoutes from './system.routes';
 import { requireModule } from '../middleware/module.middleware';
 
@@ -74,6 +75,14 @@ router.use('/storage-positions', requireModule('WMS'), storagePositionRoutes);
 // licenciou o WMS. Uma instalação só-PCP continua usando `/stock/*`, que não é
 // tocado por esta fase.
 router.use('/stock-positions', requireModule('WMS'), stockPositionRoutes);
+// F4.3/F4.5: tarefas de armazém. Mesmo requireModule('WMS') — a orientação a
+// tarefa É o módulo WMS (seção 3.3 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md).
+// Sem WMS licenciado estas rotas não existem (404) e o recebimento segue
+// linear, sem gerar tarefa nenhuma. Não recebe requireModule('COMPRAS') junto:
+// a dependência entre os módulos já é respeitada pela ausência da rota que
+// dispararia o processo (seção 3.5), e o resto da superfície de tarefa (PICKING
+// na Fase 4b) não depende de compras.
+router.use('/warehouse-tasks', requireModule('WMS'), warehouseTaskRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);

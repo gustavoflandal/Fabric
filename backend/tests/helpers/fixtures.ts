@@ -185,6 +185,57 @@ export async function createTestPositions(count = 2, options: { floors?: number;
   return { warehouse, structure, positions };
 }
 
+let supplierCounter = 0;
+let orderCounter = 0;
+
+/**
+ * F4.3 do plano do WMS: pedido de compra CONFIRMADO pronto para ser recebido —
+ * o gatilho do recebimento nos dois modos (com e sem WMS licenciado).
+ *
+ * Cria fornecedor + pedido + itens e devolve tudo. `unitPrice` é explícito
+ * porque `purchase-receipt.service.ts::updateProductCosts()` o usa para
+ * recalcular o custo médio — deixá-lo em zero esconderia regressão nesse
+ * cálculo.
+ */
+export async function createTestPurchaseOrder(
+  createdBy: string,
+  items: { productId: string; quantity: number; unitPrice?: number }[]
+) {
+  supplierCounter += 1;
+  orderCounter += 1;
+
+  const supplier = await testPrisma.supplier.create({
+    data: { code: `SUP-TEST-${supplierCounter}`, name: `Fornecedor de Teste ${supplierCounter}` },
+  });
+
+  const totalValue = items.reduce(
+    (sum, item) => sum + item.quantity * (item.unitPrice ?? 10),
+    0
+  );
+
+  const order = await testPrisma.purchaseOrder.create({
+    data: {
+      orderNumber: `PO-TEST-${orderCounter}`,
+      supplierId: supplier.id,
+      expectedDate: new Date(),
+      status: 'CONFIRMED',
+      totalValue,
+      createdBy,
+      items: {
+        create: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice ?? 10,
+          totalPrice: item.quantity * (item.unitPrice ?? 10),
+        })),
+      },
+    },
+    include: { items: true },
+  });
+
+  return { supplier, order };
+}
+
 let roleCounter = 0;
 
 /**

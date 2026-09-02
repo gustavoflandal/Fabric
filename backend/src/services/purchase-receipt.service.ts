@@ -1,7 +1,19 @@
+import { Prisma, StockMovementType, WarehouseTaskType } from '@prisma/client';
 import { prisma } from '../config/database';
 import stockService from './stock.service';
 import { eventBus, SystemEvents } from '../events/event-bus';
 import { AppError } from '../middleware/error.middleware';
+import { isModuleEnabled } from './licensed-module.service';
+import {
+  RECEIPT_TASK_REFERENCE_TYPE,
+  assertChainOrderResolved,
+  assertTaskIsOpen,
+  createReceiptTaskChain,
+  deleteTasksForReceipt,
+  loadTaskForUpdate,
+  markTaskCompleted,
+  markTaskStarted,
+} from './warehouse-task.service';
 
 export interface CreatePurchaseReceiptDto {
   purchaseOrderId: string;
@@ -16,9 +28,48 @@ export interface CreatePurchaseReceiptDto {
   }[];
 }
 
+/**
+ * F4.5 — entrada de uma conclusão (parcial ou total) de tarefa de `ALOCACAO`.
+ * `receiptItemId` é explícito e não derivado da tarefa: a cadeia gerada por
+ * F4.3 tem UMA tarefa de `ALOCACAO` por recebimento (não uma por item), então
+ * é a chamada que diz QUAL item conferido está sendo endereçado — e um mesmo
+ * recebimento pode ter dois itens do mesmo produto, o que tornaria
+ * `task.productId` ambíguo mesmo se estivesse preenchido.
+ */
+export interface CompletePutawayDto {
+  receiptItemId: string;
+  storagePositionId: string;
+  quantity: number;
+}
+
 export class PurchaseReceiptService {
   /**
    * Registra recebimento de pedido de compra
+   *
+   * ✅ F4.3 do plano do WMS (WMS_IMPLEMENTATION_ANALYSIS.md, seção 5, Fase 4;
+   * seção 3.3 de 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md): este método tem
+   * DOIS comportamentos, decididos por um único branch (`isModuleEnabled`),
+   * não por dois services paralelos — a duplicação de service é justamente o
+   * risco registrado na tabela de riscos do plano ("dois caminhos que divergem
+   * com o tempo, um deles sub-testado").
+   *
+   *   SEM WMS licenciado → comportamento IDÊNTICO ao de sempre: recebimento +
+   *     itens na transação, `status` default (`PENDING`), entrada de estoque
+   *     `IN` sem posição por item, custo médio atualizado em seguida. Nenhuma
+   *     linha deste caminho foi alterada por esta fase.
+   *
+   *   COM WMS licenciado → o recebimento nasce `CONFERIDO` (a conferência de
+   *     quantidade É a criação dos itens com `acceptedQty`) e ganha a cadeia
+   *     DESCARGA → CONFERENCIA → ETIQUETAGEM → QUARENTENA → ALOCACAO. NENHUMA
+   *     movimentação de estoque é registrada aqui: o material está fisicamente
+   *     na doca, não endereçado, e dar entrada no saldo antes de existir
+   *     endereço é exatamente a mentira que o WMS existe para eliminar. A
+   *     entrada acontece em `completePutaway()`.
+   *
+   * O que é COMUM aos dois caminhos e não se moveu: a validação de quantidade
+   * contra o pedido, o incremento de `PurchaseOrderItem.receivedQty` (o pedido
+   * foi recebido em ambos os casos — o que muda é onde o material está, não se
+   * chegou), `updateOrderStatus()` e o evento `PURCHASE_ORDER_RECEIVED`.
    */
   async create(data: CreatePurchaseReceiptDto, userId: string) {
     // Buscar pedido
@@ -57,6 +108,11 @@ export class PurchaseReceiptService {
       }
     }
 
+    // F4.3 — O BRANCH. Lido uma vez, antes da transação: `isModuleEnabled` bate
+    // num cache em memória carregado no boot (licenciamento é configuração de
+    // instalação, não filtro por request), então isto não é uma query a mais.
+    const wmsEnabled = await isModuleEnabled('WMS');
+
     // Gerar número do recebimento
     const count = await prisma.purchaseReceipt.count();
     const receiptNumber = `REC-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
@@ -70,6 +126,10 @@ export class PurchaseReceiptService {
           orderId: data.purchaseOrderId,
           receiptDate: new Date(data.receiptDate),
           receivedBy: userId,
+          // F4.2 — estado intermediário. Só o caminho COM WMS o usa; sem WMS o
+          // recebimento continua nascendo `PENDING` (o default da coluna), que
+          // é o comportamento que sempre existiu.
+          status: wmsEnabled ? 'CONFERIDO' : undefined,
           // PurchaseReceipt não tem coluna própria para nota fiscal - guardamos
           // junto das observações em vez de adicionar uma migration só pra isso.
           notes: data.invoiceNumber
@@ -116,8 +176,46 @@ export class PurchaseReceiptService {
         });
       }
 
+      // F4.3 — a cadeia de tarefas nasce na MESMA transação que o recebimento.
+      // Um recebimento `CONFERIDO` sem tarefas seria um recebimento que ninguém
+      // consegue endereçar e que nunca daria entrada em estoque — estado pior
+      // do que a criação inteira falhar.
+      if (wmsEnabled) {
+        await createReceiptTaskChain(tx, newReceipt.id);
+      }
+
       return newReceipt;
     });
+
+    // ✅ F4.3 — CAMINHO COM WMS: a entrada em estoque NÃO acontece aqui.
+    // Ela é o efeito colateral de concluir a tarefa de ALOCACAO
+    // (`completePutaway`), com `toPositionId` preenchido. `updateProductCosts`
+    // também é adiado para lá — e não por gosto: o método lê `stock_balances`
+    // e SUBTRAI `acceptedQty` para achar o saldo anterior ao recebimento
+    // (correção da Fase 1, item 1.6). Ele só está correto DEPOIS de a entrada
+    // ter sido registrada; chamá-lo aqui, no caminho com WMS, calcularia o
+    // custo médio a partir de um "saldo anterior" negativo. O corpo do método
+    // segue inalterado, como F4.5 exige — o que mudou é o momento em que a
+    // pré-condição dele passa a valer.
+    if (wmsEnabled) {
+      await this.updateOrderStatus(data.purchaseOrderId);
+
+      await eventBus.emit(SystemEvents.PURCHASE_ORDER_RECEIVED, {
+        receiptId: receipt.id,
+        receiptNumber: receipt.receiptNumber,
+        purchaseOrderId: order.id,
+        orderNumber: order.orderNumber,
+        supplierId: order.supplierId,
+        itemsCount: receipt.items.length,
+      });
+
+      console.log(
+        `[PurchaseReceipt] Recebimento ${receipt.receiptNumber} registrado como CONFERIDO ` +
+          `com cadeia de tarefas de armazém (WMS licenciado)`
+      );
+
+      return receipt;
+    }
 
     // ✅ INTEGRAÇÃO: Registrar entrada de estoque para cada item
     for (const item of receipt.items) {
@@ -168,6 +266,222 @@ export class PurchaseReceiptService {
     console.log(`[PurchaseReceipt] Recebimento ${receipt.receiptNumber} registrado com sucesso`);
 
     return receipt;
+  }
+
+  /**
+   * F4.4 + F4.5 — CONCLUSÃO DA TAREFA DE `ALOCACAO`: o momento em que o
+   * material de um recebimento entra no saldo, já endereçado.
+   *
+   * DESENHO (a decisão que F4.5 deixou em aberto): a cadeia tem UMA tarefa de
+   * `ALOCACAO` por recebimento, e este método pode ser chamado VÁRIAS vezes
+   * para ela — uma por par (item conferido, endereço). É o que a realidade de
+   * armazém pede: 100 unidades podem ir 60 para uma posição e 40 para outra, e
+   * um recebimento de cinco itens não deveria virar cinco tarefas na fila do
+   * operador quando o trabalho físico é "guardar este palete". A alternativa
+   * (uma tarefa por posição de destino) exigiria saber os destinos ANTES de
+   * alguém olhar o material — precisamente o que a tarefa existe para decidir.
+   *
+   * A tarefa fecha sozinha (`COMPLETED`) quando todo `acceptedQty` de todo item
+   * do recebimento está coberto por `ReceiptPutaway`; nesse mesmo instante o
+   * recebimento vai de `CONFERIDO` para `COMPLETED`.
+   *
+   * ATOMICIDADE E ORDEM DE LOCK — a parte crítica. Tudo abaixo roda numa
+   * transação só, travando nesta ordem invariante:
+   *
+   *   1. `warehouse_tasks`         (FOR UPDATE, em `loadTaskForUpdate`)
+   *   2. `purchase_receipt_items`  (FOR UPDATE, aqui)
+   *   3. `stock_balances`          (dentro de `applyMovement`)
+   *   4. `stock_position_balances` (idem, crescente por id)
+   *
+   * O lock 2 é o que torna a invariante de F4.4 (`SUM(putaway) <= acceptedQty`)
+   * inviolável: sem ele, dois endereçamentos concorrentes do mesmo item leriam
+   * a mesma soma parcial e ambos passariam na validação — o banco não tem como
+   * expressar uma constraint de agregação. O lock 1, mais externo, serializa as
+   * conclusões da mesma tarefa antes de qualquer leitura de saldo e impede que
+   * duas chamadas simultâneas decidam, as duas, que o recebimento terminou.
+   */
+  async completePutaway(taskId: string, data: CompletePutawayDto, userId: string) {
+    if (data.quantity <= 0) {
+      throw new AppError(400, 'Quantidade a endereçar deve ser maior que zero');
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // ---- LOCK 1: a tarefa -------------------------------------------------
+      const task = await loadTaskForUpdate(tx, taskId);
+
+      if (task.type !== WarehouseTaskType.ALOCACAO) {
+        throw new AppError(
+          400,
+          `Tarefa de ${task.type} não endereça material — use POST /warehouse-tasks/:id/complete.`
+        );
+      }
+
+      assertTaskIsOpen(task);
+      await assertChainOrderResolved(tx, task);
+
+      if (task.referenceType !== RECEIPT_TASK_REFERENCE_TYPE || !task.reference) {
+        throw new AppError(400, 'Tarefa de alocação não está vinculada a um recebimento');
+      }
+
+      const receiptId = task.reference;
+
+      // ---- LOCK 2: o item conferido ----------------------------------------
+      // `FOR UPDATE` no ITEM (e não só a leitura via Prisma) porque é a soma dos
+      // putaways DELE que precisa ser estável entre a validação e a escrita.
+      const itemRows = await tx.$queryRaw<
+        { id: string; receiptId: string; productId: string; acceptedQty: number }[]
+      >`
+        SELECT id, receiptId, productId, acceptedQty
+        FROM purchase_receipt_items
+        WHERE id = ${data.receiptItemId}
+        FOR UPDATE
+      `;
+
+      if (itemRows.length === 0) {
+        throw new AppError(404, 'Item de recebimento não encontrado');
+      }
+
+      const item = itemRows[0];
+
+      if (item.receiptId !== receiptId) {
+        throw new AppError(
+          400,
+          'Item de recebimento não pertence ao recebimento desta tarefa de alocação'
+        );
+      }
+
+      // A posição existe? `applyMovement` também valida (404), mas a checagem de
+      // BLOQUEIO mora aqui: `stock.service.ts` deliberadamente restringiu a dele
+      // a `TRANSFER` e registrou que a recusa de `IN` em posição bloqueada é
+      // decisão da Fase 4. É esta. Guardar material numa posição bloqueada
+      // (avariada, interditada, em bloqueio de qualidade) é justamente o que a
+      // flag existe para impedir.
+      const position = await tx.storagePosition.findUnique({
+        where: { id: data.storagePositionId },
+        select: { id: true, code: true, blocked: true },
+      });
+
+      if (!position) {
+        throw new AppError(404, 'Posição de armazenagem não encontrada');
+      }
+
+      if (position.blocked) {
+        throw new AppError(
+          400,
+          `Posição ${position.code} está bloqueada e não pode receber material.`
+        );
+      }
+
+      // Invariante de F4.4, com o item travado. Aritmética em `Decimal`: a
+      // coluna é DECIMAL(18,4) (decisão D2) e somar em float reintroduziria o
+      // arredondamento que ela existe para evitar.
+      const aggregated = await tx.receiptPutaway.aggregate({
+        where: { receiptItemId: item.id },
+        _sum: { quantity: true },
+      });
+
+      const alreadyPutaway = new Prisma.Decimal(aggregated._sum.quantity ?? 0);
+      const requested = new Prisma.Decimal(data.quantity);
+      const accepted = new Prisma.Decimal(item.acceptedQty);
+
+      if (alreadyPutaway.plus(requested).greaterThan(accepted)) {
+        throw new AppError(
+          400,
+          `Quantidade endereçada excede a conferida. Aceito: ${accepted.toString()}, ` +
+            `já endereçado: ${alreadyPutaway.toString()}, solicitado: ${requested.toString()}.`
+        );
+      }
+
+      const putaway = await tx.receiptPutaway.create({
+        data: {
+          receiptItemId: item.id,
+          storagePositionId: position.id,
+          quantity: requested,
+          userId,
+          taskId: task.id,
+        },
+      });
+
+      // ---- LOCKS 3 e 4 + a movimentação, na MESMA transação -----------------
+      // `registerMovementInTransaction` (já existente) em vez de
+      // `registerMovement`: o `ReceiptPutaway` e a entrada de estoque são a
+      // mesma verdade contada duas vezes — não podem existir um sem o outro.
+      await stockService.registerMovementInTransaction(tx, {
+        productId: item.productId,
+        type: StockMovementType.IN,
+        quantity: data.quantity,
+        reason: 'Endereçamento de recebimento de compra',
+        // `reference`/`referenceType` iguais aos do caminho sem WMS de propósito:
+        // é o mesmo par que `cancel()` e os relatórios de compra já procuram.
+        reference: receiptId,
+        referenceType: 'PURCHASE',
+        userId,
+        notes: `Alocação em ${position.code} (tarefa ${task.id})`,
+        toPositionId: position.id,
+      });
+
+      // O recebimento inteiro está endereçado?
+      const receiptItems = await tx.purchaseReceiptItem.findMany({
+        where: { receiptId },
+        select: { id: true, acceptedQty: true },
+      });
+
+      const sums = await tx.receiptPutaway.groupBy({
+        by: ['receiptItemId'],
+        where: { receiptItemId: { in: receiptItems.map((i) => i.id) } },
+        _sum: { quantity: true },
+      });
+
+      const putawayByItem = new Map(
+        sums.map((s) => [s.receiptItemId, new Prisma.Decimal(s._sum.quantity ?? 0)])
+      );
+
+      const fullyPutaway = receiptItems.every((receiptItem) => {
+        const total = putawayByItem.get(receiptItem.id) ?? new Prisma.Decimal(0);
+        return total.greaterThanOrEqualTo(new Prisma.Decimal(receiptItem.acceptedQty));
+      });
+
+      if (fullyPutaway) {
+        await markTaskCompleted(tx, task);
+        await tx.purchaseReceipt.update({
+          where: { id: receiptId },
+          data: { status: 'COMPLETED' },
+        });
+      } else {
+        // Endereçamento parcial: a tarefa passa a IN_PROGRESS na primeira
+        // chamada e só fecha quando o último item for coberto.
+        await markTaskStarted(tx, task);
+      }
+
+      return { putaway, receiptId, fullyPutaway };
+    });
+
+    // ✅ INTEGRAÇÃO: custo médio, FORA da transação e só quando o recebimento
+    // fecha — mesmo ponto lógico do caminho sem WMS (todas as entradas deste
+    // recebimento já registradas, `stock_balances` já refletindo todas elas).
+    // O método em si segue inalterado (F4.5).
+    if (result.fullyPutaway) {
+      const items = await prisma.purchaseReceiptItem.findMany({
+        where: { receiptId: result.receiptId },
+        include: { product: true, orderItem: true },
+      });
+
+      await this.updateProductCosts(items);
+
+      console.log(
+        `[PurchaseReceipt] Recebimento ${result.receiptId} totalmente endereçado — status COMPLETED`
+      );
+    }
+
+    return {
+      putaway: {
+        ...result.putaway,
+        // Decisão D2: quantidade `Decimal` é serializada como STRING nos
+        // endpoints novos, igual aos da Fase 1.
+        quantity: result.putaway.quantity.toString(),
+      },
+      receiptCompleted: result.fullyPutaway,
+    };
   }
 
   /**
@@ -358,22 +672,78 @@ export class PurchaseReceiptService {
    * estornado sem o recebimento ser removido - estado inconsistente.
    * Agora tudo roda em uma única transação, usando
    * `stockService.registerMovementInTransaction` para reaproveitar o `tx`.
+   *
+   * ✅ F4.3/F4.5 — o cancelamento também tem dois caminhos, e o critério NÃO é
+   * a licença atual: é a EXISTÊNCIA DE TAREFAS no recebimento. Um recebimento
+   * criado enquanto o WMS estava licenciado precisa ser cancelado do jeito WMS
+   * mesmo que a licença tenha sido desligada depois; ler `isModuleEnabled`
+   * aqui estornaria estoque que nunca entrou.
+   *
+   *   Sem tarefas (recebimento linear) → estorna `acceptedQty` de cada item,
+   *     sem posição. Idêntico ao que sempre foi.
+   *   Com tarefas → estorna EXATAMENTE o que foi endereçado (um `OUT` por
+   *     `ReceiptPutaway`, com `fromPositionId`), e nada mais. Um recebimento
+   *     ainda em `CONFERIDO`, sem nenhum endereçamento, não gera movimentação
+   *     nenhuma — não havia estoque para estornar. Estornar `acceptedQty` como
+   *     no caminho linear derrubaria o saldo do produto para negativo (ou
+   *     falharia com "estoque insuficiente"), que é o bug que este branch
+   *     evita.
    */
   async cancel(id: string, userId: string, reason: string) {
     const receipt = await this.getById(id);
 
+    const taskCount = await prisma.warehouseTask.count({
+      where: { referenceType: RECEIPT_TASK_REFERENCE_TYPE, reference: receipt.id },
+    });
+    const isTaskDriven = taskCount > 0;
+
     await prisma.$transaction(async (tx) => {
-      for (const item of receipt.items) {
-        await stockService.registerMovementInTransaction(tx, {
-          productId: item.productId,
-          type: 'OUT',
-          quantity: item.acceptedQty,
-          reason: `Estorno de recebimento - ${reason}`,
-          reference: receipt.id,
-          referenceType: 'PURCHASE',
-          userId,
-          notes: `Cancelamento do recebimento ${receipt.receiptNumber}`,
+      if (isTaskDriven) {
+        const putaways = await tx.receiptPutaway.findMany({
+          where: { receiptItemId: { in: receipt.items.map((item) => item.id) } },
+          include: { storagePosition: { select: { code: true } } },
         });
+
+        const productByItem = new Map(receipt.items.map((item) => [item.id, item.productId]));
+
+        for (const putaway of putaways) {
+          await stockService.registerMovementInTransaction(tx, {
+            productId: productByItem.get(putaway.receiptItemId)!,
+            type: StockMovementType.OUT,
+            quantity: Number(putaway.quantity),
+            reason: `Estorno de recebimento - ${reason}`,
+            reference: receipt.id,
+            referenceType: 'PURCHASE',
+            userId,
+            notes:
+              `Cancelamento do recebimento ${receipt.receiptNumber} - ` +
+              `estorno do endereçamento em ${putaway.storagePosition.code}`,
+            fromPositionId: putaway.storagePositionId,
+          });
+        }
+
+        // A trilha de endereçamento e as tarefas saem junto com o recebimento.
+        // Ordem obrigatória: as FKs são RESTRICT (ver o comentário no schema),
+        // então putaway → tarefa → recebimento, nunca o contrário.
+        await tx.receiptPutaway.deleteMany({
+          where: { receiptItemId: { in: receipt.items.map((item) => item.id) } },
+        });
+        await deleteTasksForReceipt(tx, receipt.id);
+      }
+
+      for (const item of receipt.items) {
+        if (!isTaskDriven) {
+          await stockService.registerMovementInTransaction(tx, {
+            productId: item.productId,
+            type: 'OUT',
+            quantity: item.acceptedQty,
+            reason: `Estorno de recebimento - ${reason}`,
+            reference: receipt.id,
+            referenceType: 'PURCHASE',
+            userId,
+            notes: `Cancelamento do recebimento ${receipt.receiptNumber}`,
+          });
+        }
 
         const orderItem = await tx.purchaseOrderItem.findUnique({
           where: { id: item.orderItemId },
