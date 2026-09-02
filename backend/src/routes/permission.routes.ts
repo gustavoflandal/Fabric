@@ -16,7 +16,8 @@ router.get('/:id', requirePermission('roles', 'read'), permissionController.getB
 router.post('/', requirePermission('roles', 'update'), permissionController.create);
 router.delete('/:id', requirePermission('roles', 'update'), permissionController.delete);
 
-// Seed de permissões padrão
-router.post('/seed/default', requirePermission('roles', 'update'), permissionController.seedDefault);
+// A rota POST /permissions/seed/default foi removida: mantinha uma segunda lista de
+// permissões divergente da fonte de verdade. Para adicionar uma permissão nova,
+// declare-a em backend/prisma/seed.ts e rode o seed (ver docs/PERMISSOES_SISTEMA.md).
 
 export default router;
