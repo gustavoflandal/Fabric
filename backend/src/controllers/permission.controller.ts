@@ -54,20 +54,6 @@ export class PermissionController {
       next(error);
     }
   }
-
-  async seedDefault(req: Request, res: Response, next: NextFunction) {
-    try {
-      const result = await permissionService.seedDefaultPermissions();
-
-      res.status(200).json({
-        status: 'success',
-        data: result,
-        message: result.message,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
 }
 
 export default new PermissionController();

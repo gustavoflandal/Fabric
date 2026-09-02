@@ -119,12 +119,10 @@ async function main() {
     { resource: 'pedidos_compra', action: 'aprovar', description: 'Aprovar pedidos de compra' },
     { resource: 'pedidos_compra', action: 'confirmar', description: 'Confirmar pedidos de compra' },
     { resource: 'pedidos_compra', action: 'cancelar', description: 'Cancelar pedidos de compra' },
-    { resource: 'pedidos_compra', action: 'receber', description: 'Receber pedidos de compra' },
-    
+
     // Recebimentos de Compra
     { resource: 'recebimentos_compra', action: 'criar', description: 'Criar recebimentos de compra' },
     { resource: 'recebimentos_compra', action: 'visualizar', description: 'Visualizar recebimentos de compra' },
-    { resource: 'recebimentos_compra', action: 'editar', description: 'Editar recebimentos de compra' },
     { resource: 'recebimentos_compra', action: 'excluir', description: 'Excluir recebimentos de compra' },
     
     // Planos de Contagem
@@ -149,7 +147,6 @@ async function main() {
     
     // Relatórios de Contagem
     { resource: 'relatorios_contagem', action: 'visualizar', description: 'Visualizar relatórios de contagem' },
-    { resource: 'relatorios_contagem', action: 'exportar', description: 'Exportar relatórios de contagem' },
   ];
 
   for (const perm of permissions) {
@@ -198,7 +195,7 @@ async function main() {
     })),
   });
 
-  await prisma.role.upsert({
+  const managerRoleRecord = await prisma.role.upsert({
     where: { code: 'MANAGER' },
     update: {},
     create: {
@@ -208,7 +205,7 @@ async function main() {
     },
   });
 
-  await prisma.role.upsert({
+  const operatorRoleRecord = await prisma.role.upsert({
     where: { code: 'OPERATOR' },
     update: {},
     create: {
@@ -219,6 +216,110 @@ async function main() {
   });
 
   console.log('✅ Perfis criados: ADMIN, MANAGER, OPERATOR');
+
+  // ============================================
+  // PERMISSÕES PADRÃO DE MANAGER E OPERATOR
+  // ============================================
+  // Conjuntos declarados como resource -> [ações]. Pares que não existirem na
+  // tabela `permissions` são ignorados silenciosamente (ex.: recursos criados
+  // por scripts avulsos que ainda não rodaram neste ambiente).
+  //
+  // Critério: MANAGER não recebe nenhuma ação de exclusão nem gestão de
+  // usuários/perfis além de leitura (gerente não é administrador do sistema).
+  // OPERATOR conta e reconta, mas o ajuste de estoque por divergência
+  // (`stock:adjustment` / `contagem:aprovar_divergencia`) é aprovação e fica
+  // apenas com o MANAGER.
+
+  const managerPermissions: Record<string, string[]> = {
+    products: ['create', 'read', 'update'],
+    boms: ['create', 'read', 'update'],
+    routings: ['create', 'read', 'update'],
+    production_orders: ['create', 'read', 'update', 'execute'],
+    production_pointings: ['read', 'update'],
+    work_centers: ['create', 'read', 'update'],
+    suppliers: ['create', 'read', 'update'],
+    customers: ['create', 'read', 'update'],
+    stock: ['read', 'update', 'entry', 'exit', 'adjustment'],
+    mrp: ['read', 'execute', 'consolidate'],
+    reports: ['read', 'export', 'production', 'efficiency', 'quality'],
+    orcamentos_compra: ['visualizar', 'criar', 'editar', 'aprovar', 'rejeitar'],
+    pedidos_compra: ['visualizar', 'criar', 'editar', 'aprovar', 'confirmar', 'cancelar'],
+    recebimentos_compra: ['visualizar', 'criar'],
+    armazens: ['visualizar', 'criar', 'editar'],
+    estruturas_armazem: ['visualizar', 'criar', 'editar', 'gerar_posicoes'],
+    storage_positions: ['update'],
+    planos_contagem: ['visualizar', 'criar', 'editar', 'ativar', 'pausar'],
+    sessoes_contagem: ['visualizar', 'criar', 'iniciar', 'completar', 'cancelar'],
+    contagem: ['executar', 'recontar', 'aprovar_divergencia'],
+    relatorios_contagem: ['visualizar'],
+    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms'],
+    audit_logs: ['read'],
+    roles: ['read'],
+    users: ['read'],
+  };
+
+  const operatorPermissions: Record<string, string[]> = {
+    products: ['read'],
+    boms: ['read'],
+    routings: ['read'],
+    production_orders: ['read', 'execute'],
+    production_pointings: ['create', 'read', 'update'],
+    work_centers: ['read'],
+    suppliers: ['read'],
+    customers: ['read'],
+    stock: ['read', 'entry', 'exit'],
+    mrp: ['read'],
+    reports: ['read'],
+    orcamentos_compra: ['visualizar'],
+    pedidos_compra: ['visualizar'],
+    recebimentos_compra: ['visualizar', 'criar'],
+    armazens: ['visualizar'],
+    estruturas_armazem: ['visualizar'],
+    storage_positions: ['update'],
+    planos_contagem: ['visualizar'],
+    sessoes_contagem: ['visualizar', 'iniciar'],
+    contagem: ['executar', 'recontar'],
+    relatorios_contagem: ['visualizar'],
+    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms'],
+  };
+
+  const permissionIdByKey = new Map(
+    allPermissions.map((p) => [`${p.resource}:${p.action}`, p.id])
+  );
+
+  const assignRolePermissions = async (
+    roleId: string,
+    roleLabel: string,
+    permissionMap: Record<string, string[]>
+  ) => {
+    const permissionIds: string[] = [];
+    const missing: string[] = [];
+
+    for (const [resource, actions] of Object.entries(permissionMap)) {
+      for (const action of actions) {
+        const permissionId = permissionIdByKey.get(`${resource}:${action}`);
+        if (permissionId) {
+          permissionIds.push(permissionId);
+        } else {
+          missing.push(`${resource}:${action}`);
+        }
+      }
+    }
+
+    await prisma.rolePermission.deleteMany({ where: { roleId } });
+    await prisma.rolePermission.createMany({
+      data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+    });
+
+    console.log(`   - ${roleLabel}: ${permissionIds.length} permissões atribuídas`);
+    if (missing.length > 0) {
+      console.log(`     ⚠️  ignoradas (inexistentes): ${missing.join(', ')}`);
+    }
+  };
+
+  console.log('🔐 Atribuindo permissões padrão a MANAGER e OPERATOR...');
+  await assignRolePermissions(managerRoleRecord.id, 'MANAGER', managerPermissions);
+  await assignRolePermissions(operatorRoleRecord.id, 'OPERATOR', operatorPermissions);
 
   // Criar usuário administrador
   console.log('🔑 Criando usuário administrador...');

@@ -74,14 +74,14 @@ router.patch(
 // Confirmar pedido
 router.patch(
   '/:id/confirm',
-  requirePermission('pedidos_compra', 'editar'),
+  requirePermission('pedidos_compra', 'confirmar'),
   purchaseOrderController.confirm
 );
 
 // Cancelar pedido
 router.patch(
   '/:id/cancel',
-  requirePermission('pedidos_compra', 'editar'),
+  requirePermission('pedidos_compra', 'cancelar'),
   purchaseOrderController.cancel
 );
 

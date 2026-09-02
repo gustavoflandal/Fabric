@@ -9,10 +9,18 @@ const router = Router();
 router.use(authMiddleware);
 
 // Rotas de audit logs
-router.get('/', auditLogController.getAll);
-router.get('/statistics', auditLogController.getStatistics);
-router.get('/:id', auditLogController.getById);
-router.get('/resource/:resource/:resourceId', auditLogController.getByResource);
+router.get('/', requirePermission('audit_logs', 'read'), auditLogController.getAll);
+router.get(
+  '/statistics',
+  requirePermission('audit_logs', 'read'),
+  auditLogController.getStatistics
+);
+router.get('/:id', requirePermission('audit_logs', 'read'), auditLogController.getById);
+router.get(
+  '/resource/:resource/:resourceId',
+  requirePermission('audit_logs', 'read'),
+  auditLogController.getByResource
+);
 router.delete('/clean', requirePermission('audit_logs', 'delete'), auditLogController.deleteLogs);
 
 export default router;

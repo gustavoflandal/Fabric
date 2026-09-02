@@ -75,7 +75,7 @@ router.post('/sessions/:id/complete', requirePermission('sessoes_contagem', 'com
 router.post('/sessions/:id/cancel', requirePermission('sessoes_contagem', 'cancelar'), countingSessionController.cancel);
 
 // Gerar relatório
-router.get('/sessions/:id/report', requirePermission('sessoes_contagem', 'visualizar'), countingSessionController.getReport);
+router.get('/sessions/:id/report', requirePermission('relatorios_contagem', 'visualizar'), countingSessionController.getReport);
 
 // Ajustar estoque
 router.post('/sessions/:id/adjust-stock', requirePermission('stock', 'adjustment'), countingSessionController.adjustStock);
