@@ -88,6 +88,13 @@ export const transferSchema = Joi.object({
   }),
   reference: Joi.string().trim().max(191).allow('', null),
   notes: Joi.string().trim().allow('', null),
+  // Fase 5 — o lote transferido. OPCIONAL na borda pelo mesmo critério do resto
+  // deste arquivo: se ele é obrigatório depende de `Product.lotTracked`, que é
+  // estado do banco. Quem valida a pertinência do lote (existe? é deste produto?
+  // o produto controla lote? venceu?) é `applyMovement()`, com o lock na mão.
+  lotId: Joi.string().uuid().allow(null).messages({
+    'string.guid': 'Lote inválido',
+  }),
 });
 
 export const registerAdjustmentSchema = Joi.object({

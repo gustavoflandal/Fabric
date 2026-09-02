@@ -55,7 +55,16 @@ export const loginWarehouseUser = async (permissions = WAREHOUSE_PERMISSIONS) =>
  */
 export const seedStock = async (
   productId: string,
-  positions: { positionId: string; quantity: number; updatedAt?: Date }[]
+  positions: {
+    positionId: string;
+    quantity: number;
+    updatedAt?: Date;
+    /**
+     * Fase 5: o lote da LINHA de saldo. Omitido = a linha sem lote de sempre —
+     * é o que todo teste anterior a esta fase continua criando.
+     */
+    lotId?: string | null;
+  }[]
 ) => {
   const total = positions.reduce((sum, p) => sum + p.quantity, 0);
 
@@ -66,16 +75,26 @@ export const seedStock = async (
   });
 
   for (const position of positions) {
-    await createTestPositionBalance(productId, position.positionId, position.quantity);
+    const balance = await createTestPositionBalance(
+      productId,
+      position.positionId,
+      position.quantity,
+      position.lotId ?? null
+    );
 
     // `updatedAt` é `@updatedAt` (o Prisma o sobrescreve em qualquer write) e é
     // ele que define a ordem do FIFO de F4.8. Para testar a ORDEM é preciso
     // forçá-lo, o que só dá para fazer em SQL cru.
+    //
+    // Fase 5: o `WHERE` passou a ser por `id` da linha — a mesma posição pode
+    // ter várias linhas (uma por lote), e filtrar por (produto, posição)
+    // carimbaria todas elas com o mesmo `updatedAt`, destruindo justamente a
+    // ordem que o teste está montando.
     if (position.updatedAt) {
       await testPrisma.$executeRaw`
         UPDATE stock_position_balances
         SET updatedAt = ${position.updatedAt}
-        WHERE productId = ${productId} AND storagePositionId = ${position.positionId}
+        WHERE id = ${balance.id}
       `;
     }
   }

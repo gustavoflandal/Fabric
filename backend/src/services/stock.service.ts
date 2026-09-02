@@ -52,6 +52,20 @@ export interface StockMovementDto {
    */
   fromPositionId?: string;
   toPositionId?: string;
+  /**
+   * Fase 5 do plano do WMS — o LOTE movimentado.
+   *
+   * Campo ÚNICO, e não um par `from`/`to` como as posições: a quantidade que
+   * muda de saldo é sempre do MESMO lote, inclusive num `TRANSFER` (mudar de
+   * endereço não reetiqueta o material). Ver a nota no schema.
+   *
+   * Só é preenchido para produto com `lotTracked = true` — `applyMovement()`
+   * recusa (400) um `lotId` de produto que não controla lote, e recusa um lote
+   * que não pertence ao produto da movimentação. Omitir mantém o comportamento
+   * byte-a-byte o de antes desta fase, que é o caminho de todo produto sem
+   * lote controlado e de todo chamador legado.
+   */
+  lotId?: string;
 }
 
 /**
@@ -68,6 +82,19 @@ export interface StockTransferDto {
   userId: string;
   reference?: string;
   notes?: string;
+  /**
+   * Fase 5 — o lote transferido. Um `TRANSFER` não reetiqueta material, então é
+   * um campo só (o mesmo lote nas duas pontas), e ele é o que identifica a LINHA
+   * de saldo em cada uma delas.
+   *
+   * Obrigatório na prática para produto `lotTracked`: sem lote, a origem
+   * procuraria a linha SEM lote do endereço, que não existe para material
+   * rastreado, e a transferência falharia com "estoque insuficiente na posição".
+   * Não é validado como obrigatório aqui de propósito — a exigência depende de
+   * uma flag do banco, e antecipá-la neste ponto duplicaria a regra que
+   * `applyMovement` já aplica com o lock na mão.
+   */
+  lotId?: string;
 }
 
 /**
@@ -219,6 +246,197 @@ export class StockServiceRefactored {
   }
 
   /**
+   * Fase 5 — o lote da movimentação, validado.
+   *
+   * Devolve `null` quando a movimentação não informa lote (produto sem
+   * `lotTracked`, ou qualquer chamador legado), e nesse caso NADA do
+   * comportamento de lote roda.
+   *
+   * Duas guardas que o banco não expressa:
+   *   1. o lote tem de pertencer AO PRODUTO da movimentação — a FK só garante
+   *      que o lote existe, não que é deste produto, e um lote trocado gravaria
+   *      saldo numa terceira dimensão errada, silenciosamente;
+   *   2. o produto tem de ter `lotTracked` — aceitar lote em produto que não
+   *      controla lote criaria linhas de saldo com lote convivendo com linhas
+   *      sem lote no mesmo endereço, que é justamente a inconsistência que a
+   *      flag existe para evitar.
+   */
+  private async loadMovementLot(tx: TransactionClient, data: StockMovementDto) {
+    if (!data.lotId) {
+      return null;
+    }
+
+    const lot = await tx.lot.findUnique({
+      where: { id: data.lotId },
+      select: {
+        id: true,
+        lotNumber: true,
+        productId: true,
+        expiresAt: true,
+        product: { select: { lotTracked: true } },
+      },
+    });
+
+    if (!lot) {
+      throw new AppError(404, 'Lote não encontrado');
+    }
+
+    if (lot.productId !== data.productId) {
+      throw new AppError(400, `Lote ${lot.lotNumber} não pertence ao produto informado.`);
+    }
+
+    if (!lot.product.lotTracked) {
+      throw new AppError(
+        400,
+        `Produto do lote ${lot.lotNumber} não tem controle de lote habilitado.`
+      );
+    }
+
+    return lot;
+  }
+
+  /**
+   * Fase 5 — BLOQUEIO DE SAÍDA DE LOTE VENCIDO, com a exceção que o torna
+   * utilizável.
+   *
+   * REGRA: nenhuma movimentação que REDUZA o saldo de um lote pode sair depois
+   * de `expiresAt`. Isso cobre `OUT` (inclusive a conclusão de uma tarefa de
+   * `PICKING`, que é um `OUT` com `fromPositionId`) e `TRANSFER` (que sempre
+   * debita a origem). Vencimento é DERIVADO da data no instante da operação —
+   * não existe campo de status de lote, de propósito (ver o schema).
+   *
+   * ⚠️ A EXCEÇÃO — O AJUSTE PASSA, E ISSO É DELIBERADO. NÃO "CORRIJA".
+   * Bloquear TODA saída de lote vencido tornaria impossível dar baixa no
+   * estoque vencido pelo caminho normal do sistema: o material continuaria
+   * eternamente no saldo, porque a única operação capaz de removê-lo estaria
+   * proibida. O ajuste é exatamente o que o Fabric já usa para correção e baixa
+   * (quebra, descarte, correção pós-contagem), e precisa continuar podendo
+   * remover um lote vencido do saldo. Quem revisar isto sem o contexto vai achar
+   * que é um furo na regra; é o contrário — é o que permite que a regra exista
+   * sem prender estoque morto no armazém.
+   *
+   * ⚠️ COMO "AJUSTE" É RECONHECIDO — e este detalhe é o que faz a exceção
+   * FUNCIONAR em vez de ser letra morta. Um ajuste no Fabric NÃO é
+   * `type = ADJUSTMENT`: é `type = OUT` (ou `IN`) com
+   * `referenceType = 'ADJUSTMENT'`. É assim em `registerAdjustment()`,
+   * `adjustStock()` e no ajuste pós-contagem de F3.4 — e por um motivo real:
+   * `applyMovement` calcula o delta do saldo agregado pelo TIPO, e
+   * `type = ADJUSTMENT` sempre soma (ver o cálculo de `delta`), então um ajuste
+   * de BAIXA gravado como `ADJUSTMENT` aumentaria o saldo. `StockMovementType`
+   * ADJUSTMENT existe no enum e é aceito aqui por completude, mas nenhum
+   * chamador o usa. Testar a exceção só contra o TIPO passaria — e a baixa de
+   * lote vencido continuaria impossível na prática.
+   *
+   * `referenceType = 'COUNTING'` NÃO é exceção, e não precisa ser: a contagem
+   * não ganhou dimensão de lote nesta fase (fora de escopo declarado), então
+   * todo ajuste pós-contagem chega aqui com `lot = null` e sai na primeira
+   * linha. A consequência — contagem de produto `lotTracked` mira a linha de
+   * saldo SEM lote do endereço — está registrada no plano, não é acidente.
+   *
+   * Consequência conhecida e aceita: `TRANSFER` de lote vencido é recusado,
+   * então mover material vencido para uma área de bloqueio/descarte não se faz
+   * por transferência — faz-se pela baixa (`OUT` com `referenceType`
+   * `'ADJUSTMENT'`), que é a operação que descreve o que de fato aconteceu com
+   * ele.
+   */
+  private assertLotNotExpiredForOutbound(
+    data: StockMovementDto,
+    lot: { lotNumber: string; expiresAt: Date | null } | null
+  ): void {
+    if (!lot || !lot.expiresAt) {
+      return;
+    }
+
+    // Ver os dois blocos ⚠️ acima antes de mexer nestas duas linhas.
+    if (
+      data.type === StockMovementType.ADJUSTMENT ||
+      data.referenceType === 'ADJUSTMENT'
+    ) {
+      return;
+    }
+
+    const reducesLotBalance =
+      data.type === StockMovementType.OUT || data.type === StockMovementType.TRANSFER;
+
+    if (!reducesLotBalance) {
+      return;
+    }
+
+    if (lot.expiresAt.getTime() < Date.now()) {
+      throw new AppError(
+        400,
+        `Lote ${lot.lotNumber} venceu em ${lot.expiresAt.toISOString().slice(0, 10)} e não ` +
+          'pode sair do estoque. Use um ajuste de baixa para retirar o material vencido.'
+      );
+    }
+  }
+
+  /**
+   * Fase 5 — resolve (criando se preciso) a linha de `stock_position_balances`
+   * da chave composta (produto, posição, lote) e devolve o `id` dela.
+   *
+   * POR QUE NÃO É MAIS UM `upsert` PELA CHAVE ÚNICA, como era até a Fase 4: o
+   * Prisma gera o input de chave única composta com TODAS as colunas
+   * não-nulas, mesmo quando uma delas é opcional no schema — não há como passar
+   * `lotId: null` por ali. A busca então é feita em SQL, com o operador
+   * null-safe do MySQL (`<=>`), que trata `NULL <=> NULL` como igual e é
+   * exatamente a semântica de "a linha SEM lote desta posição".
+   *
+   * SEGURANÇA DA CRIAÇÃO — o ponto delicado, e o motivo do `FOR UPDATE` na
+   * busca. São DUAS proteções distintas, e cada uma cobre o que a outra não
+   * cobre:
+   *
+   *   1. LOCK 1 (`stock_balances` do produto, adquirido no início de
+   *      `applyMovement`) SERIALIZA as escritas de saldo daquele produto. É ele
+   *      que substitui a garantia que o banco deixou de dar sozinho: como o
+   *      índice único trata NULL como distinto, nada impede o InnoDB de aceitar
+   *      duas linhas SEM lote para o mesmo (produto, posição).
+   *
+   *   2. `FOR UPDATE` nesta busca torna a leitura CONSISTENTE COM O PRESENTE.
+   *      Serializar não basta — e isto foi encontrado por teste, não por
+   *      inspeção. Em REPEATABLE READ (o default do InnoDB) o snapshot da
+   *      transação nasce na PRIMEIRA leitura não-travante dela, que aqui é o
+   *      `upsert` de `stock_balances` — ANTES de LOCK 1 ser concedido. A
+   *      transação que esperou pelo lock enxergaria, num `SELECT` comum, um
+   *      mundo em que a linha criada pela vencedora ainda não existe, e
+   *      tentaria criá-la de novo: com lote, estoura no índice único; SEM lote,
+   *      seria pior — o índice não recusa, e a posição ficaria com duas linhas
+   *      do mesmo produto, cada uma com metade do saldo. Leitura travante lê a
+   *      versão mais recente commitada, não o snapshot, e é isso que fecha a
+   *      janela.
+   *
+   * O `FOR UPDATE` também já deixa a linha travada para o `SELECT quantity`
+   * seguinte em `applyMovement` — é a MESMA linha, na mesma ordem, não um lock
+   * a mais (ver a nota de ordem determinística lá).
+   */
+  private async resolvePositionBalanceRow(
+    tx: TransactionClient,
+    productId: string,
+    storagePositionId: string,
+    lotId: string | null
+  ): Promise<string> {
+    const existing = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM stock_position_balances
+      WHERE productId = ${productId}
+        AND storagePositionId = ${storagePositionId}
+        AND lotId <=> ${lotId}
+      LIMIT 1
+      FOR UPDATE
+    `;
+
+    if (existing.length > 0) {
+      return existing[0].id;
+    }
+
+    const created = await tx.stockPositionBalance.create({
+      data: { productId, storagePositionId, lotId, quantity: 0 },
+      select: { id: true },
+    });
+
+    return created.id;
+  }
+
+  /**
    * F1.2 / F2.1 do plano do WMS — ORDEM DETERMINÍSTICA DE LOCK.
    *
    * Quando a movimentação informa posição, ATÉ TRÊS linhas são travadas na
@@ -255,6 +473,16 @@ export class StockServiceRefactored {
    * Regra prática para quem mexer aqui: nunca trave uma linha de
    * `stock_position_balances` sem já segurar o lock do `stock_balances` do
    * mesmo produto, e nunca trave duas posições fora da ordem crescente de id.
+   *
+   * FASE 5 — O LOTE NÃO ACRESCENTA UMA PERNA DE LOCK. Quando `data.lotId` vem
+   * preenchido, ele apenas ESTREITA a linha de `stock_position_balances` a ser
+   * travada: a chave passa de (produto, posição) para (produto, posição, lote),
+   * mas continua sendo UMA linha por perna de movimentação. Nada muda na ordem
+   * entre `stock_balances` e `stock_position_balances`, nem na ordem crescente
+   * por `storagePositionId` entre as duas pernas de um `TRANSFER` — o lote é
+   * mais uma coluna da mesma linha, não um recurso a mais para disputar.
+   * (E, como o índice único trata NULL como distinto, é justamente o LOCK 1 que
+   * garante unicidade da linha sem lote — ver `resolvePositionBalanceRow`.)
    */
   private async applyMovement(tx: TransactionClient, data: StockMovementDto) {
     this.assertPositionsMatchType(data);
@@ -270,6 +498,14 @@ export class StockServiceRefactored {
       SELECT quantity FROM stock_balances WHERE productId = ${data.productId} FOR UPDATE
     `;
     const currentQty = Number(locked[0]?.quantity ?? 0);
+
+    // ---- FASE 5: lote (validação + regra de vencimento) --------------------
+    // Depois do LOCK 1 de propósito: são leituras de `lots`/`products`, que não
+    // participam da ordem de lock de saldo, e falhar aqui já com o lock na mão
+    // custa uma transação abortada — nunca uma inconsistência.
+    const lot = await this.loadMovementLot(tx, data);
+    this.assertLotNotExpiredForOutbound(data, lot);
+    const lotId = lot?.id ?? null;
 
     // TRANSFER: delta ZERO no agregado (só muda de endereço). OUT: negativo.
     // IN/ADJUSTMENT: positivo.
@@ -292,6 +528,9 @@ export class StockServiceRefactored {
     // o de antes da Fase 1 (compatibilidade — nenhum chamador legado passa
     // posição).
     const positionDeltas = this.buildPositionDeltas(data);
+    // Fase 5: a chave do mapa passou a ser o `id` da LINHA de saldo (que já
+    // encapsula produto + posição + lote), e não mais o id da posição — numa
+    // mesma posição podem conviver várias linhas, uma por lote.
     const newPositionQuantities = new Map<string, Prisma.Decimal>();
 
     if (positionDeltas.length > 0) {
@@ -326,24 +565,19 @@ export class StockServiceRefactored {
       for (const { positionId, delta: positionDelta } of positionDeltas) {
         const position = positionById.get(positionId)!;
 
-        await tx.stockPositionBalance.upsert({
-          where: {
-            productId_storagePositionId: {
-              productId: data.productId,
-              storagePositionId: positionId,
-            },
-          },
-          create: {
-            productId: data.productId,
-            storagePositionId: positionId,
-            quantity: 0,
-          },
-          update: {},
-        });
+        // Fase 5 — a linha é resolvida pela chave (produto, posição, LOTE).
+        // Sem lote, `lotId` é `null` e o `<=>` lá dentro encontra exatamente a
+        // mesma linha única que o `upsert` por chave composta encontrava antes.
+        const balanceRowId = await this.resolvePositionBalanceRow(
+          tx,
+          data.productId,
+          positionId,
+          lotId
+        );
 
         const lockedPosition = await tx.$queryRaw<{ quantity: Prisma.Decimal }[]>`
           SELECT quantity FROM stock_position_balances
-          WHERE productId = ${data.productId} AND storagePositionId = ${positionId}
+          WHERE id = ${balanceRowId}
           FOR UPDATE
         `;
 
@@ -361,12 +595,16 @@ export class StockServiceRefactored {
         if (newQty.isNegative()) {
           throw new AppError(
             400,
-            `Estoque insuficiente na posição ${position.code}. ` +
-              `Disponível: ${currentPositionQty.toString()}, Solicitado: ${data.quantity}`
+            `Estoque insuficiente na posição ${position.code}` +
+              // Sem lote a mensagem é idêntica à de sempre; com lote, dizer só a
+              // posição seria enganoso — o operador olharia o endereço, veria
+              // material e não entenderia a recusa.
+              (lot ? ` (lote ${lot.lotNumber})` : '') +
+              `. Disponível: ${currentPositionQty.toString()}, Solicitado: ${data.quantity}`
           );
         }
 
-        newPositionQuantities.set(positionId, newQty);
+        newPositionQuantities.set(balanceRowId, newQty);
       }
     }
 
@@ -383,6 +621,7 @@ export class StockServiceRefactored {
         notes: data.notes,
         fromPositionId: data.fromPositionId,
         toPositionId: data.toPositionId,
+        lotId,
       },
       include: {
         product: true,
@@ -405,14 +644,25 @@ export class StockServiceRefactored {
       });
     }
 
-    for (const [positionId, quantity] of newPositionQuantities) {
-      await tx.stockPositionBalance.update({
-        where: {
-          productId_storagePositionId: {
-            productId: data.productId,
-            storagePositionId: positionId,
-          },
-        },
+    // `updateMany` e não `update`, apesar de o `where` ser a chave primária —
+    // e a diferença NÃO é estilística.
+    //
+    // No MySQL o Prisma implementa `update` como SELECT-então-UPDATE, e esse
+    // SELECT é uma leitura NÃO-TRAVANTE: em REPEATABLE READ ele enxerga o
+    // snapshot da transação, aberto na primeira leitura dela (o `upsert` de
+    // `stock_balances`, antes de LOCK 1 ser concedido). Uma transação que
+    // esperou pelo lock e vai atualizar uma linha CRIADA nesse meio-tempo pela
+    // vencedora falha com "Record to update not found" — a linha existe, está
+    // travada por esta mesma transação, e ainda assim o snapshot não a vê.
+    // `updateMany` emite um `UPDATE ... WHERE` direto, e escrita sempre opera
+    // sobre a versão mais recente commitada.
+    //
+    // O mesmo cuidado do `FOR UPDATE` em `resolvePositionBalanceRow`, do outro
+    // lado da mesma janela; os dois foram encontrados pelo teste de duas
+    // entradas concorrentes criando a mesma linha de saldo.
+    for (const [balanceRowId, quantity] of newPositionQuantities) {
+      await tx.stockPositionBalance.updateMany({
+        where: { id: balanceRowId },
         data: { quantity, version: { increment: 1 } },
       });
     }
@@ -744,6 +994,7 @@ export class StockServiceRefactored {
         notes: data.notes,
         fromPositionId: data.fromPositionId,
         toPositionId: data.toPositionId,
+        lotId: data.lotId,
       })
     );
 
@@ -1014,10 +1265,8 @@ export class StockServiceRefactored {
    *     datas diferentes: não há como saber qual unidade sai.
    *   * FEFO (por validade) é o critério certo para quem tem lote/validade —
    *     e é exatamente por isso que a Decisão D6 do plano deixou lote/validade
-   *     para uma fase condicional posterior. Sem `StockLot`, não há data de
-   *     validade para ordenar. O GANCHO para ela é este método: quando
-   *     `StockLot` existir, é aqui que o `orderBy` muda, e nada mais no fluxo
-   *     de picking precisa saber.
+   *     para uma fase condicional posterior. O gancho previsto era este método,
+   *     e a Fase 5 é quem o usou (ver abaixo).
    *
    * A honestidade sobre a limitação está registrada de propósito: `updatedAt`
    * muda a cada movimento na posição, então uma posição que recebeu material
@@ -1028,12 +1277,40 @@ export class StockServiceRefactored {
    * (perfeitamente possível — duas posições atualizadas na mesma transação)
    * precisam sair sempre na mesma ordem, senão duas chamadas idênticas geram
    * planos de separação diferentes.
+   *
+   * ────────────────────────────────────────────────────────────────────────
+   * FASE 5 — FEFO PARA PRODUTO COM `lotTracked`.
+   *
+   * Para produto com lote controlado o critério deixa de ser antiguidade e
+   * passa a ser VALIDADE: `Lot.expiresAt` ascendente, o que vence primeiro sai
+   * primeiro — mesmo que tenha entrado DEPOIS de outro lote. É a inversão que
+   * dá nome ao FEFO e a razão de a fase existir.
+   *
+   * Três decisões dentro disso:
+   *
+   *   * A ordenação final é feita EM MEMÓRIA, não no `orderBy`. O MySQL ordena
+   *     NULL primeiro no ASC, e "lote sem validade" (que existe: nem todo lote
+   *     tem data) tem de sair POR ÚLTIMO, não primeiro — material que nunca
+   *     vence é o que menos urge. O `orderBy` do banco continua entregando o
+   *     FIFO, que serve de desempate ESTÁVEL (`Array.sort` é estável) entre
+   *     lotes com a mesma validade.
+   *   * Lote JÁ VENCIDO é EXCLUÍDO dos candidatos. Não é decoração: a saída de
+   *     lote vencido é recusada por `applyMovement`, então planejar picking a
+   *     partir dele geraria uma tarefa impossível de executar — o operador
+   *     descobriria isso na frente do endereço. É a mesma disciplina do
+   *     `blocked: false` logo acima e do "a tarefa nasce executável ou não
+   *     nasce" da reposição (F4.10).
+   *   * Linha de saldo SEM lote de produto `lotTracked` (estoque que já existia
+   *     quando a flag foi ligada) continua sendo candidata, ordenada junto dos
+   *     lotes sem validade, no fim. Excluí-la deixaria esse estoque preso para
+   *     sempre; consumi-la por último é o comportamento conservador.
    */
   private async planPickingFromPositions(
     tx: TransactionClient,
     productId: string,
     productCode: string,
-    requiredQty: number
+    requiredQty: number,
+    lotTracked: boolean
   ) {
     const required = new Prisma.Decimal(requiredQty);
 
@@ -1046,24 +1323,49 @@ export class StockServiceRefactored {
         // material de lá é exatamente o que a flag existe para impedir.
         storagePosition: { blocked: false },
       },
-      select: { storagePositionId: true, quantity: true },
+      select: {
+        storagePositionId: true,
+        lotId: true,
+        quantity: true,
+        lot: { select: { expiresAt: true } },
+      },
       orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
     });
+
+    // FIFO (o de sempre) para produto sem lote controlado; FEFO para os
+    // demais. O `filter`/`sort` só existe no segundo caso — o primeiro sai
+    // daqui com exatamente a lista que a query devolveu, como antes da Fase 5.
+    const candidates = lotTracked
+      ? balances
+          .filter(
+            (balance) =>
+              !balance.lot?.expiresAt || balance.lot.expiresAt.getTime() >= Date.now()
+          )
+          .sort((a, b) => {
+            // Sem validade (lote sem data, ou linha sem lote) = nunca vence =
+            // por último. `Infinity` expressa isso sem um `if` por combinação.
+            const aExpiry = a.lot?.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY;
+            const bExpiry = b.lot?.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY;
+            return aExpiry - bExpiry;
+          })
+      : balances;
 
     const allocations: {
       productId: string;
       storagePositionId: string;
+      lotId: string | null;
       quantity: Prisma.Decimal;
     }[] = [];
     let remaining = required;
 
-    for (const balance of balances) {
+    for (const balance of candidates) {
       if (remaining.lessThanOrEqualTo(0)) break;
 
       const take = Prisma.Decimal.min(remaining, balance.quantity);
       allocations.push({
         productId,
         storagePositionId: balance.storagePositionId,
+        lotId: balance.lotId,
         quantity: take,
       });
       remaining = remaining.minus(take);
@@ -1172,6 +1474,10 @@ export class StockServiceRefactored {
         componentId: bomItem.componentId,
         componentCode: bomItem.component.code,
         requiredQty: bomItem.quantity * order.quantity * (1 + bomItem.scrapFactor),
+        // Fase 5 — a flag vem do componente já carregado pelo `include` da BOM,
+        // sem uma query a mais. Ela decide FIFO vs. FEFO em
+        // `planPickingFromPositions` e só é lida no caminho COM WMS.
+        lotTracked: bomItem.component.lotTracked,
       }));
 
       for (const item of requiredItems) {
@@ -1199,6 +1505,10 @@ export class StockServiceRefactored {
         const allocations: {
           productId: string;
           storagePositionId: string;
+          // Fase 5 — o lote que o FEFO escolheu, gravado na tarefa de PICKING.
+          // `null` para componente sem `lotTracked` (e para linha de saldo sem
+          // lote de componente que passou a ser rastreado depois).
+          lotId: string | null;
           quantity: Prisma.Decimal;
         }[] = [];
 
@@ -1207,7 +1517,8 @@ export class StockServiceRefactored {
             tx,
             item.componentId,
             item.componentCode,
-            item.requiredQty
+            item.requiredQty,
+            item.lotTracked
           );
           allocations.push(...planned);
         }
@@ -1228,6 +1539,12 @@ export class StockServiceRefactored {
           pickingTasks: allocations.map((allocation) => ({
             productId: allocation.productId,
             storagePositionId: allocation.storagePositionId,
+            // Fase 5 — o lote escolhido pelo FEFO. Sempre presente no contrato
+            // (`null` para produto sem lote controlado) em vez de omitido: um
+            // campo que aparece e some conforme a flag do produto obrigaria o
+            // consumidor a distinguir "não tem lote" de "a versão da API não
+            // manda lote".
+            lotId: allocation.lotId,
             // Decisão D2: quantidade `Decimal` sai como STRING nos contratos
             // novos, igual ao resto do WMS.
             quantity: allocation.quantity.toString(),

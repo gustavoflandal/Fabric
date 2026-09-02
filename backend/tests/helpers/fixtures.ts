@@ -33,6 +33,12 @@ export async function createTestProduct(
     depth: number;
     maxStackQty: number;
     segregationGroup: string;
+    /**
+     * Fase 5: controle de lote OPT-IN. Default `false` — todo teste anterior a
+     * esta fase segue criando exatamente o produto sem lote que sempre criou, e
+     * nenhum deles passa a exigir `lotNumber` no recebimento.
+     */
+    lotTracked: boolean;
   }> = {}
 ) {
   productCounter += 1;
@@ -53,6 +59,38 @@ export async function createTestProduct(
       depth: overrides.depth ?? null,
       maxStackQty: overrides.maxStackQty ?? null,
       segregationGroup: overrides.segregationGroup ?? null,
+      lotTracked: overrides.lotTracked ?? false,
+    },
+  });
+}
+
+let lotCounter = 0;
+
+/**
+ * Fase 5: um `Lot` do produto, com validade opcional.
+ *
+ * `expiresAt` é passado como Date (e não como "dias a partir de hoje") de
+ * propósito: o FEFO e o bloqueio de vencido comparam com `Date.now()`, e um
+ * teste que diz `new Date('2020-01-01')` deixa explícito na leitura qual lote
+ * está vencido — o que uma aritmética de dias esconderia.
+ */
+export async function createTestLot(
+  productId: string,
+  overrides: Partial<{
+    lotNumber: string;
+    manufacturedAt: Date | null;
+    expiresAt: Date | null;
+    supplierId: string | null;
+  }> = {}
+) {
+  lotCounter += 1;
+  return testPrisma.lot.create({
+    data: {
+      productId,
+      lotNumber: overrides.lotNumber ?? `LOTE-TEST-${lotCounter}`,
+      manufacturedAt: overrides.manufacturedAt ?? null,
+      expiresAt: overrides.expiresAt ?? null,
+      supplierId: overrides.supplierId ?? null,
     },
   });
 }
@@ -180,10 +218,12 @@ export async function setTestLicensedModule(code: string, enabled: boolean) {
 export async function createTestPositionBalance(
   productId: string,
   storagePositionId: string,
-  quantity: number
+  quantity: number,
+  /** Fase 5: a terceira dimensão. `null` = a linha sem lote de sempre. */
+  lotId: string | null = null
 ) {
   return testPrisma.stockPositionBalance.create({
-    data: { productId, storagePositionId, quantity },
+    data: { productId, storagePositionId, quantity, lotId },
   });
 }
 

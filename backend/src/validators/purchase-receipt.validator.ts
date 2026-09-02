@@ -23,6 +23,39 @@ export const createPurchaseReceiptSchema = Joi.object({
           'number.greater': 'Quantidade recebida deve ser maior que zero',
         }),
         notes: Joi.string().trim().allow('', null),
+
+        // --- Lote lido na conferência (Fase 5 do plano do WMS) --------------
+        // Os três são OPCIONAIS AQUI, e isso é deliberado: a obrigatoriedade de
+        // `lotNumber` depende de `Product.lotTracked`, uma flag do banco que o
+        // Joi não enxerga. Quem exige é `purchase-receipt.service.ts::create()`,
+        // com `AppError` 400 — a mesma divisão de trabalho já registrada em
+        // `stock.validator.ts` ("este schema cobre só o que é verificável a
+        // partir do próprio payload").
+        //
+        // `expiresAt` NÃO é comparado com "hoje": receber material já vencido é
+        // um fato do mundo (aconteceu, está na doca), e o sistema precisa
+        // conseguir registrá-lo para depois dar baixa. Quem recusa a SAÍDA de
+        // lote vencido é `applyMovement`, no momento certo.
+        lotNumber: Joi.string().trim().max(100).allow('', null).messages({
+          'string.max': 'Número do lote deve ter no máximo 100 caracteres',
+        }),
+        manufacturedAt: Joi.date().iso().allow(null).messages({
+          'date.format': 'Data de fabricação inválida',
+        }),
+        // O `when` guarda a referência cruzada: sem `manufacturedAt` no payload,
+        // um `min(ref)` solto resolveria para `undefined` e o Joi rejeitaria a
+        // própria regra, transformando "só informei a validade" num 400.
+        expiresAt: Joi.date()
+          .iso()
+          .allow(null)
+          .when('manufacturedAt', {
+            is: Joi.date().iso().required(),
+            then: Joi.date().iso().allow(null).min(Joi.ref('manufacturedAt')),
+          })
+          .messages({
+            'date.format': 'Data de validade inválida',
+            'date.min': 'Validade não pode ser anterior à fabricação',
+          }),
       })
     )
     .min(1)

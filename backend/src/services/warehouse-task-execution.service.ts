@@ -157,6 +157,17 @@ export const executeTask = async (
         userId,
         notes: `Separação (tarefa ${task.id})`,
         fromPositionId: task.fromPositionId,
+        // ✅ FASE 5 — o lote gravado na tarefa pelo FEFO. É ele que identifica
+        // a LINHA de saldo por posição a debitar; sem ele, a saída tentaria
+        // debitar a linha SEM lote daquele endereço (que não existe para
+        // produto rastreado) e falharia com "estoque insuficiente na posição".
+        //
+        // É também aqui que o bloqueio de saída de lote vencido pega o picking:
+        // `applyMovement` recusa um `OUT` de lote com `expiresAt` no passado.
+        // Uma tarefa planejada com lote válido cujo vencimento passou entre o
+        // planejamento e a execução falha na conclusão — e é o comportamento
+        // correto: quem venceu na prateleira não pode ir para a produção.
+        lotId: task.lotId ?? undefined,
       });
     } else {
       if (!task.fromPositionId || !task.toPositionId) {
@@ -177,6 +188,11 @@ export const executeTask = async (
         notes: `Reposição (tarefa ${task.id})`,
         fromPositionId: task.fromPositionId,
         toPositionId: task.toPositionId,
+        // ✅ FASE 5 — o lote herdado da linha de saldo de origem na criação da
+        // tarefa. Um `TRANSFER` não reetiqueta material: o MESMO lote sai do
+        // pulmão e chega ao picking, então as duas pernas usam este único
+        // `lotId` (ver a nota do campo no schema sobre não haver par from/to).
+        lotId: task.lotId ?? undefined,
       });
     }
 
@@ -192,6 +208,7 @@ export const executeTask = async (
       type: true,
       status: true,
       productId: true,
+      lotId: true,
       quantity: true,
       fromPositionId: true,
       toPositionId: true,
@@ -268,6 +285,7 @@ export const listByProductionOrder = async (productionOrderId: string) => {
       type: true,
       status: true,
       productId: true,
+      lotId: true,
       quantity: true,
       fromPositionId: true,
       priority: true,
@@ -277,6 +295,8 @@ export const listByProductionOrder = async (productionOrderId: string) => {
       startedAt: true,
       completedAt: true,
       product: { select: { id: true, code: true, name: true } },
+      // Fase 5 — a tela de acompanhamento mostra de qual lote cada separação sai.
+      lot: { select: { id: true, lotNumber: true, expiresAt: true } },
       fromPosition: { select: { id: true, code: true } },
       assignee: { select: { id: true, name: true } },
     },

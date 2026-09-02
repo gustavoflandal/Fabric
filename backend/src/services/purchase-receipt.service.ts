@@ -29,6 +29,23 @@ export interface CreatePurchaseReceiptDto {
     productId: string;
     quantityReceived: number;
     notes?: string;
+    /**
+     * ✅ FASE 5 do plano do WMS — O LOTE LIDO NA CONFERÊNCIA.
+     *
+     * Os três campos são capturados no MESMO momento que `quantityReceived`:
+     * conferir é ter a caixa na mão e ler a etiqueta do fabricante. Adiar a
+     * captura para a alocação obrigaria o operador a reabrir o palete.
+     *
+     * OBRIGATORIEDADE POR PRODUTO, não por payload: `lotNumber` é exigido (400)
+     * quando `Product.lotTracked` é `true`, e IGNORADO quando não é — mandar
+     * lote de produto que não controla lote não é erro, é ruído de um cliente
+     * genérico, e recusar o recebimento por causa disso seria pior do que
+     * descartar o campo. O Joi não tem como decidir isso: a regra depende de uma
+     * flag que só existe no banco.
+     */
+    lotNumber?: string | null;
+    manufacturedAt?: string | null;
+    expiresAt?: string | null;
   }[];
 }
 
@@ -112,6 +129,35 @@ export class PurchaseReceiptService {
       }
     }
 
+    // ✅ FASE 5 — VALIDAÇÃO DE LOTE NA CONFERÊNCIA.
+    //
+    // Fora da transação e junto das outras validações de payload, pelo mesmo
+    // critério: é uma checagem que não depende de estado que possa mudar entre
+    // aqui e a escrita (a flag do produto é cadastro, não saldo), e falhar antes
+    // de abrir transação é o caminho barato.
+    //
+    // A checagem NÃO olha `isModuleEnabled('WMS')`: lote controlado é uma
+    // afirmação sobre o PRODUTO ("este material é rastreado por lote"), não
+    // sobre o módulo licenciado. Uma instalação sem WMS que marque um produto
+    // como `lotTracked` continua obrigada a informar o número do lote no
+    // recebimento — o que ela não tem é endereço para guardá-lo.
+    const lotTrackedProducts = await prisma.product.findMany({
+      where: { id: { in: data.items.map((item) => item.productId) }, lotTracked: true },
+      select: { id: true, code: true },
+    });
+    const lotTrackedById = new Map(lotTrackedProducts.map((p) => [p.id, p.code]));
+
+    for (const item of data.items) {
+      const code = lotTrackedById.get(item.productId);
+
+      if (code && !item.lotNumber?.trim()) {
+        throw new AppError(
+          400,
+          `Produto ${code} tem controle de lote: informe o número do lote na conferência.`
+        );
+      }
+    }
+
     // F4.3 — O BRANCH. Lido uma vez, antes da transação: `isModuleEnabled` bate
     // num cache em memória carregado no boot (licenciamento é configuração de
     // instalação, não filtro por request), então isto não é uma query a mais.
@@ -162,6 +208,21 @@ export class PurchaseReceiptService {
               acceptedQty: item.quantityReceived,
               rejectedQty: 0,
               notes: item.notes,
+              // ✅ Fase 5 — só grava lote de produto que CONTROLA lote. Para os
+              // demais os três campos são descartados aqui, num ponto só: gravar
+              // "L-2026-001" num item cujo produto não é rastreado criaria um
+              // dado que nada lê, que nenhum `Lot` vai nascer de, e que a
+              // primeira auditoria interpretaria como rastreabilidade que não
+              // existe.
+              ...(lotTrackedById.has(item.productId)
+                ? {
+                    lotNumber: item.lotNumber!.trim(),
+                    manufacturedAt: item.manufacturedAt
+                      ? new Date(item.manufacturedAt)
+                      : null,
+                    expiresAt: item.expiresAt ? new Date(item.expiresAt) : null,
+                  }
+                : {}),
             })),
           },
         },
@@ -345,9 +406,18 @@ export class PurchaseReceiptService {
       // `FOR UPDATE` no ITEM (e não só a leitura via Prisma) porque é a soma dos
       // putaways DELE que precisa ser estável entre a validação e a escrita.
       const itemRows = await tx.$queryRaw<
-        { id: string; receiptId: string; productId: string; acceptedQty: number }[]
+        {
+          id: string;
+          receiptId: string;
+          productId: string;
+          acceptedQty: number;
+          // Fase 5 — o que foi LIDO na etiqueta durante a conferência.
+          lotNumber: string | null;
+          manufacturedAt: Date | null;
+          expiresAt: Date | null;
+        }[]
       >`
-        SELECT id, receiptId, productId, acceptedQty
+        SELECT id, receiptId, productId, acceptedQty, lotNumber, manufacturedAt, expiresAt
         FROM purchase_receipt_items
         WHERE id = ${data.receiptItemId}
         FOR UPDATE
@@ -418,6 +488,13 @@ export class PurchaseReceiptService {
         },
       });
 
+      // ---- FASE 5: o `Lot` NASCE AQUI ---------------------------------------
+      // Não na conferência: até a alocação acontecer, o que existe é uma
+      // ETIQUETA LIDA na doca (`purchase_receipt_items.lotNumber`), não um lote
+      // com saldo pendurado. Criar o `Lot` na conferência produziria lotes
+      // órfãos para todo recebimento cancelado antes de ser endereçado.
+      const lotId = await this.resolveLotForPutaway(tx, item, receiptId);
+
       // ---- LOCKS 3 e 4 + a movimentação, na MESMA transação -----------------
       // `registerMovementInTransaction` (já existente) em vez de
       // `registerMovement`: o `ReceiptPutaway` e a entrada de estoque são a
@@ -434,6 +511,12 @@ export class PurchaseReceiptService {
         userId,
         notes: `Alocação em ${position.code} (tarefa ${task.id})`,
         toPositionId: position.id,
+        // Fase 5 — a entrada de estoque carrega o lote, e é isto que faz a
+        // terceira dimensão do saldo existir: a linha de
+        // `stock_position_balances` criada/atualizada é a de (produto, posição,
+        // lote). `undefined` (não `null`) para produto sem lote — é o valor que
+        // `StockMovementDto.lotId?` espera para "não informado".
+        lotId: lotId ?? undefined,
       });
 
       // O recebimento inteiro está endereçado?
@@ -498,6 +581,126 @@ export class PurchaseReceiptService {
       },
       receiptCompleted: result.fullyPutaway,
     };
+  }
+
+  /**
+   * ✅ FASE 5 — resolve (criando na primeira vez) o `Lot` de um item de
+   * recebimento sendo endereçado. Devolve `null` quando não há lote a rastrear.
+   *
+   * QUANDO DEVOLVE `null`, e os dois casos são diferentes:
+   *   * produto sem `lotTracked` — o caminho de sempre, sem uma linha de
+   *     comportamento nova;
+   *   * produto `lotTracked` cujo item NÃO tem `lotNumber`. Só acontece quando a
+   *     flag foi LIGADA depois da conferência: o recebimento foi conferido
+   *     quando o produto ainda não era rastreado, e o número do lote é uma
+   *     informação que ninguém leu e que este método não tem como inventar.
+   *     Recusar o endereçamento deixaria o material preso na doca para sempre;
+   *     endereçá-lo sem lote produz exatamente o "estoque legado sem lote" que
+   *     `planPickingFromPositions` já sabe consumir por último. Endereçar é o
+   *     mal menor, e a lacuna é visível (linha de saldo com `lotId` nulo).
+   *
+   * IDENTIDADE DO LOTE: `(productId, lotNumber)`, o unique do schema. O mesmo
+   * lote do mesmo produto chegando em dois recebimentos é UM lote — é o ponto
+   * inteiro da rastreabilidade, e criar duas linhas partiria o saldo e o recall
+   * em dois.
+   *
+   * DATAS: quem cria manda. Um segundo recebimento do MESMO lote não
+   * SOBRESCREVE `manufacturedAt`/`expiresAt`/`supplierId` já gravados —
+   * reescrever a validade de material que já está no estoque a partir de uma
+   * digitação posterior é como um lote vencido "desvence" por engano. O que ele
+   * faz é PREENCHER o que estava nulo, que é ganho de informação sem perda.
+   *
+   * CONCORRÊNCIA: dois endereçamentos de recebimentos DIFERENTES do mesmo lote
+   * podem chegar juntos aqui (o lock 1 serializa a mesma TAREFA, não o mesmo
+   * lote). O unique `(productId, lotNumber)` é quem decide: o perdedor da
+   * corrida toma P2002 e relê a linha que o vencedor criou. Em MySQL um
+   * statement que falha não aborta a transação, então a releitura é válida e o
+   * endereçamento segue normalmente.
+   */
+  private async resolveLotForPutaway(
+    tx: Prisma.TransactionClient,
+    item: {
+      productId: string;
+      lotNumber: string | null;
+      manufacturedAt: Date | null;
+      expiresAt: Date | null;
+    },
+    receiptId: string
+  ): Promise<string | null> {
+    if (!item.lotNumber) {
+      return null;
+    }
+
+    const product = await tx.product.findUnique({
+      where: { id: item.productId },
+      select: { lotTracked: true },
+    });
+
+    if (!product?.lotTracked) {
+      return null;
+    }
+
+    const lotNumber = item.lotNumber.trim();
+
+    const existing = await tx.lot.findUnique({
+      where: { productId_lotNumber: { productId: item.productId, lotNumber } },
+      select: { id: true, manufacturedAt: true, expiresAt: true, supplierId: true },
+    });
+
+    // O fornecedor do lote é o do PEDIDO por trás do recebimento — o lote nasce
+    // de uma compra neste caminho. Lote de produção própria ou de ajuste nasce
+    // sem fornecedor (a coluna é nullable justamente por isso).
+    const receipt = await tx.purchaseReceipt.findUnique({
+      where: { id: receiptId },
+      select: { order: { select: { supplierId: true } } },
+    });
+    const supplierId = receipt?.order?.supplierId ?? null;
+
+    if (existing) {
+      const fill: Prisma.LotUpdateInput = {};
+      if (existing.manufacturedAt === null && item.manufacturedAt) {
+        fill.manufacturedAt = item.manufacturedAt;
+      }
+      if (existing.expiresAt === null && item.expiresAt) {
+        fill.expiresAt = item.expiresAt;
+      }
+      if (existing.supplierId === null && supplierId) {
+        fill.supplier = { connect: { id: supplierId } };
+      }
+
+      if (Object.keys(fill).length > 0) {
+        await tx.lot.update({ where: { id: existing.id }, data: fill });
+      }
+
+      return existing.id;
+    }
+
+    try {
+      const created = await tx.lot.create({
+        data: {
+          productId: item.productId,
+          lotNumber,
+          manufacturedAt: item.manufacturedAt,
+          expiresAt: item.expiresAt,
+          supplierId,
+        },
+        select: { id: true },
+      });
+
+      return created.id;
+    } catch (error: any) {
+      if (error?.code !== 'P2002') {
+        throw error;
+      }
+
+      // Perdeu a corrida: o lote existe agora, criado por outra transação.
+      const raced = await tx.lot.findUniqueOrThrow({
+        where: { productId_lotNumber: { productId: item.productId, lotNumber } },
+        select: { id: true },
+      });
+
+      return raced.id;
+    }
   }
 
   /**
@@ -722,9 +925,43 @@ export class PurchaseReceiptService {
 
         const productByItem = new Map(receipt.items.map((item) => [item.id, item.productId]));
 
+        // ✅ FASE 5 — o estorno tem de devolver o MESMO lote que entrou.
+        //
+        // Não é cosmético: a entrada criou a linha de saldo (produto, posição,
+        // LOTE), e um `OUT` sem `lotId` procuraria a linha SEM lote daquele
+        // endereço — que não existe — e falharia com "estoque insuficiente na
+        // posição". O lote é reencontrado por `(productId, lotNumber)`, o mesmo
+        // par que `resolveLotForPutaway` usou para criá-lo.
+        //
+        // CONSEQUÊNCIA CONHECIDA E ACEITA: cancelar um recebimento cujo lote JÁ
+        // VENCEU é recusado, porque o estorno é um `OUT` e `applyMovement`
+        // bloqueia saída de lote vencido. O caminho para tirar material vencido
+        // do saldo é o ajuste (`ADJUSTMENT`), que é a exceção deliberada da
+        // regra — e é também a operação que descreve honestamente o que
+        // aconteceu (o material venceu no armazém; não "nunca foi recebido").
+        const lotIdByItem = new Map<string, string>();
+        const lotTrackedItems = receipt.items.filter((item) => item.lotNumber);
+
+        for (const item of lotTrackedItems) {
+          const lot = await tx.lot.findUnique({
+            where: {
+              productId_lotNumber: {
+                productId: item.productId,
+                lotNumber: item.lotNumber!,
+              },
+            },
+            select: { id: true },
+          });
+
+          if (lot) {
+            lotIdByItem.set(item.id, lot.id);
+          }
+        }
+
         for (const putaway of putaways) {
           await stockService.registerMovementInTransaction(tx, {
             productId: productByItem.get(putaway.receiptItemId)!,
+            lotId: lotIdByItem.get(putaway.receiptItemId),
             type: StockMovementType.OUT,
             quantity: Number(putaway.quantity),
             reason: `Estorno de recebimento - ${reason}`,

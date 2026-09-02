@@ -4,7 +4,7 @@
 **Versão:** 2.1 (revisão da seção 5 — substitui a v2.0, mesma data)
 **Branch de análise:** `revisao-plano-wms-modular`
 **Escopo:** análise do estado real do schema e do código, decisão arquitetural sobre endereçamento físico, e plano faseado para completar o WMS.
-**Natureza deste documento:** análise e planejamento. Nenhum código, schema ou migration foi alterado na produção deste documento.
+**Natureza deste documento:** análise e planejamento. Nenhum código, schema ou migration foi alterado na produção das revisões 2.0/2.1 deste documento. As Fases 0 a 5 foram implementadas DEPOIS, em sessões próprias, e o documento passou a registrar também o que foi construído (ver a seção 5 e o rodapé) — o plano original não foi reescrito para parecer que sempre esteve certo.
 
 ---
 
@@ -364,9 +364,31 @@ Aproveita integralmente o módulo maduro; só troca a dimensão.
 
 **Entregável:** com WMS licenciado, o material entra e sai do armazém pelo processo real — descarga, conferência, etiquetagem, quarentena quando aplicável, alocação sugerida, picking — cada etapa uma tarefa rastreável em dispositivo móvel. Sem WMS licenciado, nada muda no fluxo de compras/estoque que já existe.
 
-### Fase 5 — Lote, validade e rastreabilidade (condicional, ~2-3 semanas)
+### Fase 5 — Lote, validade e rastreabilidade (condicional) — ✅ IMPLEMENTADA
 
-**Só executar mediante requisito de negócio explícito** (decisão D6). Se acontecer: `Lot` (`lotNumber`, `productId`, `manufacturedAt`, `expiresAt`, `supplierId`) como terceira dimensão de `StockPositionBalance` e de `StockMovement`, com FEFO em `reserveForOrder()` e bloqueio de saída de lote vencido. Impacta todas as operações de saldo das fases 1-4 — daí a recomendação de não antecipar.
+Era condicional por decisão D6 (**só executar mediante requisito de negócio explícito**) e o requisito veio. Implementada sobre a base das Fases 0-4, com o escopo abaixo.
+
+**A decisão que organiza a fase inteira: lote é OPT-IN POR PRODUTO.** `Product.lotTracked Boolean @default(false)`. Toda a mecânica desta fase só roda para produto com a flag ligada; produto sem ela percorre recebimento, saldo, picking e reposição exatamente como antes da fase, sem uma linha de comportamento diferente. É a mesma disciplina que F0.8 aplicou ao MÓDULO ("sem WMS licenciado, comportamento idêntico ao de hoje"), aplicada aqui ao PRODUTO — um parafuso não tem lote, um lote de tinta tem.
+
+| # | Ação | Estado |
+|---|---|---|
+| F5.1 | Model `Lot` (`productId`, `lotNumber`, `manufacturedAt?`, `expiresAt?`, `supplierId?`), único por `(productId, lotNumber)` — número de lote é emitido pelo FABRICANTE, então um unique global recusaria recebimento legítimo de outro fornecedor. **Sem campo de status**: vencimento é DERIVADO de `expiresAt < now()` no instante da operação, nunca armazenado (um estado armazenado precisaria de job e ficaria dessincronizado entre a virada do dia e a próxima execução). | ✅ |
+| F5.2 | `StockPositionBalance.lotId` e `StockMovement.lotId` (`String?`, FK `Restrict` explícito). O unique do saldo passa de `(produto, posição)` para `(produto, posição, lote)`; como NULL é distinto no MySQL, produto sem lote continua com exatamente uma linha por posição. | ✅ |
+| F5.3 | `applyMovement()` estendido à terceira dimensão: com `lotId`, a linha de saldo travada é a de `(produto, posição, lote)`. **Não é uma perna de lock a mais** — é a MESMA linha com chave maior, na ordem já estabelecida (`stock_balances` → `stock_position_balances` crescente por posição). Valida que o lote pertence ao produto e que o produto controla lote. | ✅ |
+| F5.4 | Captura na CONFERÊNCIA: `PurchaseReceiptItem.{lotNumber,manufacturedAt,expiresAt}`, preenchidos no mesmo momento que `acceptedQty` (conferir é ter a caixa na mão e ler a etiqueta). `lotNumber` obrigatório (`AppError` 400) quando o produto é `lotTracked`; ignorado quando não é. A obrigatoriedade **não** olha licença de módulo — é afirmação sobre o produto, não sobre o WMS. | ✅ |
+| F5.5 | O `Lot` NASCE na conclusão da `ALOCACAO` (`completePutaway()`), não na conferência: até endereçar, o que existe é uma etiqueta lida na doca. Resolução por `(productId, lotNumber)`, herdando o fornecedor do pedido; um segundo recebimento do mesmo lote reaproveita a linha e só PREENCHE datas nulas, nunca sobrescreve as existentes. | ✅ |
+| F5.6 | **FEFO** em `planPickingFromPositions()`: produto `lotTracked` ordena candidatos por `Lot.expiresAt` ascendente — o que vence primeiro sai primeiro, mesmo tendo entrado depois. Produto sem a flag mantém o FIFO por `updatedAt` de F4.8, intocado. Lote sem validade e saldo legado sem lote saem por ÚLTIMO (`Infinity` na ordenação, feita em memória porque o MySQL põe NULL primeiro no ASC). Lote já vencido é excluído dos candidatos — a tarefa nasce executável ou não nasce. A tarefa de `PICKING` grava o `lotId` escolhido; a granularidade passa a ser (componente × posição × lote). | ✅ |
+| F5.7 | **Bloqueio de saída de lote vencido** em `OUT` e `TRANSFER` (que sempre debita a origem), o que cobre a conclusão de `PICKING`. ⚠️ **Exceção deliberada: o AJUSTE passa** — bloquear toda saída tornaria impossível dar baixa no vencido, e o material ficaria preso no saldo para sempre. O ajuste é reconhecido por `referenceType = 'ADJUSTMENT'` (além do tipo `ADJUSTMENT`), porque é assim que o Fabric expressa baixa desde antes desta fase: `type = ADJUSTMENT` **soma** no agregado, então um ajuste de baixa é `type = OUT` com aquele `referenceType`. Testar a exceção só contra o tipo passaria e a baixa continuaria impossível na prática. | ✅ |
+| F5.8 | Reposição (F4.10) sob lote: a origem no pulmão é escolhida por FEFO para produto rastreado (repor pelo lote mais longevo enquanto o mais curto envelhece é o oposto do objetivo da fase), lote vencido é excluído da origem, e a tarefa `REPLENISHMENT` HERDA o lote da linha de saldo de origem — transferir não reetiqueta material. | ✅ |
+
+**Fora de escopo, deliberadamente:** contagem cíclica **não** ganhou dimensão de lote (o `systemQty` continua sendo "quantas unidades deste produto há neste endereço", agora somando as linhas de lote da posição); não há status manual/quarentena de lote (só vencimento por data); sem frontend.
+
+**Dois achados de concorrência, encontrados por teste e não por inspeção** — os dois vêm do mesmo fato: em REPEATABLE READ o snapshot da transação nasce na primeira leitura NÃO-TRAVANTE dela, que em `applyMovement()` acontece **antes** de o lock do saldo agregado ser concedido. Serializar não basta; é preciso ler o presente.
+
+1. A busca da linha de saldo em `resolvePositionBalanceRow()` precisa de `FOR UPDATE`. Com um `SELECT` comum, a transação que esperou pelo lock não enxerga a linha criada pela vencedora e tenta criá-la de novo — com lote estoura no índice único; **sem** lote seria pior, porque o índice não recusa e a posição ficaria com duas linhas do mesmo produto, cada uma com metade do saldo.
+2. A escrita final usa `updateMany` e não `update`: no MySQL o Prisma implementa `update` como SELECT-então-UPDATE, e esse SELECT é não-travante — atualizar uma linha criada no meio-tempo falha com "Record to update not found" mesmo estando travada por esta transação.
+
+**Entregável:** com `lotTracked` ligado no produto, o lote é lido na doca, nasce ao ser endereçado, define de onde o picking tira material (FEFO) e não pode sair do estoque depois de vencido — exceto por baixa. Produto sem a flag, e instalação sem WMS licenciado, seguem exatamente como antes.
 
 ### Resumo do cronograma
 
@@ -377,7 +399,7 @@ Aproveita integralmente o módulo maduro; só troca a dimensão.
 | 2 | Movimentação rastreada e transferência | ~1,5 sem | 1 |
 | 3 | Contagem por endereço (+ drop de `Location`) | ~1,5 sem | 1, 2 |
 | 4 | Recebimento e separação orientados a tarefa | ~4-4,5 sem | 0, 1, 2 |
-| 5 | Lote e validade (condicional) | ~2-3 sem | 1-4 |
+| 5 | Lote e validade (condicional) — ✅ implementada | ~2-3 sem | 1-4 |
 | | **Total (fases 0-4)** | **~12-13,5 semanas** | |
 
 Fase 3 e Fase 4 continuam largamente independentes entre si (podem ser paralelizadas com mais de um desenvolvedor), mas Fase 4 agora depende diretamente de F0.8 (licenciamento) e F0.9 (dados de produto), que antes não existiam como pré-requisito. Fases 0, 1 e 2 seguem estritamente sequenciais — todas mexem no mesmo caminho crítico de escrita de saldo, e mexer nele em paralelo é a receita para reabrir as race conditions corrigidas na Fase 1 do cronograma de modernização.
@@ -394,7 +416,8 @@ Fase 3 e Fase 4 continuam largamente independentes entre si (podem ser paraleliz
 | Performance de consultas de saldo | Médio | F0.5 corrige o N+1 **antes** de multiplicar a cardinalidade; índices em `StockPositionBalance` desde a criação |
 | `Decimal` nas tabelas novas convivendo com `Float` nas antigas | Médio — aritmética mista e serialização JSON como string | Fronteira explícita: conversão só na borda do service, endpoints novos documentados; alinhado à justificativa do item 4.1 do cronograma |
 | Drop de `Location` remover dado que alguém usava fora do sistema | Baixo | Coluna sempre `NULL`, sem API, sem tela; drop só na Fase 3, após o endereço novo estar em produção; migration reversível com backup prévio |
-| Escopo inflar com lote/validade antes da base existir | Médio — atrasa tudo | Decisão D6: fase condicional e explicitamente última |
+| Escopo inflar com lote/validade antes da base existir | Médio — atrasa tudo | Decisão D6: fase condicional e explicitamente última. ✅ Respeitada: a Fase 5 só foi executada depois das Fases 0-4, e o custo de "impacta todas as operações de saldo" se concentrou num ponto só (`applyMovement`) porque a base já estava lá |
+| Lote quebrar quem não usa lote | Alto — a Fase 5 mexe no caminho crítico de escrita de saldo, que serve TODOS os produtos | `Product.lotTracked` OPT-IN com default `false`: sem a flag, `lotId` é nulo e o comportamento é byte-a-byte o de antes. Coberto por testes explícitos de não-regressão (FIFO intocado, uma linha por posição, movimentação sem lote) em `lot-fefo-expiry.service.test.ts` |
 | `purchase-receipt.service.ts` acumular dois caminhos (com/sem WMS) que divergem com o tempo, um deles sub-testado | Alto — é justamente o service mais crítico de compras, já corrigido uma vez na Fase 1 do cronograma | F4.3 é um único branch no início do método, não dois services paralelos; todo teste de integração de recebimento roda nos dois modos (licenciado e não licenciado), não só num |
 | Escopo do frontend mobile/PWA ficar subestimado por não ter sido desenhado aqui | Médio | F4.11 entrega só a API; F4.12 registra explicitamente que a escolha de frontend do coletor (nativo/PWA/terceiro) é decisão de produto separada, não estimada nesta revisão |
 
@@ -414,6 +437,19 @@ Registrado para evitar que uma futura análise reproponha o que já existe:
 
 ---
 
-**Elaborado em:** 01/09/2026 (v2.0); revisado em 01/09/2026 (v2.1 — seção 5, fusão das antigas Fases 4/5)
+**Elaborado em:** 01/09/2026 (v2.0); revisado em 01/09/2026 (v2.1 — seção 5, fusão das antigas Fases 4/5); atualizado em 02/09/2026 (Fase 5 implementada)
 **Baseado em:** leitura integral de `backend/prisma/schema.prisma`, varredura de `backend/src/{services,controllers,routes,validators}/`, `frontend/src/`, dos documentos de [`docs/fase-2026-09-modernizacao/`](./) e da decisão registrada em [`04_ARQUITETURA_MODULAR_LICENCIAMENTO.md`](./04_ARQUITETURA_MODULAR_LICENCIAMENTO.md).
-**Status:** proposta para revisão. Nenhuma alteração de código ou schema foi realizada.
+**Status:** Fases 0 a 5 implementadas no backend. O plano permanece como registro das decisões e do raciocínio por trás delas — o que estava escrito como proposta e foi executado está marcado ✅ na seção 5, com as divergências entre o previsto e o construído registradas ali (e não apagadas).
+
+**Onde a Fase 5 vive no código:**
+
+| Arquivo | Papel |
+|---|---|
+| `backend/prisma/schema.prisma` | `Product.lotTracked`, model `Lot`, `lotId` em `StockPositionBalance` / `StockMovement` / `WarehouseTask`, campos de lote em `PurchaseReceiptItem` |
+| `backend/prisma/migrations/20260902500000_fase5_wms_lote_validade/` | Migration. **A ordem das operações de índice foi corrigida à mão** (o novo unique é criado ANTES de o antigo cair, senão o InnoDB recusa com erro 1553 — a FK `productId` se apoia nele). Quem regenerar precisa reordenar de novo; a nota está no topo do arquivo |
+| `backend/src/services/stock.service.ts` | `loadMovementLot()`, `assertLotNotExpiredForOutbound()` (a exceção do ajuste), `resolvePositionBalanceRow()`, FEFO em `planPickingFromPositions()` |
+| `backend/src/services/purchase-receipt.service.ts` | Exigência de `lotNumber` na conferência, `resolveLotForPutaway()`, estorno com lote no `cancel()` |
+| `backend/src/services/warehouse-task.service.ts` / `warehouse-task-execution.service.ts` | `lotId` na tarefa de `PICKING` e na movimentação da conclusão |
+| `backend/src/services/replenishment.service.ts` | FEFO na escolha do pulmão e herança do lote pela tarefa de `REPLENISHMENT` |
+| `backend/tests/services/lot-fefo-expiry.service.test.ts` | FEFO, bloqueio de vencido, exceção do ajuste, concorrência sobre a linha de saldo do lote |
+| `backend/tests/integration/wms-lot-receipt.test.ts` | Captura na conferência e o fluxo receber → alocar → `Lot` → saldo em três dimensões, nos dois modos de licenciamento |

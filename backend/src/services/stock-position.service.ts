@@ -54,6 +54,22 @@ const productSelect = {
 } as const;
 
 /**
+ * Fase 5 — a projeção do lote embutida nas leituras de saldo por posição.
+ *
+ * Ela existe porque a chave de `stock_position_balances` passou a incluir o
+ * lote: a MESMA posição pode ter várias linhas do mesmo produto, uma por lote.
+ * Sem o lote na resposta, essas linhas seriam indistinguíveis para o
+ * consumidor — duas entradas com o mesmo `storagePositionId` e quantidades
+ * diferentes, sem nada que explicasse a diferença.
+ *
+ * Enxuta pelo mesmo critério de `MOVEMENT_POSITION_SELECT` (F2.4): número (o
+ * que está na etiqueta) e validade (o que decide FEFO e vencimento).
+ */
+const LOT_SELECT = {
+  select: { id: true, lotNumber: true, expiresAt: true },
+} as const;
+
+/**
  * F1.4 — saldo de um produto detalhado por posição.
  * Só posições com linha de saldo aparecem; a soma delas pode ser MENOR que o
  * saldo agregado (a diferença é o saldo ainda não endereçado — ver a nota em
@@ -78,8 +94,12 @@ export const getBalancesByProduct = async (productId: string) => {
           structure: { select: { id: true, streetCode: true, warehouseId: true } },
         },
       },
+      // Fase 5 — sem isto a lista passaria a ter DUAS entradas com o mesmo
+      // `storagePositionId` (uma por lote) e nada que as distinguisse. `null`
+      // para produto sem lote controlado, que é a forma de sempre.
+      lot: LOT_SELECT,
     },
-    orderBy: { storagePosition: { code: 'asc' } },
+    orderBy: [{ storagePosition: { code: 'asc' } }, { lot: { expiresAt: 'asc' } }],
   });
 
   const addressedQty = rows.reduce(
@@ -104,6 +124,7 @@ export const getBalancesByProduct = async (productId: string) => {
     positions: rows.map((row) => ({
       storagePositionId: row.storagePositionId,
       position: row.storagePosition,
+      lot: row.lot,
       quantity: serializeQuantity(row.quantity),
       version: row.version,
       updatedAt: row.updatedAt,
@@ -135,8 +156,8 @@ export const getBalancesByPosition = async (storagePositionId: string) => {
 
   const rows = await prisma.stockPositionBalance.findMany({
     where: { storagePositionId },
-    include: { product: { select: productSelect } },
-    orderBy: { product: { code: 'asc' } },
+    include: { product: { select: productSelect }, lot: LOT_SELECT },
+    orderBy: [{ product: { code: 'asc' } }, { lot: { expiresAt: 'asc' } }],
   });
 
   return {
@@ -146,6 +167,7 @@ export const getBalancesByPosition = async (storagePositionId: string) => {
     occupied: rows.some((row) => row.quantity.greaterThan(0)),
     products: rows.map((row) => ({
       product: row.product,
+      lot: row.lot,
       quantity: serializeQuantity(row.quantity),
       version: row.version,
       updatedAt: row.updatedAt,
@@ -197,8 +219,13 @@ export const getOccupiedPositions = async (filters: {
     include: {
       product: { select: productSelect },
       storagePosition: { select: positionSelect },
+      lot: LOT_SELECT,
     },
-    orderBy: [{ storagePosition: { code: 'asc' } }, { product: { code: 'asc' } }],
+    orderBy: [
+      { storagePosition: { code: 'asc' } },
+      { product: { code: 'asc' } },
+      { lot: { expiresAt: 'asc' } },
+    ],
   });
 
   // Agrupa por posição em memória: a query já vem ordenada por código de
@@ -209,7 +236,14 @@ export const getOccupiedPositions = async (filters: {
     {
       position: (typeof rows)[number]['storagePosition'];
       totalQuantity: Prisma.Decimal;
-      products: { product: (typeof rows)[number]['product']; quantity: string }[];
+      // Fase 5 — uma entrada por (produto, LOTE) na posição, não mais só por
+      // produto. `totalQuantity` continua sendo a soma da posição inteira, que
+      // é o número que a tela de ocupação mostra.
+      products: {
+        product: (typeof rows)[number]['product'];
+        lot: (typeof rows)[number]['lot'];
+        quantity: string;
+      }[];
     }
   >();
 
@@ -224,7 +258,11 @@ export const getOccupiedPositions = async (filters: {
       byPosition.set(row.storagePositionId, entry);
     }
     entry.totalQuantity = entry.totalQuantity.plus(row.quantity);
-    entry.products.push({ product: row.product, quantity: serializeQuantity(row.quantity) });
+    entry.products.push({
+      product: row.product,
+      lot: row.lot,
+      quantity: serializeQuantity(row.quantity),
+    });
   }
 
   return [...byPosition.values()].map((entry) => ({

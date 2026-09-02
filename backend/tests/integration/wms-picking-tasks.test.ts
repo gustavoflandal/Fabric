@@ -126,8 +126,15 @@ describe('Integração: separação orientada a tarefa (Fase 4b, F4.8)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.mode).toBe('WMS_PICKING');
+      // Fase 5 acrescentou `lotId` ao contrato, sempre presente e `null` para
+      // produto sem lote controlado — que é o caso deste teste.
       expect(res.body.data.pickingTasks).toEqual([
-        { productId: component.id, storagePositionId: positions[0].id, quantity: '30' },
+        {
+          productId: component.id,
+          storagePositionId: positions[0].id,
+          lotId: null,
+          quantity: '30',
+        },
       ]);
 
       // O NÚCLEO DE F4.8: criar a tarefa não move estoque.
