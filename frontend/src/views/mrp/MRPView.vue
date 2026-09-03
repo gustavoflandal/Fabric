@@ -62,7 +62,7 @@
         <Card>
           <div class="text-center">
             <div class="text-3xl mb-2">🏭</div>
-            <p class="text-2xl font-bold text-success-600">{{ summary.totalToProduce }}</p>
+            <p class="text-2xl font-bold text-green-600">{{ summary.totalToProduce }}</p>
             <p class="text-sm text-gray-600">Itens para Produzir</p>
           </div>
         </Card>

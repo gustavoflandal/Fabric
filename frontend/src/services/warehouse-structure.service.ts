@@ -1,34 +1,41 @@
 import api from '@/services/api';
+import type {
+  ApiEnvelope,
+  WarehouseStructure,
+  WarehouseStructureFilters,
+} from '@/types/warehouse.types';
 
 const warehouseStructureService = {
-  async getAll(page = 1, limit = 100, filters = {}) {
+  async getAll(page = 1, limit = 100, filters: WarehouseStructureFilters = {}) {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
     });
-    
+
     if (filters.search) params.append('search', filters.search);
     if (filters.blocked !== undefined && filters.blocked !== '') {
-      params.append('blocked', filters.blocked);
+      params.append('blocked', String(filters.blocked));
     }
-    
-    return await api.get(`/warehouse-structures?${params.toString()}`);
+
+    return await api.get<ApiEnvelope<WarehouseStructure[]>>(
+      `/warehouse-structures?${params.toString()}`
+    );
   },
 
-  async getById(id) {
-    return await api.get(`/warehouse-structures/${id}`);
+  async getById(id: string) {
+    return await api.get<ApiEnvelope<WarehouseStructure>>(`/warehouse-structures/${id}`);
   },
 
-  async create(data) {
-    return await api.post('/warehouse-structures', data);
+  async create(data: Record<string, unknown>) {
+    return await api.post<ApiEnvelope<WarehouseStructure>>('/warehouse-structures', data);
   },
 
-  async update(id, data) {
-    return await api.put(`/warehouse-structures/${id}`, data);
+  async update(id: string, data: Record<string, unknown>) {
+    return await api.put<ApiEnvelope<WarehouseStructure>>(`/warehouse-structures/${id}`, data);
   },
 
-  async delete(id) {
-    return await api.delete(`/warehouse-structures/${id}`);
+  async delete(id: string) {
+    return await api.delete<ApiEnvelope<null>>(`/warehouse-structures/${id}`);
   },
 };
 

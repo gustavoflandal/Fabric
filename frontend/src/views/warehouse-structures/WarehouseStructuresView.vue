@@ -88,11 +88,11 @@
             <tbody class="bg-white divide-y divide-gray-200">
               <tr v-for="structure in structures" :key="structure.id" class="hover:bg-gray-50">
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ structure.streetCode }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ structure.warehouse.name }}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ structure.warehouse?.name }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ structure.floors }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ structure.positions }}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <span :class="structure.generatedPositionsCount > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'">
+                  <span :class="(structure.generatedPositionsCount ?? 0) > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'">
                     {{ structure.generatedPositionsCount || 0 }}
                   </span>
                 </td>
@@ -104,7 +104,7 @@
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                   <button 
-                    v-if="structure.generatedPositionsCount > 0" 
+                    v-if="(structure.generatedPositionsCount ?? 0) > 0" 
                     @click="openPositionsModal(structure)" 
                     class="text-blue-600 hover:text-blue-900 font-semibold"
                   >
@@ -112,25 +112,25 @@
                   </button>
                   <button 
                     @click="openEditModal(structure)" 
-                    :disabled="structure.generatedPositionsCount > 0"
+                    :disabled="(structure.generatedPositionsCount ?? 0) > 0"
                     :class="[
-                      structure.generatedPositionsCount > 0 
+                      (structure.generatedPositionsCount ?? 0) > 0 
                         ? 'text-gray-400 cursor-not-allowed' 
                         : 'text-primary-600 hover:text-primary-900'
                     ]"
-                    :title="structure.generatedPositionsCount > 0 ? 'Excluir as posições antes de editar' : 'Editar estrutura'"
+                    :title="(structure.generatedPositionsCount ?? 0) > 0 ? 'Excluir as posições antes de editar' : 'Editar estrutura'"
                   >
                     Editar
                   </button>
                   <button 
                     @click="handleDelete(structure)" 
-                    :disabled="structure.generatedPositionsCount > 0"
+                    :disabled="(structure.generatedPositionsCount ?? 0) > 0"
                     :class="[
-                      structure.generatedPositionsCount > 0 
+                      (structure.generatedPositionsCount ?? 0) > 0 
                         ? 'text-gray-400 cursor-not-allowed' 
                         : 'text-red-600 hover:text-red-900'
                     ]"
-                    :title="structure.generatedPositionsCount > 0 ? 'Excluir as posições antes de excluir a estrutura' : 'Excluir estrutura'"
+                    :title="(structure.generatedPositionsCount ?? 0) > 0 ? 'Excluir as posições antes de excluir a estrutura' : 'Excluir estrutura'"
                   >
                     Excluir
                   </button>
@@ -167,36 +167,36 @@
             <div class="grid grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Andares *</label>
-                <input v-model="formData.floors" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.floors = e.target.value.replace(/[^0-9]/g, '')" />
+                <input v-model="formData.floors" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.floors = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Posições *</label>
-                <input v-model="formData.positions" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.positions = e.target.value.replace(/[^0-9]/g, '')" />
+                <input v-model="formData.positions" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.positions = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Capacidade de Peso (kg) *</label>
-                <input v-model="formData.weightCapacity" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.weightCapacity = e.target.value.replace(/[^0-9.]/g, '')" />
+                <input v-model="formData.weightCapacity" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.weightCapacity = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
               </div>
             </div>
 
             <div class="grid grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Altura (cm) *</label>
-                <input v-model="formData.height" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.height = e.target.value.replace(/[^0-9.]/g, '')" />
+                <input v-model="formData.height" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.height = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Largura (cm) *</label>
-                <input v-model="formData.width" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.width = e.target.value.replace(/[^0-9.]/g, '')" />
+                <input v-model="formData.width" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.width = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Profundidade (cm) *</label>
-                <input v-model="formData.depth" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.depth = e.target.value.replace(/[^0-9.]/g, '')" />
+                <input v-model="formData.depth" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.depth = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
               </div>
             </div>
 
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Altura Máxima (cm) *</label>
-              <input v-model="formData.maxHeight" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.maxHeight = e.target.value.replace(/[^0-9.]/g, '')" />
+              <input v-model="formData.maxHeight" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.maxHeight = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
             </div>
 
             <div>
@@ -216,7 +216,7 @@
               <div class="bg-blue-50 p-4 rounded-lg">
                 <h4 class="text-sm font-semibold text-gray-900 mb-2">Geração de Posições</h4>
                 <p class="text-sm text-gray-600 mb-3">
-                  Gere automaticamente {{ formData.floors }} andares com {{ formData.positions }} posições cada (total: {{ formData.floors * formData.positions }} posições).
+                  Gere automaticamente {{ formData.floors }} andares com {{ formData.positions }} posições cada (total: {{ Number(formData.floors) * Number(formData.positions) }} posições).
                 </p>
                 <div class="flex gap-2">
                   <Button 
@@ -262,9 +262,7 @@
           Posições - {{ selectedStructure?.streetCode }}
         </h3>
         <button @click="closePositionsModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <XMarkIcon class="w-6 h-6" />
         </button>
       </div>
 
@@ -330,9 +328,7 @@
       <div class="px-6 py-4 border-t border-gray-200 flex justify-between">
         <div class="flex gap-3">
           <Button @click="openStructureViewModal" class="bg-blue-600 hover:bg-blue-700 text-white">
-            <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
-            </svg>
+            <Squares2X2Icon class="w-4 h-4 mr-2 inline" />
             Ver Estrutura
           </Button>
           <Button 
@@ -341,9 +337,7 @@
             :disabled="deletingAllPositions"
             class="bg-red-600 hover:bg-red-700 text-white"
           >
-            <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+            <TrashIcon class="w-4 h-4 mr-2 inline" />
             {{ deletingAllPositions ? 'Excluindo...' : 'Excluir Todas' }}
           </Button>
         </div>
@@ -365,9 +359,7 @@
           </p>
         </div>
         <button @click="closeStructureViewModal" class="text-gray-400 hover:text-gray-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <XMarkIcon class="w-6 h-6" />
         </button>
       </div>
 
@@ -437,7 +429,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth.store';
@@ -449,6 +441,15 @@ import Card from '@/components/common/Card.vue';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 import { useDebounce } from '@/composables/useDebounce';
+import { Squares2X2Icon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import type {
+  ApiError,
+  Pagination,
+  StoragePosition,
+  Warehouse,
+  WarehouseStructure,
+  WarehouseStructureFormData,
+} from '@/types/warehouse.types';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -456,31 +457,31 @@ const warehouseStructureStore = useWarehouseStructureStore();
 const warehouseStore = useWarehouseStore();
 const toast = useToast();
 
-const structures = ref([]);
-const warehouses = ref([]);
+const structures = ref<WarehouseStructure[]>([]);
+const warehouses = ref<Warehouse[]>([]);
 const loading = ref(false);
 const showModal = ref(false);
-const editingStructure = ref(null);
+const editingStructure = ref<WarehouseStructure | null>(null);
 const generatingPositions = ref(false);
 const deletingPositions = ref(false);
-const positionsCount = ref(null);
+const positionsCount = ref<number | null>(null);
 
 // Modal de posições
 const showPositionsModal = ref(false);
-const selectedStructure = ref(null);
-const storagePositions = ref([]);
+const selectedStructure = ref<WarehouseStructure | null>(null);
+const storagePositions = ref<StoragePosition[]>([]);
 const loadingPositions = ref(false);
 
 // Modal de visualização de estrutura (grid)
 const showStructureViewModal = ref(false);
-const floors = ref([]);
-const positions = ref([]);
+const floors = ref<number[]>([]);
+const positions = ref<number[]>([]);
 const deletingAllPositions = ref(false);
 
-const filters = ref({ search: '', blocked: '' });
-const pagination = ref({ page: 1, limit: 100, total: 0, pages: 0 });
+const filters = ref<{ search: string; blocked: string }>({ search: '', blocked: '' });
+const pagination = ref<Pagination>({ page: 1, limit: 100, total: 0, pages: 0 });
 
-const formData = ref({
+const formData = ref<WarehouseStructureFormData>({
   streetCode: '',
   warehouseId: '',
   floors: '',
@@ -550,14 +551,14 @@ const openCreateModal = () => {
   showModal.value = true;
 };
 
-const openEditModal = async (structure) => {
-  if (structure.generatedPositionsCount > 0) {
+const openEditModal = async (structure: WarehouseStructure) => {
+  if ((structure.generatedPositionsCount ?? 0) > 0) {
     toast.warning('Não é possível editar uma estrutura com posições geradas. Exclua as posições primeiro.');
     return;
   }
-  
+
   editingStructure.value = structure;
-  formData.value = { ...structure };
+  formData.value = { ...structure } as unknown as WarehouseStructureFormData;
   showModal.value = true;
   
   // Carregar contagem de posições
@@ -570,7 +571,7 @@ const closeModal = () => {
   positionsCount.value = null;
 };
 
-const loadPositionsCount = async (structureId) => {
+const loadPositionsCount = async (structureId: string) => {
   try {
     const response = await storagePositionService.getPositions(structureId);
     positionsCount.value = response.data.length;
@@ -583,7 +584,7 @@ const loadPositionsCount = async (structureId) => {
 const handleGeneratePositions = async () => {
   if (!editingStructure.value) return;
   
-  if (!(await confirmDialog(`Deseja gerar ${formData.value.floors * formData.value.positions} posições para esta estrutura?`))) {
+  if (!(await confirmDialog(`Deseja gerar ${Number(formData.value.floors) * Number(formData.value.positions)} posições para esta estrutura?`))) {
     return;
   }
 
@@ -594,7 +595,7 @@ const handleGeneratePositions = async () => {
     await loadPositionsCount(editingStructure.value.id);
     await loadStructures(); // Recarregar lista para atualizar contagem
   } catch (error) {
-    toast.error(error.response?.data?.message || 'Erro ao gerar posições');
+    toast.error((error as ApiError).response?.data?.message || 'Erro ao gerar posições');
   } finally {
     generatingPositions.value = false;
   }
@@ -613,7 +614,7 @@ const handleDeletePositions = async () => {
     await loadPositionsCount(editingStructure.value.id);
     await loadStructures(); // Recarregar lista para atualizar contagem
   } catch (error) {
-    toast.error(error.response?.data?.message || 'Erro ao excluir posições');
+    toast.error((error as ApiError).response?.data?.message || 'Erro ao excluir posições');
   } finally {
     deletingPositions.value = false;
   }
@@ -642,12 +643,12 @@ const handleSubmit = async () => {
     closeModal();
     await loadStructures();
   } catch (error) {
-    toast.error(error.response?.data?.message || 'Erro ao salvar estrutura');
+    toast.error((error as ApiError).response?.data?.message || 'Erro ao salvar estrutura');
   }
 };
 
-const handleDelete = async (structure) => {
-  if (structure.generatedPositionsCount > 0) {
+const handleDelete = async (structure: WarehouseStructure) => {
+  if ((structure.generatedPositionsCount ?? 0) > 0) {
     toast.warning('Não é possível excluir uma estrutura com posições geradas. Exclua as posições primeiro.');
     return;
   }
@@ -658,7 +659,7 @@ const handleDelete = async (structure) => {
       toast.success('Estrutura excluída com sucesso!');
       await loadStructures();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Erro ao excluir estrutura');
+      toast.error((error as ApiError).response?.data?.message || 'Erro ao excluir estrutura');
     }
   }
 };
@@ -669,7 +670,7 @@ const handleLogout = async () => {
 };
 
 // Funções do modal de posições
-const openPositionsModal = async (structure) => {
+const openPositionsModal = async (structure: WarehouseStructure) => {
   selectedStructure.value = structure;
   showPositionsModal.value = true;
   await loadStoragePositions(structure.id);
@@ -681,7 +682,7 @@ const closePositionsModal = () => {
   storagePositions.value = [];
 };
 
-const loadStoragePositions = async (structureId) => {
+const loadStoragePositions = async (structureId: string) => {
   try {
     loadingPositions.value = true;
     const response = await storagePositionService.getPositions(structureId);
@@ -694,7 +695,7 @@ const loadStoragePositions = async (structureId) => {
   }
 };
 
-const toggleBlockPosition = async (position) => {
+const toggleBlockPosition = async (position: StoragePosition) => {
   try {
     await storagePositionService.updatePosition(position.id, {
       blocked: !position.blocked
@@ -710,7 +711,7 @@ const toggleBlockPosition = async (position) => {
   }
 };
 
-const deletePosition = async (position) => {
+const deletePosition = async (position: StoragePosition) => {
   if (!(await confirmDialog(`Deseja realmente excluir a posição "${position.code}"?`))) {
     return;
   }
@@ -746,8 +747,8 @@ const closeStructureViewModal = () => {
   showStructureViewModal.value = false;
 };
 
-const getPositionInfo = (floor, position) => {
-  const code = `${selectedStructure.value.streetCode}-${String(floor).padStart(2, '0')}-${String(position).padStart(2, '0')}`;
+const getPositionInfo = (floor: number, position: number) => {
+  const code = `${selectedStructure.value?.streetCode}-${String(floor).padStart(2, '0')}-${String(position).padStart(2, '0')}`;
   const pos = storagePositions.value.find(p => p.floor === floor && p.position === position);
   
   if (!pos) {
@@ -757,7 +758,7 @@ const getPositionInfo = (floor, position) => {
   return `${code}\nStatus: ${pos.blocked ? 'Bloqueada' : 'Disponível'}`;
 };
 
-const isPositionBlocked = (floor, position) => {
+const isPositionBlocked = (floor: number, position: number) => {
   const pos = storagePositions.value.find(p => p.floor === floor && p.position === position);
   return pos?.blocked || false;
 }
@@ -784,7 +785,7 @@ const deleteAllPositions = async () => {
     toast.success(response.message || `${count} posições excluídas com sucesso!`);
   } catch (error) {
     console.error('Erro ao excluir todas as posições:', error);
-    toast.error(error.response?.data?.message || 'Erro ao excluir posições');
+    toast.error((error as ApiError).response?.data?.message || 'Erro ao excluir posições');
   } finally {
     deletingAllPositions.value = false;
   }

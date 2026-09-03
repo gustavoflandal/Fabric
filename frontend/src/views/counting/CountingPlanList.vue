@@ -38,9 +38,7 @@
           to="/counting/plans/new"
           class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm"
         >
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
+          <PlusIcon class="w-5 h-5 mr-2" />
           Novo Plano
         </RouterLink>
       </div>
@@ -183,9 +181,7 @@
 
         <!-- Empty State -->
         <div v-if="plans.length === 0" class="text-center py-12">
-          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
+          <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-gray-400" />
           <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum plano encontrado</h3>
           <p class="mt-1 text-sm text-gray-500">Comece criando um novo plano de contagem.</p>
         </div>
@@ -202,6 +198,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { storeToRefs } from 'pinia';
 import type { PlanFilters } from '@/types/counting.types';
 import Button from '@/components/common/Button.vue';
+import { ClipboardDocumentListIcon, PlusIcon } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 
@@ -239,8 +236,8 @@ const activatePlan = async (id: string) => {
   try {
     await countingStore.activatePlan(id);
     await loadPlans();
-  } catch (error) {
-    console.error('Erro ao ativar plano:', error);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao ativar plano');
   }
 };
 
@@ -248,8 +245,8 @@ const pausePlan = async (id: string) => {
   try {
     await countingStore.pausePlan(id);
     await loadPlans();
-  } catch (error) {
-    console.error('Erro ao pausar plano:', error);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao pausar plano');
   }
 };
 

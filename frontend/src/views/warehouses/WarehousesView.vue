@@ -39,7 +39,7 @@
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div class="md:col-span-2">
             <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input v-model="search" type="text" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Digite para buscar..." />
+            <input v-model="search" type="text" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Digite para buscar..." @input="debouncedSearch" />
           </div>
         </div>
       </Card>
@@ -180,7 +180,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useWarehouseStore } from '@/stores/warehouse.store';
@@ -189,6 +189,8 @@ import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
+import { useDebounce } from '@/composables/useDebounce';
+import type { ApiError, Warehouse, WarehouseFormData } from '@/types/warehouse.types';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -196,12 +198,12 @@ const warehouseStore = useWarehouseStore();
 const toast = useToast();
 
 const search = ref('');
-const warehouses = ref([]);
+const warehouses = ref<Warehouse[]>([]);
 const loading = ref(false);
 const showModal = ref(false);
-const editingWarehouse = ref(null);
+const editingWarehouse = ref<Warehouse | null>(null);
 
-const formData = ref({
+const formData = ref<Partial<WarehouseFormData>>({
   code: '',
   name: '',
   legalName: '',
@@ -222,12 +224,15 @@ const formData = ref({
 const loadWarehouses = async () => {
   try {
     loading.value = true;
-    await warehouseStore.fetchWarehouses();
+    await warehouseStore.fetchWarehouses({ search: search.value || undefined });
     warehouses.value = warehouseStore.warehouses;
   } finally {
     loading.value = false;
   }
 };
+
+// I18: o campo de busca existia no template mas nunca chegava a chamada da API.
+const debouncedSearch = useDebounce(loadWarehouses, 350);
 
 const openCreateModal = () => {
   editingWarehouse.value = null;
@@ -251,7 +256,7 @@ const openCreateModal = () => {
   showModal.value = true;
 };
 
-const openEditModal = (warehouse) => {
+const openEditModal = (warehouse: Warehouse) => {
   editingWarehouse.value = warehouse;
   formData.value = { ...warehouse };
   showModal.value = true;
@@ -274,29 +279,29 @@ const handleSubmit = async () => {
     closeModal();
     await loadWarehouses();
   } catch (error) {
-    toast.error(error.response?.data?.message || 'Erro ao salvar armazém');
+    toast.error((error as ApiError).response?.data?.message || 'Erro ao salvar armazém');
   }
 };
 
-const handleToggleActive = async (warehouse) => {
+const handleToggleActive = async (warehouse: Warehouse) => {
   if (await confirmDialog(`Deseja ${warehouse.active ? 'desativar' : 'ativar'} o armazém "${warehouse.name}"?`)) {
     try {
       await warehouseStore.updateWarehouse(warehouse.id, { active: !warehouse.active });
       await loadWarehouses();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Erro ao alterar status');
+      toast.error((error as ApiError).response?.data?.message || 'Erro ao alterar status');
     }
   }
 };
 
-const handleDelete = async (warehouse) => {
+const handleDelete = async (warehouse: Warehouse) => {
   if (await confirmDialog(`Deseja realmente excluir o armazém "${warehouse.name}"?`)) {
     try {
       await warehouseStore.deleteWarehouse(warehouse.id);
       toast.success('Armazém excluído com sucesso!');
       await loadWarehouses();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Erro ao excluir armazém');
+      toast.error((error as ApiError).response?.data?.message || 'Erro ao excluir armazém');
     }
   }
 };

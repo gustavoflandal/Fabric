@@ -1,12 +1,21 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import warehouseStructureService from '@/services/warehouse-structure.service';
+import type {
+  Pagination,
+  WarehouseStructure,
+  WarehouseStructureFilters,
+} from '@/types/warehouse.types';
 
 export const useWarehouseStructureStore = defineStore('warehouseStructure', () => {
-  const structures = ref([]);
+  const structures = ref<WarehouseStructure[]>([]);
   const loading = ref(false);
 
-  const fetchStructures = async (page = 1, limit = 100, filters = {}) => {
+  const fetchStructures = async (
+    page = 1,
+    limit = 100,
+    filters: WarehouseStructureFilters = {}
+  ): Promise<{ data: WarehouseStructure[]; pagination: Pagination }> => {
     loading.value = true;
     try {
       const response = await warehouseStructureService.getAll(page, limit, filters);
@@ -22,7 +31,7 @@ export const useWarehouseStructureStore = defineStore('warehouseStructure', () =
     }
   };
 
-  const createStructure = async (data) => {
+  const createStructure = async (data: Record<string, unknown>) => {
     try {
       const response = await warehouseStructureService.create(data);
       structures.value.push(response.data.data);
@@ -33,7 +42,7 @@ export const useWarehouseStructureStore = defineStore('warehouseStructure', () =
     }
   };
 
-  const updateStructure = async (id, data) => {
+  const updateStructure = async (id: string, data: Record<string, unknown>) => {
     try {
       const response = await warehouseStructureService.update(id, data);
       const index = structures.value.findIndex((s) => s.id === id);
@@ -47,7 +56,7 @@ export const useWarehouseStructureStore = defineStore('warehouseStructure', () =
     }
   };
 
-  const deleteStructure = async (id) => {
+  const deleteStructure = async (id: string) => {
     try {
       await warehouseStructureService.delete(id);
       structures.value = structures.value.filter((s) => s.id !== id);
