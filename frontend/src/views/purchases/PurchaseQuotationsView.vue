@@ -1,51 +1,26 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <AppLayout title="Orçamentos de Compra" subtitle="Gerencie orçamentos de fornecedores">
+    <template #actions>
+      <Button variant="primary" @click="showCreateModal = true"><span class="mr-2">+</span>Novo Orçamento</Button>
+    </template>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="mb-6 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Orçamentos de Compra</h2>
-          <p class="mt-1 text-sm text-gray-600">
-            Gerencie orçamentos de fornecedores
-          </p>
-        </div>
-        <Button @click="showCreateModal = true">
-          + Novo Orçamento
-        </Button>
-      </div>
-
-      <Card>
-        <div class="mb-4 flex gap-4">
+    <Card class="mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FormField id="pq-filter-search" label="Buscar" class="md:col-span-2">
           <input
             v-model="filters.search"
             type="text"
             placeholder="Buscar..."
-            class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             @input="debouncedLoadQuotations"
           />
-          <select v-model="filters.status" @change="loadQuotations" class="rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+        </FormField>
+        <FormField id="pq-filter-status" label="Status">
+          <select
+            v-model="filters.status"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            @change="loadQuotations"
+          >
             <option value="">Todos os Status</option>
             <option value="PENDING">Pendente</option>
             <option value="SENT">Enviado</option>
@@ -54,249 +29,229 @@
             <option value="REJECTED">Rejeitado</option>
             <option value="EXPIRED">Expirado</option>
           </select>
-        </div>
-
-        <div v-if="loading" class="text-center py-8">
-          <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <p class="mt-2 text-gray-600">Carregando...</p>
-        </div>
-
-        <div v-else-if="quotations.length === 0" class="text-center py-8">
-          <p class="text-gray-500">Nenhum orçamento encontrado</p>
-        </div>
-
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fornecedor</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Validade</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="quotation in quotations" :key="quotation.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {{ quotation.quotationNumber }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ quotation.supplier?.name }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ formatDate(quotation.requestDate) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ formatDate(quotation.dueDate) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span :class="getStatusClass(quotation.status)" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-                    {{ getStatusLabel(quotation.status) }}
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ formatCurrency(quotation.totalValue) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <Button variant="outline" size="sm" @click="viewQuotation(quotation)" class="mr-2">
-                    Ver
-                  </Button>
-                  <Button v-if="quotation.status === 'APPROVED'" variant="primary" size="sm" @click="createOrder(quotation)" class="mr-2">
-                    Gerar Pedido
-                  </Button>
-                  <Button variant="danger" size="sm" @click="deleteQuotation(quotation.id)">
-                    Excluir
-                  </Button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </main>
-
-    <!-- Modal Criar/Editar -->
-    <div v-if="showCreateModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-medium">Novo Orçamento</h3>
-          <button @click="showCreateModal = false" class="text-gray-400 hover:text-gray-500">
-            <span class="text-2xl">&times;</span>
-          </button>
-        </div>
-        
-        <form @submit.prevent="handleSubmit">
-          <div class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Fornecedor</label>
-              <select v-model="form.supplierId" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                <option value="">Selecione...</option>
-                <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
-                  {{ supplier.name }}
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Data de Validade</label>
-              <input v-model="form.dueDate" type="date" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Observações</label>
-              <textarea v-model="form.notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
-            </div>
-
-            <div>
-              <div class="flex justify-between items-center mb-2">
-                <label class="block text-sm font-medium text-gray-700">Itens</label>
-                <Button type="button" size="sm" @click="addItem">+ Adicionar Item</Button>
-              </div>
-              
-              <div v-for="(item, index) in form.items" :key="index" class="flex gap-2 mb-2">
-                <select v-model="item.productId" required class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                  <option value="">Produto...</option>
-                  <option v-for="product in products" :key="product.id" :value="product.id">
-                    {{ product.code }} - {{ product.name }}
-                  </option>
-                </select>
-                <input v-model.number="item.quantity" type="number" placeholder="Qtd" required class="w-24 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-                <input v-model.number="item.unitPrice" type="number" step="0.01" placeholder="Preço" required class="w-32 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-                <input v-model.number="item.discount" type="number" step="0.01" placeholder="Desc %" class="w-24 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-                <Button type="button" variant="danger" size="sm" @click="removeItem(index)">X</Button>
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-6 flex justify-end gap-3">
-            <Button type="button" variant="outline" @click="showCreateModal = false">
-              Cancelar
-            </Button>
-            <Button type="submit" :disabled="submitting">
-              {{ submitting ? 'Salvando...' : 'Salvar' }}
-            </Button>
-          </div>
-        </form>
+        </FormField>
       </div>
-    </div>
+    </Card>
+
+    <DataTable
+      :loading="loading"
+      :error="error"
+      :items="quotations"
+      empty-title="Nenhum orçamento encontrado"
+      empty-hint="Ajuste os filtros ou crie um novo orçamento."
+      @retry="loadQuotations"
+    >
+      <template #empty-action>
+        <Button @click="showCreateModal = true"><span class="mr-2">+</span>Novo Orçamento</Button>
+      </template>
+
+      <template #head>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">Número</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Fornecedor</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Data</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Validade</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Status</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Valor Total</th>
+        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-48">Ações</th>
+      </template>
+
+      <template #row="{ item }">
+        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.quotationNumber }}</td>
+        <td class="px-4 py-4 text-sm text-gray-900">{{ item.supplier?.name }}</td>
+        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(item.requestDate) }}</td>
+        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(item.dueDate) }}</td>
+        <td class="px-4 py-4 whitespace-nowrap">
+          <StatusBadge :label="getStatusLabel(item.status)" :tone="getStatusTone(item.status)" />
+        </td>
+        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{{ formatCurrency(item.totalValue) }}</td>
+        <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <div class="flex items-center justify-end space-x-3">
+            <button @click="viewQuotation(item)" class="text-primary-600 hover:text-primary-900 whitespace-nowrap">Ver</button>
+            <button
+              v-if="item.status === 'APPROVED'"
+              @click="createOrder(item)"
+              class="text-primary-600 hover:text-primary-900 whitespace-nowrap"
+            >
+              Gerar Pedido
+            </button>
+            <button @click="deleteQuotation(item.id)" class="text-red-600 hover:text-red-900 whitespace-nowrap">Excluir</button>
+          </div>
+        </td>
+      </template>
+    </DataTable>
+
+    <!-- Modal Criar — Esc/focus trap agora vêm do AppModal (§4.2). -->
+    <AppModal v-model="showCreateModal" size="lg" title="Novo Orçamento">
+      <form @submit.prevent="handleSubmit" class="space-y-4">
+        <FormField id="pq-form-supplier" label="Fornecedor" required>
+          <select v-model="form.supplierId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <option value="">Selecione...</option>
+            <option v-for="supplier in suppliers" :key="supplier.id" :value="supplier.id">
+              {{ supplier.name }}
+            </option>
+          </select>
+        </FormField>
+
+        <FormField id="pq-form-due-date" label="Data de Validade" required>
+          <input v-model="form.dueDate" type="date" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
+
+        <FormField id="pq-form-notes" label="Observações">
+          <textarea v-model="form.notes" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+        </FormField>
+
+        <!-- Itens — mesmo tratamento de PurchaseOrdersView: rótulo de grupo único, sem um
+             FormField por controle de linha (ids/labels repetidos por índice do array). -->
+        <div class="border-t pt-4 mt-4">
+          <div class="flex justify-between items-center mb-2">
+            <h4 class="text-sm font-semibold text-gray-900">Itens</h4>
+            <Button type="button" size="sm" @click="addItem">+ Adicionar Item</Button>
+          </div>
+
+          <div v-for="(item, index) in form.items" :key="index" class="flex gap-2 mb-2">
+            <select v-model="item.productId" required aria-label="Produto" class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+              <option value="">Produto...</option>
+              <option v-for="product in products" :key="product.id" :value="product.id">
+                {{ product.code }} - {{ product.name }}
+              </option>
+            </select>
+            <input v-model.number="item.quantity" type="number" placeholder="Qtd" required aria-label="Quantidade" class="w-24 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input v-model.number="item.unitPrice" type="number" step="0.01" placeholder="Preço" required aria-label="Preço unitário" class="w-32 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input v-model.number="item.discount" type="number" step="0.01" placeholder="Desc %" aria-label="Desconto (%)" class="w-24 rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <Button type="button" variant="danger" size="sm" @click="removeItem(index)">X</Button>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="showCreateModal = false" class="flex-1">Cancelar</Button>
+          <Button type="submit" :disabled="submitting" class="flex-1">{{ submitting ? 'Salvando...' : 'Salvar' }}</Button>
+        </div>
+      </form>
+    </AppModal>
 
     <!-- Modal de Visualização -->
-    <div v-if="showViewModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center mb-4">
-          <h3 class="text-lg font-medium">Detalhes do Orçamento</h3>
-          <button @click="showViewModal = false" class="text-gray-400 hover:text-gray-500">
-            <span class="text-2xl">&times;</span>
-          </button>
-        </div>
-        
-        <div v-if="selectedQuotation" class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Número</label>
-              <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.quotationNumber }}</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Status</label>
-              <span :class="getStatusClass(selectedQuotation.status)" class="mt-1 inline-flex px-2 text-xs leading-5 font-semibold rounded-full">
-                {{ getStatusLabel(selectedQuotation.status) }}
-              </span>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Fornecedor</label>
-              <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.supplier?.name }}</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Data de Solicitação</label>
-              <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedQuotation.requestDate) }}</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Data de Validade</label>
-              <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedQuotation.dueDate) }}</p>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Valor Total</label>
-              <p class="mt-1 text-sm font-bold text-gray-900">{{ formatCurrency(selectedQuotation.totalValue) }}</p>
-            </div>
-            <div v-if="selectedQuotation.approvedBy">
-              <label class="block text-sm font-medium text-gray-700">Aprovado por</label>
-              <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.approvedBy }}</p>
-            </div>
-          </div>
-
-          <div v-if="selectedQuotation.notes">
-            <label class="block text-sm font-medium text-gray-700">Observações</label>
-            <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.notes }}</p>
-          </div>
-
+    <AppModal v-model="showViewModal" size="lg" title="Detalhes do Orçamento">
+      <div v-if="selectedQuotation" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Itens</label>
-            <div class="overflow-x-auto">
-              <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                  <tr>
-                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Desconto</th>
-                    <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="item in selectedQuotation.items" :key="item.id">
-                    <td class="px-4 py-2 text-sm text-gray-900">{{ item.product?.code }} - {{ item.product?.name }}</td>
-                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.quantity }}</td>
-                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ formatCurrency(item.unitPrice) }}</td>
-                    <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.discount || 0 }}%</td>
-                    <td class="px-4 py-2 text-sm text-right font-semibold text-gray-900">{{ formatCurrency(item.totalPrice) }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <p class="block text-sm font-medium text-gray-700">Número</p>
+            <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.quotationNumber }}</p>
           </div>
+          <div>
+            <p class="block text-sm font-medium text-gray-700">Status</p>
+            <StatusBadge
+              class="mt-1"
+              :label="getStatusLabel(selectedQuotation.status)"
+              :tone="getStatusTone(selectedQuotation.status)"
+            />
+          </div>
+          <div>
+            <p class="block text-sm font-medium text-gray-700">Fornecedor</p>
+            <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.supplier?.name }}</p>
+          </div>
+          <div>
+            <p class="block text-sm font-medium text-gray-700">Data de Solicitação</p>
+            <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedQuotation.requestDate) }}</p>
+          </div>
+          <div>
+            <p class="block text-sm font-medium text-gray-700">Data de Validade</p>
+            <p class="mt-1 text-sm text-gray-900">{{ formatDate(selectedQuotation.dueDate) }}</p>
+          </div>
+          <div>
+            <p class="block text-sm font-medium text-gray-700">Valor Total</p>
+            <p class="mt-1 text-sm font-bold text-gray-900">{{ formatCurrency(selectedQuotation.totalValue) }}</p>
+          </div>
+          <div v-if="selectedQuotation.approvedBy">
+            <p class="block text-sm font-medium text-gray-700">Aprovado por</p>
+            <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.approvedBy }}</p>
+          </div>
+        </div>
 
-          <div class="mt-6 flex justify-end gap-3">
-            <Button type="button" variant="outline" @click="showViewModal = false">
-              Fechar
-            </Button>
-            <Button v-if="selectedQuotation.status === 'APPROVED'" variant="outline" @click="printQuotationPDF(selectedQuotation)">
-              📄 Imprimir PDF
-            </Button>
-            <Button v-if="selectedQuotation.status === 'APPROVED'" variant="primary" @click="createOrder(selectedQuotation)">
-              Gerar Pedido
-            </Button>
+        <div v-if="selectedQuotation.notes">
+          <p class="block text-sm font-medium text-gray-700">Observações</p>
+          <p class="mt-1 text-sm text-gray-900">{{ selectedQuotation.notes }}</p>
+        </div>
+
+        <!-- Itens do orçamento: tabela simples, não DataTable — mesmo raciocínio de
+             PurchaseOrdersView (o modal só abre após `getQuotationById` resolver, então
+             carregando/erro são inalcançáveis). -->
+        <div class="border-t pt-4 mt-4">
+          <h4 class="text-sm font-semibold text-gray-900 mb-2">Itens</h4>
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50">
+                <tr>
+                  <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Preço Unit.</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Desconto</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-for="item in selectedQuotation.items" :key="item.id">
+                  <td class="px-4 py-2 text-sm text-gray-900">{{ item.product?.code }} - {{ item.product?.name }}</td>
+                  <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.quantity }}</td>
+                  <td class="px-4 py-2 text-sm text-right text-gray-900">{{ formatCurrency(item.unitPrice) }}</td>
+                  <td class="px-4 py-2 text-sm text-right text-gray-900">{{ item.discount || 0 }}%</td>
+                  <td class="px-4 py-2 text-sm text-right font-semibold text-gray-900">{{ formatCurrency(item.totalPrice) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
-    </div>
-  </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <Button type="button" variant="outline" @click="showViewModal = false">Fechar</Button>
+          <Button
+            v-if="selectedQuotation && selectedQuotation.status === 'APPROVED'"
+            variant="outline"
+            @click="printQuotationPDF(selectedQuotation)"
+          >
+            📄 Imprimir PDF
+          </Button>
+          <Button
+            v-if="selectedQuotation && selectedQuotation.status === 'APPROVED'"
+            variant="primary"
+            @click="createOrder(selectedQuotation)"
+          >
+            Gerar Pedido
+          </Button>
+        </div>
+      </template>
+    </AppModal>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth.store';
 import { usePurchaseQuotationStore } from '@/stores/purchase-quotation.store';
 import { usePurchaseOrderStore } from '@/stores/purchase-order.store';
 import type { PurchaseQuotation } from '@/services/purchase-quotation.service';
+import AppLayout from '@/components/common/AppLayout.vue';
+import AppModal from '@/components/common/AppModal.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import DataTable from '@/components/common/DataTable.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge, { type BadgeTone } from '@/components/common/StatusBadge.vue';
 import { generatePDF, formatCurrency as formatCurrencyPDF, formatDate as formatDatePDF } from '@/utils/pdf-generator';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 import { useDebounce } from '@/composables/useDebounce';
 
 const router = useRouter();
-const authStore = useAuthStore();
 const quotationStore = usePurchaseQuotationStore();
 const orderStore = usePurchaseOrderStore();
 const toast = useToast();
 
 const quotations = ref<PurchaseQuotation[]>([]);
 const loading = ref(false);
+// §4.4-5 / I11: erro de carregamento é um estado próprio, nunca "lista vazia".
+const error = ref('');
 const showCreateModal = ref(false);
 const showViewModal = ref(false);
 const selectedQuotation = ref<PurchaseQuotation | null>(null);
@@ -313,11 +268,6 @@ const form = ref({
   items: [{ productId: '', quantity: 0, unitPrice: 0, discount: 0 }],
 });
 
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
-
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('pt-BR');
 };
@@ -326,16 +276,21 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 };
 
-const getStatusClass = (status: string) => {
-  const classes: Record<string, string> = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    SENT: 'bg-blue-100 text-blue-800',
-    RECEIVED: 'bg-purple-100 text-purple-800',
-    APPROVED: 'bg-green-100 text-green-800',
-    REJECTED: 'bg-red-100 text-red-800',
-    EXPIRED: 'bg-gray-100 text-gray-800',
+// yellow/blue/purple/green/red/gray do badge antigo normalizados para a paleta do
+// StatusBadge (§4.2): PENDING = warning (ainda não enviado, exige ação nossa),
+// SENT = info e RECEIVED = info (etapas informativas do trâmite com o fornecedor;
+// o roxo original não tem equivalente na paleta), APPROVED = success,
+// REJECTED = danger, EXPIRED = neutral (estado inerte).
+const getStatusTone = (status: string): BadgeTone => {
+  const tones: Record<string, BadgeTone> = {
+    PENDING: 'warning',
+    SENT: 'info',
+    RECEIVED: 'info',
+    APPROVED: 'success',
+    REJECTED: 'danger',
+    EXPIRED: 'neutral',
   };
-  return classes[status] || 'bg-gray-100 text-gray-800';
+  return tones[status] || 'neutral';
 };
 
 const getStatusLabel = (status: string) => {
@@ -352,11 +307,12 @@ const getStatusLabel = (status: string) => {
 
 const loadQuotations = async () => {
   loading.value = true;
+  error.value = '';
   try {
     const response = await quotationStore.fetchQuotations(filters.value);
     quotations.value = response.data;
-  } catch (error: any) {
-    toast.error(error.message || 'Erro ao carregar orçamentos');
+  } catch (e: any) {
+    error.value = e.response?.data?.message || e.message || 'Erro ao carregar orçamentos';
   } finally {
     loading.value = false;
   }
@@ -453,13 +409,13 @@ const printQuotationPDF = (quotation: PurchaseQuotation) => {
       'Status': getStatusLabel(quotation.status),
       'Valor Total': formatCurrencyPDF(quotation.totalValue),
     };
-    
+
     if (quotation.approvedBy) {
       pdfData['Aprovado por'] = quotation.approvedBy;
     }
-    
+
     pdfData['Observações'] = quotation.notes || 'Nenhuma';
-    
+
     const pdf = generatePDF({
       title: 'ORÇAMENTO DE COMPRA',
       subtitle: quotation.quotationNumber,
@@ -480,7 +436,7 @@ const printQuotationPDF = (quotation: PurchaseQuotation) => {
       ],
       supplierSignature: true,
     });
-    
+
     pdf.save(`Orcamento_${quotation.quotationNumber}.pdf`);
   } catch (error: any) {
     toast.error('Erro ao gerar PDF: ' + error.message);
