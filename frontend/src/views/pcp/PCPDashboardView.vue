@@ -1,141 +1,144 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Main Content -->
-    <main class="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12">
-        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-        <p class="mt-4 text-gray-600">Carregando dashboard...</p>
-      </div>
+  <!-- Esta view estava sem <header> algum (logo/Sair/sino sumiram em algum ponto);
+       envolve-la no AppLayout restaura o cabecalho canonico automaticamente. -->
+  <AppLayout title="Dashboard PCP">
+    <template #nav>
+      <NotificationBell />
+    </template>
 
-      <!-- Error State -->
-      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-        <p class="text-red-600">{{ error }}</p>
-        <Button @click="loadDashboardData" class="mt-4">Tentar Novamente</Button>
-      </div>
+    <!-- Loading State -->
+    <div v-if="loading" class="text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <p class="mt-4 text-gray-600">Carregando dashboard...</p>
+    </div>
 
-      <!-- Dashboard Content -->
-      <div v-else>
-        <!-- KPI Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <!-- Ordens em Produção -->
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div class="flex items-center justify-between">
-              <div class="flex-1 min-w-0">
-                <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Ordens em Produção</p>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.ordersInProgress }}</p>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">{{ kpis.ordersTotal }} no total</p>
-              </div>
-              <div class="bg-blue-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
-                <ClipboardDocumentListIcon class="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-              </div>
+    <!-- Error State -->
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <p class="text-red-600">{{ error }}</p>
+      <Button @click="loadDashboardData" class="mt-4">Tentar Novamente</Button>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div v-else>
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <!-- Ordens em Produção -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Ordens em Produção</p>
+              <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.ordersInProgress }}</p>
+              <p class="text-xs sm:text-sm text-gray-500 mt-1">{{ kpis.ordersTotal }} no total</p>
             </div>
-          </div>
-
-          <!-- Eficiência do Dia -->
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div class="flex items-center justify-between">
-              <div class="flex-1 min-w-0">
-                <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Eficiência do Dia</p>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.efficiency }}%</p>
-                <p class="text-xs sm:text-sm mt-1" :class="kpis.efficiencyTrend >= 0 ? 'text-green-600' : 'text-red-600'">
-                  {{ kpis.efficiencyTrend >= 0 ? '+' : '' }}{{ kpis.efficiencyTrend }}% vs ontem
-                </p>
-              </div>
-              <div class="bg-green-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
-                <ArrowTrendingUpIcon class="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Taxa de Refugo -->
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div class="flex items-center justify-between">
-              <div class="flex-1 min-w-0">
-                <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Taxa de Refugo</p>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.scrapRate }}%</p>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">{{ kpis.scrapQuantity }} unidades</p>
-              </div>
-              <div class="bg-red-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
-                <ExclamationTriangleIcon class="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Ordens Atrasadas -->
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-            <div class="flex items-center justify-between">
-              <div class="flex-1 min-w-0">
-                <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Ordens Atrasadas</p>
-                <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.delayedOrders }}</p>
-                <p class="text-xs sm:text-sm text-gray-500 mt-1">Requer atenção</p>
-              </div>
-              <div class="bg-yellow-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
-                <ClockIcon class="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
-              </div>
+            <div class="bg-blue-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
+              <ClipboardDocumentListIcon class="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
             </div>
           </div>
         </div>
 
-        <!-- Charts Row 1 -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
-          <!-- Ordens por Status -->
-          <Card title="Ordens por Status">
-            <div class="h-72">
-              <canvas ref="ordersChartRef"></canvas>
+        <!-- Eficiência do Dia -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Eficiência do Dia</p>
+              <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.efficiency }}%</p>
+              <p class="text-xs sm:text-sm mt-1" :class="kpis.efficiencyTrend >= 0 ? 'text-green-600' : 'text-red-600'">
+                {{ kpis.efficiencyTrend >= 0 ? '+' : '' }}{{ kpis.efficiencyTrend }}% vs ontem
+              </p>
             </div>
-          </Card>
-
-          <!-- Produção Diária -->
-          <Card title="Produção Diária (Últimos 7 dias)">
-            <div class="h-72">
-              <canvas ref="productionChartRef"></canvas>
+            <div class="bg-green-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
+              <ArrowTrendingUpIcon class="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
             </div>
-          </Card>
-
-          <!-- Eficiência por Centro de Trabalho -->
-          <Card title="Eficiência por Centro de Trabalho">
-            <div class="h-72">
-              <canvas ref="workCenterChartRef"></canvas>
-            </div>
-          </Card>
+          </div>
         </div>
 
-        <!-- Charts Row 2 -->
-        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
-          <!-- Top Produtos -->
-          <Card title="Top 5 Produtos Produzidos">
-            <div class="h-72">
-              <canvas ref="topProductsChartRef"></canvas>
+        <!-- Taxa de Refugo -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Taxa de Refugo</p>
+              <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.scrapRate }}%</p>
+              <p class="text-xs sm:text-sm text-gray-500 mt-1">{{ kpis.scrapQuantity }} unidades</p>
             </div>
-          </Card>
+            <div class="bg-red-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
+              <ExclamationTriangleIcon class="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
+            </div>
+          </div>
+        </div>
 
-          <!-- Ocupação de Centros -->
-          <Card title="Ocupação dos Centros de Trabalho">
-            <div class="h-72">
-              <canvas ref="occupationChartRef"></canvas>
+        <!-- Ordens Atrasadas -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div class="flex items-center justify-between">
+            <div class="flex-1 min-w-0">
+              <p class="text-xs sm:text-sm font-medium text-gray-600 truncate">Ordens Atrasadas</p>
+              <p class="text-2xl sm:text-3xl font-bold text-gray-900 mt-1 sm:mt-2">{{ kpis.delayedOrders }}</p>
+              <p class="text-xs sm:text-sm text-gray-500 mt-1">Requer atenção</p>
             </div>
-          </Card>
-
-          <!-- Tempo de Setup vs Execução -->
-          <Card title="Tempo de Setup vs Execução">
-            <div class="h-72">
-              <canvas ref="timeChartRef"></canvas>
+            <div class="bg-yellow-100 rounded-full p-2 sm:p-3 flex-shrink-0 ml-2">
+              <ClockIcon class="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
             </div>
-          </Card>
+          </div>
         </div>
       </div>
-    </main>
-  </div>
+
+      <!-- Charts Row 1 -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
+        <!-- Ordens por Status -->
+        <Card title="Ordens por Status">
+          <div class="h-72">
+            <canvas ref="ordersChartRef"></canvas>
+          </div>
+        </Card>
+
+        <!-- Produção Diária -->
+        <Card title="Produção Diária (Últimos 7 dias)">
+          <div class="h-72">
+            <canvas ref="productionChartRef"></canvas>
+          </div>
+        </Card>
+
+        <!-- Eficiência por Centro de Trabalho -->
+        <Card title="Eficiência por Centro de Trabalho">
+          <div class="h-72">
+            <canvas ref="workCenterChartRef"></canvas>
+          </div>
+        </Card>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
+        <!-- Top Produtos -->
+        <Card title="Top 5 Produtos Produzidos">
+          <div class="h-72">
+            <canvas ref="topProductsChartRef"></canvas>
+          </div>
+        </Card>
+
+        <!-- Ocupação de Centros -->
+        <Card title="Ocupação dos Centros de Trabalho">
+          <div class="h-72">
+            <canvas ref="occupationChartRef"></canvas>
+          </div>
+        </Card>
+
+        <!-- Tempo de Setup vs Execução -->
+        <Card title="Tempo de Setup vs Execução">
+          <div class="h-72">
+            <canvas ref="timeChartRef"></canvas>
+          </div>
+        </Card>
+      </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth.store'
+import AppLayout from '@/components/common/AppLayout.vue'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import NotificationBell from '@/components/notifications/NotificationBell.vue'
+import pcpDashboardService from '@/services/pcp-dashboard.service'
 import {
   ArrowTrendingUpIcon,
   ClipboardDocumentListIcon,
@@ -143,9 +146,6 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 import Chart from 'chart.js/auto'
-
-const router = useRouter()
-const authStore = useAuthStore()
 
 const loading = ref(true)
 const error = ref('')
@@ -185,19 +185,10 @@ const loadDashboardData = async () => {
     loading.value = true
     error.value = ''
 
-    // Buscar todos os dados do dashboard
-    const response = await fetch('http://localhost:3001/api/v1/pcp/dashboard', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
-        'Content-Type': 'application/json'
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error('Erro ao buscar dados do dashboard')
-    }
-
-    const data = await response.json()
+    // Buscar todos os dados do dashboard.
+    // O fetch antigo tinha a URL da API fixa na porta 3001, ja aposentada; o service
+    // dedicado ja resolve a base URL (VITE_API_URL, fallback 3005) e o Bearer token.
+    const data = await pcpDashboardService.getDashboardData()
 
     // Atualizar KPIs
     kpis.value = data.kpis
@@ -210,7 +201,7 @@ const loadDashboardData = async () => {
       createCharts()
     }, 100)
   } catch (err: any) {
-    error.value = err.response?.data?.message || 'Erro ao carregar dashboard'
+    error.value = err.response?.data?.message || err.message || 'Erro ao carregar dashboard'
   } finally {
     loading.value = false
   }
@@ -549,11 +540,6 @@ const destroyCharts = () => {
   topProductsChart?.destroy()
   occupationChart?.destroy()
   timeChart?.destroy()
-}
-
-const handleLogout = async () => {
-  await authStore.logout()
-  router.push('/login')
 }
 
 onMounted(() => {
