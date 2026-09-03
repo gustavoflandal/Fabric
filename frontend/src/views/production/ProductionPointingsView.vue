@@ -254,7 +254,7 @@ const handleDelete = async (pointing: ProductionPointing) => {
 const loadProductionOrders = async () => {
   try {
     // Buscar ordens em andamento ou planejadas
-    const response = await fetch('http://localhost:3001/api/v1/production-orders?status=IN_PROGRESS,PLANNED', {
+    const response = await fetch('http://localhost:3005/api/v1/production-orders?status=IN_PROGRESS,PLANNED', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
       }
@@ -274,7 +274,7 @@ const loadOperations = async () => {
 
   try {
     // Buscar operações da ordem selecionada
-    const response = await fetch(`http://localhost:3001/api/v1/production-orders/${form.value.productionOrderId}/operations`, {
+    const response = await fetch(`http://localhost:3005/api/v1/production-orders/${form.value.productionOrderId}/operations`, {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
       }

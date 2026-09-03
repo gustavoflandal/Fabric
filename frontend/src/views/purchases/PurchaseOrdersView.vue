@@ -340,7 +340,7 @@ const debouncedLoadOrders = useDebounce(loadOrders, 350);
 
 const loadSuppliers = async () => {
   try {
-    const response = await fetch('http://localhost:3001/api/v1/suppliers', {
+    const response = await fetch('http://localhost:3005/api/v1/suppliers', {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
     });
     const data = await response.json();
@@ -352,7 +352,7 @@ const loadSuppliers = async () => {
 
 const loadProducts = async () => {
   try {
-    const response = await fetch('http://localhost:3001/api/v1/products', {
+    const response = await fetch('http://localhost:3005/api/v1/products', {
       headers: { 'Authorization': `Bearer ${localStorage.getItem('accessToken')}` }
     });
     const data = await response.json();
