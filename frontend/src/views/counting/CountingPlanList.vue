@@ -1,217 +1,167 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
+  <AppLayout title="Planos de Contagem" subtitle="Gerencie os planos de contagem de estoque">
+    <template #actions>
+      <RouterLink
+        to="/counting/plans/new"
+        class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm"
+      >
+        <PlusIcon class="w-5 h-5 mr-2" />
+        Novo Plano
+      </RouterLink>
+    </template>
+
+    <!-- Filters -->
+    <Card class="mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <FormField id="counting-plans-filter-status" label="Status">
+          <select v-model="filters.status" class="w-full border-gray-300 rounded-md shadow-sm">
+            <option value="">Todos</option>
+            <option value="DRAFT">Rascunho</option>
+            <option value="ACTIVE">Ativo</option>
+            <option value="PAUSED">Pausado</option>
+            <option value="COMPLETED">Concluído</option>
+            <option value="CANCELLED">Cancelado</option>
+          </select>
+        </FormField>
+        <FormField id="counting-plans-filter-type" label="Tipo">
+          <select v-model="filters.type" class="w-full border-gray-300 rounded-md shadow-sm">
+            <option value="">Todos</option>
+            <option value="FULL">Completa</option>
+            <option value="PARTIAL">Parcial</option>
+            <option value="CYCLIC">Cíclica</option>
+          </select>
+        </FormField>
+        <FormField id="counting-plans-filter-frequency" label="Frequência">
+          <select v-model="filters.frequency" class="w-full border-gray-300 rounded-md shadow-sm">
+            <option value="">Todas</option>
+            <option value="DAILY">Diária</option>
+            <option value="WEEKLY">Semanal</option>
+            <option value="MONTHLY">Mensal</option>
+            <option value="QUARTERLY">Trimestral</option>
+            <option value="YEARLY">Anual</option>
+          </select>
+        </FormField>
+        <FormField id="counting-plans-filter-search" label="Buscar">
+          <input
+            v-model="filters.search"
+            type="text"
+            placeholder="Nome ou código..."
+            class="w-full border-gray-300 rounded-md shadow-sm"
+          />
+        </FormField>
+      </div>
+    </Card>
+
+    <!-- Plans Table — aqui o `loading` do store e exclusivo deste fetch. -->
+    <DataTable
+      :loading="loading"
+      :error="error"
+      :items="plans"
+      empty-title="Nenhum plano encontrado"
+      empty-hint="Comece criando um novo plano de contagem."
+      @retry="loadPlans"
+    >
+      <template #head>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+          Código
+        </th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Nome
+        </th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+          Tipo
+        </th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+          Frequência
+        </th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+          Status
+        </th>
+        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">
+          Ações
+        </th>
+      </template>
+
+      <template #row="{ item: plan }">
+        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+          {{ plan.code }}
+        </td>
+        <td class="px-4 py-3 text-sm text-gray-900">
+          {{ plan.name }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+          {{ formatType(plan.type) }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+          {{ formatFrequency(plan.frequency) }}
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <StatusBadge :label="formatStatus(plan.status)" :tone="getStatusTone(plan.status)" />
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm">
+          <div class="flex items-center space-x-3">
+            <RouterLink
+              :to="`/counting/plans/${plan.id}`"
+              class="text-blue-600 hover:text-blue-900 font-medium"
+            >
+              Editar
             </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
+            <button
+              v-if="plan.status === 'DRAFT'"
+              @click="activatePlan(plan.id)"
+              class="text-green-600 hover:text-green-900 font-medium"
+            >
+              Ativar
+            </button>
+            <button
+              v-if="plan.status === 'ACTIVE'"
+              @click="pausePlan(plan.id)"
+              class="text-yellow-600 hover:text-yellow-900 font-medium"
+            >
+              Pausar
+            </button>
+            <button
+              v-if="plan.status === 'PAUSED'"
+              @click="activatePlan(plan.id)"
+              class="text-green-600 hover:text-green-900 font-medium"
+            >
+              Retomar
+            </button>
+            <button
+              @click="deletePlan(plan.id)"
+              class="text-red-600 hover:text-red-900 font-medium"
+            >
+              Excluir
+            </button>
           </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-      <!-- Header -->
-      <div class="mb-8 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Planos de Contagem</h2>
-          <p class="mt-2 text-sm text-gray-600">
-            Gerencie os planos de contagem de estoque
-          </p>
-        </div>
-        <RouterLink
-          to="/counting/plans/new"
-          class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm"
-        >
-          <PlusIcon class="w-5 h-5 mr-2" />
-          Novo Plano
-        </RouterLink>
-      </div>
-
-      <!-- Filters -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select v-model="filters.status" class="w-full border-gray-300 rounded-md shadow-sm">
-              <option value="">Todos</option>
-              <option value="DRAFT">Rascunho</option>
-              <option value="ACTIVE">Ativo</option>
-              <option value="PAUSED">Pausado</option>
-              <option value="COMPLETED">Concluído</option>
-              <option value="CANCELLED">Cancelado</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-            <select v-model="filters.type" class="w-full border-gray-300 rounded-md shadow-sm">
-              <option value="">Todos</option>
-              <option value="FULL">Completa</option>
-              <option value="PARTIAL">Parcial</option>
-              <option value="CYCLIC">Cíclica</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Frequência</label>
-            <select v-model="filters.frequency" class="w-full border-gray-300 rounded-md shadow-sm">
-              <option value="">Todas</option>
-              <option value="DAILY">Diária</option>
-              <option value="WEEKLY">Semanal</option>
-              <option value="MONTHLY">Mensal</option>
-              <option value="QUARTERLY">Trimestral</option>
-              <option value="YEARLY">Anual</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input
-              v-model="filters.search"
-              type="text"
-              placeholder="Nome ou código..."
-              class="w-full border-gray-300 rounded-md shadow-sm"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Loading -->
-      <div v-if="loading" class="flex justify-center items-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-
-      <!-- Plans Table -->
-      <div v-else class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                Código
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Nome
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
-                Tipo
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
-                Frequência
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
-                Status
-              </th>
-              <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-56">
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="plan in plans" :key="plan.id" class="hover:bg-gray-50">
-              <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                {{ plan.code }}
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-900">
-                {{ plan.name }}
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                {{ formatType(plan.type) }}
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                {{ formatFrequency(plan.frequency) }}
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap">
-                <span :class="getStatusClass(plan.status)">
-                  {{ formatStatus(plan.status) }}
-                </span>
-              </td>
-              <td class="px-4 py-3 whitespace-nowrap text-sm">
-                <div class="flex items-center space-x-3">
-                  <RouterLink
-                    :to="`/counting/plans/${plan.id}`"
-                    class="text-blue-600 hover:text-blue-900 font-medium"
-                  >
-                    Editar
-                  </RouterLink>
-                  <button
-                    v-if="plan.status === 'DRAFT'"
-                    @click="activatePlan(plan.id)"
-                    class="text-green-600 hover:text-green-900 font-medium"
-                  >
-                    Ativar
-                  </button>
-                  <button
-                    v-if="plan.status === 'ACTIVE'"
-                    @click="pausePlan(plan.id)"
-                    class="text-yellow-600 hover:text-yellow-900 font-medium"
-                  >
-                    Pausar
-                  </button>
-                  <button
-                    v-if="plan.status === 'PAUSED'"
-                    @click="activatePlan(plan.id)"
-                    class="text-green-600 hover:text-green-900 font-medium"
-                  >
-                    Retomar
-                  </button>
-                  <button
-                    @click="deletePlan(plan.id)"
-                    class="text-red-600 hover:text-red-900 font-medium"
-                  >
-                    Excluir
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Empty State -->
-        <div v-if="plans.length === 0" class="text-center py-12">
-          <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-gray-400" />
-          <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum plano encontrado</h3>
-          <p class="mt-1 text-sm text-gray-500">Comece criando um novo plano de contagem.</p>
-        </div>
-      </div>
-    </main>
-  </div>
+        </td>
+      </template>
+    </DataTable>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, onMounted, watch } from 'vue';
+import { RouterLink } from 'vue-router';
 import { useCountingStore } from '@/stores/counting.store';
-import { useAuthStore } from '@/stores/auth.store';
 import { storeToRefs } from 'pinia';
 import type { PlanFilters } from '@/types/counting.types';
-import Button from '@/components/common/Button.vue';
-import { ClipboardDocumentListIcon, PlusIcon } from '@heroicons/vue/24/outline';
+import AppLayout from '@/components/common/AppLayout.vue';
+import Card from '@/components/common/Card.vue';
+import DataTable from '@/components/common/DataTable.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge, { type BadgeTone } from '@/components/common/StatusBadge.vue';
+import { PlusIcon } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 
-const router = useRouter();
 const countingStore = useCountingStore();
-const authStore = useAuthStore();
 const toast = useToast();
 const { plans, loading } = storeToRefs(countingStore);
 
-const handleLogout = () => {
-  authStore.logout();
-  router.push('/login');
-};
+// Antes nao havia estado de erro algum: uma falha no fetch deixava a tela
+// parecendo "nenhum plano encontrado" (I11).
+const error = ref('');
 
 const filters = ref<PlanFilters>({
   status: '',
@@ -229,15 +179,20 @@ watch(filters, async () => {
 }, { deep: true });
 
 const loadPlans = async () => {
-  await countingStore.fetchPlans(filters.value);
+  error.value = '';
+  try {
+    await countingStore.fetchPlans(filters.value);
+  } catch (err: any) {
+    error.value = err.response?.data?.message || err.message || 'Erro ao carregar planos';
+  }
 };
 
 const activatePlan = async (id: string) => {
   try {
     await countingStore.activatePlan(id);
     await loadPlans();
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || 'Erro ao ativar plano');
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao ativar plano');
   }
 };
 
@@ -245,8 +200,8 @@ const pausePlan = async (id: string) => {
   try {
     await countingStore.pausePlan(id);
     await loadPlans();
-  } catch (error: any) {
-    toast.error(error.response?.data?.message || 'Erro ao pausar plano');
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao pausar plano');
   }
 };
 
@@ -258,8 +213,8 @@ const deletePlan = async (id: string) => {
   try {
     await countingStore.deletePlan(id);
     await loadPlans();
-  } catch (error) {
-    console.error('Erro ao excluir plano:', error);
+  } catch (err) {
+    console.error('Erro ao excluir plano:', err);
     toast.error('Erro ao excluir plano. Verifique se não há sessões vinculadas.');
   }
 };
@@ -295,14 +250,15 @@ const formatStatus = (status: string) => {
   return statuses[status] || status;
 };
 
-const getStatusClass = (status: string) => {
-  const classes: Record<string, string> = {
-    DRAFT: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800',
-    ACTIVE: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800',
-    PAUSED: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800',
-    COMPLETED: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800',
-    CANCELLED: 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800',
+// Mesmas cores do antigo getStatusClass: gray/green/yellow/blue/red.
+const getStatusTone = (status: string): BadgeTone => {
+  const tones: Record<string, BadgeTone> = {
+    DRAFT: 'neutral',
+    ACTIVE: 'success',
+    PAUSED: 'warning',
+    COMPLETED: 'info',
+    CANCELLED: 'danger',
   };
-  return classes[status] || classes.DRAFT;
+  return tones[status] || 'neutral';
 };
 </script>
