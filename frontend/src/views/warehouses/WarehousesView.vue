@@ -1,205 +1,169 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
+  <AppLayout title="Armazéns" subtitle="Gerencie os armazéns do sistema">
+    <template #actions>
+      <Button @click="openCreateModal"><span class="mr-2">+</span>Novo Armazém</Button>
+    </template>
+
+    <Card class="mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FormField id="wh-filter-search" label="Buscar" class="md:col-span-2">
+          <input
+            v-model="search"
+            type="text"
+            placeholder="Digite para buscar..."
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            @input="debouncedSearch"
+          />
+        </FormField>
       </div>
-    </header>
+    </Card>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="mb-6 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Armazéns</h2>
-          <p class="mt-1 text-sm text-gray-600">Gerencie os armazéns do sistema</p>
+    <DataTable
+      :loading="loading"
+      :error="error"
+      :items="warehouses"
+      empty-title="Nenhum armazém encontrado"
+      empty-hint="Ajuste a busca ou cadastre um novo armazém."
+      @retry="loadWarehouses"
+    >
+      <template #empty-action>
+        <Button @click="openCreateModal"><span class="mr-2">+</span>Novo Armazém</Button>
+      </template>
+
+      <template #head>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cidade</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+      </template>
+
+      <template #row="{ item }">
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ asItem(item).code }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ asItem(item).name }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ asItem(item).document || '-' }}</td>
+        <td class="px-6 py-4 text-sm text-gray-500">
+          <div>{{ asItem(item).email || '-' }}</div>
+          <div class="text-xs">{{ asItem(item).phone || '-' }}</div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ asItem(item).city || '-' }}</td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <StatusBadge
+            :label="asItem(item).active ? 'Ativo' : 'Inativo'"
+            :tone="asItem(item).active ? 'success' : 'danger'"
+          />
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+          <button @click="openEditModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Editar</button>
+          <button @click="handleToggleActive(asItem(item))" class="text-yellow-600 hover:text-yellow-900">
+            {{ asItem(item).active ? 'Desativar' : 'Ativar' }}
+          </button>
+          <button @click="handleDelete(asItem(item))" class="text-red-600 hover:text-red-900">Excluir</button>
+        </td>
+      </template>
+    </DataTable>
+
+    <AppModal
+      v-model="showModal"
+      :title="editingWarehouse ? 'Editar Armazém' : 'Novo Armazém'"
+      @close="closeModal"
+    >
+      <form @submit.prevent="handleSubmit" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <FormField id="wh-form-code" label="Código" required>
+            <input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+          <FormField id="wh-form-name" label="Nome" required>
+            <input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
         </div>
-        <Button @click="openCreateModal">
-          <span class="mr-2">+</span>
-          Novo Armazém
-        </Button>
-      </div>
 
-      <Card class="mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input v-model="search" type="text" class="w-full border-gray-300 rounded-md shadow-sm" placeholder="Digite para buscar..." @input="debouncedSearch" />
-          </div>
+        <FormField id="wh-form-legal-name" label="Razão Social">
+          <input v-model="formData.legalName" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
+
+        <div class="grid grid-cols-2 gap-4">
+          <FormField id="wh-form-document" label="CNPJ/CPF">
+            <input v-model="formData.document" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+          <FormField id="wh-form-phone" label="Telefone">
+            <input v-model="formData.phone" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
         </div>
-      </Card>
 
-      <Card>
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contato</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cidade</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th scope="col" class="relative px-6 py-3">
-                <span class="sr-only">Ações</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="warehouse in warehouses" :key="warehouse.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ warehouse.code }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ warehouse.name }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ warehouse.document || '-' }}</td>
-              <td class="px-6 py-4 text-sm text-gray-500">
-                <div>{{ warehouse.email || '-' }}</div>
-                <div class="text-xs">{{ warehouse.phone || '-' }}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ warehouse.city || '-' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                <span :class="warehouse.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                  {{ warehouse.active ? 'Ativo' : 'Inativo' }}
-                </span>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                <button @click="openEditModal(warehouse)" class="text-primary-600 hover:text-primary-900">Editar</button>
-                <button @click="handleToggleActive(warehouse)" class="text-yellow-600 hover:text-yellow-900">
-                  {{ warehouse.active ? 'Desativar' : 'Ativar' }}
-                </button>
-                <button @click="handleDelete(warehouse)" class="text-red-600 hover:text-red-900">Excluir</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </Card>
-    </main>
+        <FormField id="wh-form-email" label="Email">
+          <input v-model="formData.email" type="email" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
 
-    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="closeModal">
-      <div class="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
-        <div class="p-6">
-          <div class="flex justify-between items-start mb-6">
-            <h3 class="text-2xl font-bold text-gray-900">{{ editingWarehouse ? 'Editar Armazém' : 'Novo Armazém' }}</h3>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-          </div>
+        <FormField id="wh-form-address" label="Endereço">
+          <input v-model="formData.address" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
 
-          <form @submit.prevent="handleSubmit" class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Código *</label>
-                <input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
-                <input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Razão Social</label>
-              <input v-model="formData.legalName" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">CNPJ/CPF</label>
-                <input v-model="formData.document" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                <input v-model="formData.phone" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input v-model="formData.email" type="email" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Endereço</label>
-              <input v-model="formData.address" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
-                <input v-model="formData.city" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                <input v-model="formData.state" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">CEP</label>
-                <input v-model="formData.zipCode" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Responsável</label>
-                <input v-model="formData.managerName" type="text" placeholder="Nome do gerente" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Capacidade (m³)</label>
-                <input v-model.number="formData.capacity" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-              <textarea v-model="formData.description" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
-            </div>
-
-            <div class="flex items-center">
-              <input v-model="formData.active" type="checkbox" id="active" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <label for="active" class="ml-2 text-sm text-gray-700">Ativo</label>
-            </div>
-
-            <div class="flex gap-3 pt-4">
-              <Button type="button" variant="outline" @click="closeModal" class="flex-1">Cancelar</Button>
-              <Button type="submit" :disabled="loading" class="flex-1">{{ editingWarehouse ? 'Salvar' : 'Criar' }}</Button>
-            </div>
-          </form>
+        <div class="grid grid-cols-3 gap-4">
+          <FormField id="wh-form-city" label="Cidade">
+            <input v-model="formData.city" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+          <FormField id="wh-form-state" label="Estado">
+            <input v-model="formData.state" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+          <FormField id="wh-form-zip" label="CEP">
+            <input v-model="formData.zipCode" type="text" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
         </div>
-      </div>
-    </div>
-  </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <FormField id="wh-form-manager" label="Responsável">
+            <input v-model="formData.managerName" type="text" placeholder="Nome do gerente" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+          <FormField id="wh-form-capacity" label="Capacidade (m³)">
+            <input v-model.number="formData.capacity" type="number" step="0.01" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+        </div>
+
+        <FormField id="wh-form-description" label="Descrição">
+          <textarea v-model="formData.description" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+        </FormField>
+
+        <div class="flex items-center">
+          <input v-model="formData.active" type="checkbox" id="wh-form-active" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+          <label for="wh-form-active" class="ml-2 text-sm text-gray-700">Ativo</label>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="closeModal" class="flex-1">Cancelar</Button>
+          <Button type="submit" :disabled="saving" class="flex-1">{{ editingWarehouse ? 'Salvar' : 'Criar' }}</Button>
+        </div>
+      </form>
+    </AppModal>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useWarehouseStore } from '@/stores/warehouse.store';
-import { useAuthStore } from '@/stores/auth.store';
+import AppLayout from '@/components/common/AppLayout.vue';
+import AppModal from '@/components/common/AppModal.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import DataTable from '@/components/common/DataTable.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 import { useDebounce } from '@/composables/useDebounce';
 import type { ApiError, Warehouse, WarehouseFormData } from '@/types/warehouse.types';
 
-const router = useRouter();
-const authStore = useAuthStore();
 const warehouseStore = useWarehouseStore();
 const toast = useToast();
 
 const search = ref('');
 const warehouses = ref<Warehouse[]>([]);
 const loading = ref(false);
+// §4.4-5 / I11: erro de carregamento e um estado proprio, nunca "lista vazia".
+const error = ref('');
+const saving = ref(false);
 const showModal = ref(false);
 const editingWarehouse = ref<Warehouse | null>(null);
 
@@ -221,11 +185,21 @@ const formData = ref<Partial<WarehouseFormData>>({
   active: true
 });
 
+// DataTable expoe o item do slot #row como `unknown` (o componente nao e generico);
+// este e o unico ponto de cast da view, mantendo o template tipado.
+const asItem = (item: unknown) => item as Warehouse;
+
 const loadWarehouses = async () => {
   try {
     loading.value = true;
+    error.value = '';
+    // Nota: warehouse.store.ts:19-23 engole a falha de fetchWarehouses num
+    // console.error sem relancar — enquanto ele nao relancar, este catch nao
+    // dispara e a tela cai em "nenhum armazem encontrado" (I10/I11).
     await warehouseStore.fetchWarehouses({ search: search.value || undefined });
     warehouses.value = warehouseStore.warehouses;
+  } catch (e) {
+    error.value = (e as ApiError).response?.data?.message || 'Erro ao carregar armazéns';
   } finally {
     loading.value = false;
   }
@@ -262,6 +236,7 @@ const openEditModal = (warehouse: Warehouse) => {
   showModal.value = true;
 };
 
+// Esc, focus trap e devolucao de foco agora vem do AppModal (§4.2).
 const closeModal = () => {
   showModal.value = false;
   editingWarehouse.value = null;
@@ -269,6 +244,7 @@ const closeModal = () => {
 
 const handleSubmit = async () => {
   try {
+    saving.value = true;
     if (editingWarehouse.value) {
       await warehouseStore.updateWarehouse(editingWarehouse.value.id, formData.value);
       toast.success('Armazém atualizado com sucesso!');
@@ -280,13 +256,17 @@ const handleSubmit = async () => {
     await loadWarehouses();
   } catch (error) {
     toast.error((error as ApiError).response?.data?.message || 'Erro ao salvar armazém');
+  } finally {
+    saving.value = false;
   }
 };
 
 const handleToggleActive = async (warehouse: Warehouse) => {
   if (await confirmDialog(`Deseja ${warehouse.active ? 'desativar' : 'ativar'} o armazém "${warehouse.name}"?`)) {
+    const acao = warehouse.active ? 'desativado' : 'ativado';
     try {
       await warehouseStore.updateWarehouse(warehouse.id, { active: !warehouse.active });
+      toast.success(`Armazém ${acao} com sucesso!`);
       await loadWarehouses();
     } catch (error) {
       toast.error((error as ApiError).response?.data?.message || 'Erro ao alterar status');
@@ -304,11 +284,6 @@ const handleDelete = async (warehouse: Warehouse) => {
       toast.error((error as ApiError).response?.data?.message || 'Erro ao excluir armazém');
     }
   }
-};
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
 };
 
 onMounted(() => loadWarehouses());

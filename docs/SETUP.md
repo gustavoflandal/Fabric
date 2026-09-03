@@ -155,6 +155,16 @@ docker-compose logs -f
 docker-compose down
 ```
 
+**Armadilha ao adicionar dependência nova (`npm install` em `frontend/` ou `backend/`):** `docker-compose.yml` declara `/app/node_modules` como volume anônimo, de propósito (evita `node_modules` do host, compilado pra Windows, vazar pra dentro do container Linux). Consequência: esse volume **sobrevive a `docker compose build`** — a imagem fica com o `node_modules` novo, mas o container recriado continua montando o volume antigo por cima, escondendo a dependência nova. Sintoma: `Cannot find package 'X'` mesmo depois de rebuildar. Confirmado em 02/09/2026 com o `fabric-frontend` (Vitest instalado no host, container em crash-loop até isso ser corrigido). Correção:
+
+```powershell
+docker compose build <servico>
+docker compose rm -f -s -v <servico>   # -v remove o volume anonimo orfao
+docker compose up -d <servico>
+```
+
+`docker compose up -d --build <servico>` sozinho **não resolve** — precisa do `rm -v` no meio.
+
 ## 📚 Documentação
 
 Toda a documentação técnica está na pasta `docs/`:
