@@ -1,7 +1,7 @@
 <template>
   <AppLayout
-    :title="isEditing ? 'Editar Plano' : 'Novo Plano de Contagem'"
-    :subtitle="isEditing ? 'Atualize as informações do plano' : 'Crie um novo plano de contagem de estoque'"
+    :title="isEditing ? 'Editar Plano' : 'Novo Plano de Inventário'"
+    :subtitle="isEditing ? 'Atualize as informações do plano' : 'Crie um novo plano de inventário de estoque'"
   >
     <!-- Form — o Card ja fornece bg/borda/sombra e o padding px-6 py-4. -->
     <Card>
@@ -25,7 +25,7 @@
                 type="text"
                 required
                 class="w-full border-gray-300 rounded-md shadow-sm"
-                placeholder="Ex: Contagem Mensal"
+                placeholder="Ex: Inventário Mensal"
               />
             </FormField>
           </div>
@@ -38,10 +38,10 @@
             <FormField id="counting-plan-type" label="Tipo" required>
               <select v-model="form.type" required class="w-full border-gray-300 rounded-md shadow-sm">
                 <option value="">Selecione...</option>
-                <option value="FULL_INVENTORY">Contagem Completa</option>
-                <option value="SPOT">Contagem Parcial</option>
-                <option value="CYCLIC">Contagem Cíclica</option>
-                <option value="BLIND">Contagem Cega</option>
+                <option value="FULL_INVENTORY">Inventário Completo</option>
+                <option value="SPOT">Inventário Parcial</option>
+                <option value="CYCLIC">Inventário Cíclico</option>
+                <option value="BLIND">Inventário Cego</option>
               </select>
             </FormField>
             <FormField id="counting-plan-frequency" label="Frequência" required>
@@ -114,8 +114,8 @@
               </span>
               <p class="text-xs text-gray-500 mt-1">
                 {{ isPaused
-                  ? 'Desmarque para reativar o plano de contagem'
-                  : 'Marque para pausar temporariamente o plano de contagem'
+                  ? 'Desmarque para reativar o plano de inventário'
+                  : 'Marque para pausar temporariamente o plano de inventário'
                 }}
               </p>
             </label>
@@ -387,7 +387,7 @@ const generatePDF = async () => {
     // Cabeçalho
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('DOCUMENTO DE CONTAGEM DE ESTOQUE', pageWidth / 2, 20, { align: 'center' });
+    doc.text('DOCUMENTO DE INVENTÁRIO DE ESTOQUE', pageWidth / 2, 20, { align: 'center' });
     
     // Linha divisória
     doc.setLineWidth(0.5);
@@ -403,10 +403,10 @@ const generatePDF = async () => {
     let yPos = 42;
     
     const typeLabels: Record<string, string> = {
-      'FULL_INVENTORY': 'Contagem Completa',
-      'SPOT': 'Contagem Parcial',
-      'CYCLIC': 'Contagem Cíclica',
-      'BLIND': 'Contagem Cega'
+      'FULL_INVENTORY': 'Inventário Completo',
+      'SPOT': 'Inventário Parcial',
+      'CYCLIC': 'Inventário Cíclico',
+      'BLIND': 'Inventário Cego'
     };
     
     const frequencyLabels: Record<string, string> = {
@@ -445,7 +445,7 @@ const generatePDF = async () => {
     // Tabela de Produtos
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text('Produtos para Contagem', 15, yPos);
+    doc.text('Produtos para Inventário', 15, yPos);
     yPos += 7;
     
     if (selectedProducts.value.length > 0) {

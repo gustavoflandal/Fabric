@@ -298,7 +298,7 @@ export const CountingTypeLabels: Record<CountingType, string> = {
   [CountingType.CYCLIC]: 'Cíclica',
   [CountingType.SPOT]: 'Pontual',
   [CountingType.FULL_INVENTORY]: 'Inventário Completo',
-  [CountingType.BLIND]: 'Contagem Cega',
+  [CountingType.BLIND]: 'Inventário Cego',
 };
 
 export const CountingFrequencyLabels: Record<CountingFrequency, string> = {

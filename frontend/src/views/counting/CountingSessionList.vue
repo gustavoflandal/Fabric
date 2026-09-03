@@ -1,5 +1,5 @@
 <template>
-  <AppLayout title="Sessões de Contagem" subtitle="Acompanhe e gerencie as sessões de contagem">
+  <AppLayout title="Sessões de Inventário" subtitle="Acompanhe e gerencie as sessões de inventário">
     <!-- Filters -->
     <Card class="mb-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">

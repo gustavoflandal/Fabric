@@ -1,7 +1,7 @@
 <template>
   <AppLayout
-    title="Contagem de Estoque"
-    subtitle="Gerencie planos e acompanhe as contagens de estoque"
+    title="Inventário"
+    subtitle="Gerencie planos e acompanhe os inventários de estoque"
   >
     <template #actions>
       <RouterLink
@@ -92,7 +92,7 @@
 
       <!-- Planos de Contagem -->
       <div class="mb-8">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Planos de Contagem</h3>
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Planos de Inventário</h3>
 
         <!-- Filters -->
         <Card class="mb-6">
@@ -143,7 +143,7 @@
           :error="plansError"
           :items="plans"
           empty-title="Nenhum plano encontrado"
-          empty-hint="Comece criando um novo plano de contagem."
+          empty-hint="Comece criando um novo plano de inventário."
           @retry="loadPlans"
         >
           <template #head>
@@ -362,7 +362,7 @@ const loadDashboardData = async () => {
     ]);
   } catch (error: any) {
     dashboardError.value =
-      error.response?.data?.message || error.message || 'Erro ao carregar o dashboard de contagem';
+      error.response?.data?.message || error.message || 'Erro ao carregar o dashboard de inventário';
   }
 };
 

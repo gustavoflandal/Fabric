@@ -138,7 +138,7 @@
       <svg class="mx-auto h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h3 class="mt-4 text-lg font-medium text-gray-900">Contagem Concluída!</h3>
+      <h3 class="mt-4 text-lg font-medium text-gray-900">Inventário Concluído!</h3>
       <p class="mt-2 text-sm text-gray-600">Todos os itens foram contados.</p>
       <div class="mt-6 space-x-3">
         <button
