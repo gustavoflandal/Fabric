@@ -1,180 +1,139 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <AppLayout title="Ordens de Produção" subtitle="Gerencie as ordens de produção">
+    <template #actions>
+      <Button variant="primary" @click="openCreateModal"><span class="mr-2">+</span>Nova Ordem</Button>
+    </template>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Page Header -->
-      <div class="mb-6 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Ordens de Produção</h2>
-          <p class="mt-1 text-sm text-gray-600">
-            Gerencie as ordens de produção
-          </p>
-        </div>
-        <Button variant="primary" @click="openCreateModal">
-          + Nova Ordem
-        </Button>
+    <Card class="mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FormField id="po-filter-search" label="Buscar" class="md:col-span-2">
+          <input
+            v-model="filters.search"
+            type="text"
+            placeholder="Número ou produto..."
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            @input="debouncedSearch"
+          />
+        </FormField>
+        <FormField id="po-filter-status" label="Status">
+          <select
+            v-model="filters.status"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            @change="handleSearch"
+          >
+            <option value="">Todos</option>
+            <option value="PLANNED">Planejada</option>
+            <option value="RELEASED">Liberada</option>
+            <option value="IN_PROGRESS">Em Progresso</option>
+            <option value="COMPLETED">Concluída</option>
+            <option value="CANCELLED">Cancelada</option>
+          </select>
+        </FormField>
       </div>
+    </Card>
 
-      <Card>
-        <div class="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input
-              v-model="filters.search"
-              type="text"
-              placeholder="Número ou produto..."
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @input="debouncedSearch"
-            />
+    <DataTable
+      :loading="loading"
+      :error="error"
+      :items="orders"
+      empty-title="Nenhuma ordem de produção encontrada"
+      empty-hint="Ajuste os filtros ou crie uma nova ordem de produção."
+      @retry="loadOrders"
+    >
+      <template #empty-action>
+        <Button @click="openCreateModal"><span class="mr-2">+</span>Nova Ordem</Button>
+      </template>
+
+      <template #head>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Número</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Produto</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Qtd.</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Progresso</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Status</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Início</th>
+        <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Fim</th>
+        <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Ações</th>
+      </template>
+
+      <template #row="{ item }">
+        <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.orderNumber }}</td>
+        <td class="px-4 py-4 text-sm text-gray-900">
+          <div class="font-medium">{{ item.product?.code }}</div>
+          <div class="text-xs text-gray-500">{{ item.product?.name }}</div>
+        </td>
+        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.quantity }}</td>
+        <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+          <div>{{ item.producedQty }} / {{ item.quantity }}</div>
+          <div class="text-xs text-gray-400">({{ progressPercent(item) }}%)</div>
+        </td>
+        <td class="px-4 py-4 whitespace-nowrap">
+          <StatusBadge :label="getStatusLabel(item.status)" :tone="getStatusTone(item.status)" />
+        </td>
+        <td class="px-4 py-4 text-sm text-gray-500">{{ formatDate(item.scheduledStart) }}</td>
+        <td class="px-4 py-4 text-sm text-gray-500">{{ formatDate(item.scheduledEnd) }}</td>
+        <td class="px-4 py-4 text-right text-sm font-medium">
+          <div class="flex items-center justify-end space-x-3">
+            <button @click="openDetailsModal(item)" class="text-primary-600 hover:text-primary-900 whitespace-nowrap">Detalhes</button>
+            <button @click="handleDelete(item)" class="text-red-600 hover:text-red-900 whitespace-nowrap">Excluir</button>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
-            <select v-model="filters.status" @change="handleSearch" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-              <option value="">Todos</option>
-              <option value="PLANNED">Planejada</option>
-              <option value="RELEASED">Liberada</option>
-              <option value="IN_PROGRESS">Em Progresso</option>
-              <option value="COMPLETED">Concluída</option>
-              <option value="CANCELLED">Cancelada</option>
+        </td>
+      </template>
+    </DataTable>
+
+    <!-- Modal de Criação — Esc/focus trap agora vêm do AppModal (§4.2). -->
+    <AppModal v-model="showModal" title="Nova Ordem de Produção" @close="closeModal">
+      <form @submit.prevent="handleSubmit" class="space-y-4">
+        <FormField id="po-form-order-number" label="Número da Ordem" required>
+          <input v-model="formData.orderNumber" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
+
+        <FormField id="po-form-product" label="Produto" required>
+          <select v-model="formData.productId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <option value="">Selecione um produto...</option>
+            <option v-for="product in products" :key="product.id" :value="product.id">
+              {{ product.code }} - {{ product.name }}
+            </option>
+          </select>
+        </FormField>
+
+        <FormField id="po-form-quantity" label="Quantidade" required>
+          <input v-model.number="formData.quantity" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
+
+        <!-- Programação — delimitação de seção do precedente de ProductsView (§5.2). -->
+        <div class="border-t pt-4 mt-4 space-y-4">
+          <h4 class="text-sm font-semibold text-gray-900">Programação</h4>
+
+          <div class="grid grid-cols-2 gap-4">
+            <FormField id="po-form-scheduled-start" label="Início Agendado" required>
+              <input v-model="formData.scheduledStart" type="datetime-local" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            </FormField>
+            <FormField id="po-form-scheduled-end" label="Fim Agendado" required>
+              <input v-model="formData.scheduledEnd" type="datetime-local" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            </FormField>
+          </div>
+
+          <FormField id="po-form-priority" label="Prioridade">
+            <select v-model.number="formData.priority" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+              <option :value="1">1 - Muito Baixa</option>
+              <option :value="3">3 - Baixa</option>
+              <option :value="5">5 - Normal</option>
+              <option :value="7">7 - Alta</option>
+              <option :value="10">10 - Urgente</option>
             </select>
-          </div>
+          </FormField>
         </div>
 
-        <div v-if="loading" class="text-center py-12">
-          <p class="text-gray-500">Carregando...</p>
-        </div>
+        <FormField id="po-form-notes" label="Observações">
+          <textarea v-model="formData.notes" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+        </FormField>
 
-        <div v-else-if="orders.length === 0" class="text-center py-12">
-          <p class="text-gray-500">Nenhuma ordem de produção encontrada</p>
-          <Button @click="openCreateModal" class="mt-4">Criar Primeira Ordem</Button>
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="closeModal" class="flex-1">Cancelar</Button>
+          <Button type="submit" :disabled="loading" class="flex-1">Criar Ordem</Button>
         </div>
-
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Número</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Produto</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Qtd.</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Progresso</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Status</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Início</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">Fim</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Ações</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="order in orders" :key="order.id" class="hover:bg-gray-50">
-                <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ order.orderNumber }}</td>
-                <td class="px-4 py-4 text-sm text-gray-900">
-                  <div class="font-medium">{{ order.product?.code }}</div>
-                  <div class="text-xs text-gray-500">{{ order.product?.name }}</div>
-                </td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{{ order.quantity }}</td>
-                <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <div>{{ order.producedQty }} / {{ order.quantity }}</div>
-                  <div class="text-xs text-gray-400">({{ Math.round((order.producedQty / order.quantity) * 100) }}%)</div>
-                </td>
-                <td class="px-4 py-4 whitespace-nowrap">
-                  <span :class="getStatusClass(order.status)" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                    {{ getStatusLabel(order.status) }}
-                  </span>
-                </td>
-                <td class="px-4 py-4 text-sm text-gray-500">{{ formatDate(order.scheduledStart) }}</td>
-                <td class="px-4 py-4 text-sm text-gray-500">{{ formatDate(order.scheduledEnd) }}</td>
-                <td class="px-4 py-4 text-right text-sm font-medium">
-                  <div class="flex justify-end gap-2">
-                    <button @click="openDetailsModal(order)" class="text-primary-600 hover:text-primary-900 whitespace-nowrap">Detalhes</button>
-                    <button @click="handleDelete(order)" class="text-red-600 hover:text-red-900 whitespace-nowrap">Excluir</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </main>
-
-    <!-- Modal de Criação -->
-    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" @click="closeModal">
-      <div class="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto" @click.stop>
-        <div class="p-6">
-          <div class="flex justify-between items-start mb-6">
-            <h3 class="text-2xl font-bold text-gray-900">Nova Ordem de Produção</h3>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-          </div>
-          <form @submit.prevent="handleSubmit" class="space-y-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Número da Ordem *</label>
-              <input v-model="formData.orderNumber" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Produto *</label>
-              <select v-model="formData.productId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                <option value="">Selecione um produto...</option>
-                <option v-for="product in products" :key="product.id" :value="product.id">
-                  {{ product.code }} - {{ product.name }}
-                </option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Quantidade *</label>
-              <input v-model.number="formData.quantity" type="number" min="0.01" step="0.01" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-            </div>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Início Agendado *</label>
-                <input v-model="formData.scheduledStart" type="datetime-local" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Fim Agendado *</label>
-                <input v-model="formData.scheduledEnd" type="datetime-local" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Prioridade</label>
-              <select v-model.number="formData.priority" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                <option :value="1">1 - Muito Baixa</option>
-                <option :value="3">3 - Baixa</option>
-                <option :value="5">5 - Normal</option>
-                <option :value="7">7 - Alta</option>
-                <option :value="10">10 - Urgente</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
-              <textarea v-model="formData.notes" rows="3" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
-            </div>
-            <div class="flex gap-3 pt-4">
-              <Button type="button" variant="outline" @click="closeModal" class="flex-1">Cancelar</Button>
-              <Button type="submit" :disabled="loading" class="flex-1">Criar Ordem</Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+      </form>
+    </AppModal>
 
     <!-- Modal de Detalhes -->
     <ProductionOrderDetailsModal
@@ -182,25 +141,26 @@
       :order="selectedOrder"
       @refresh="loadOrders"
     />
-  </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth.store';
 import { useProductionOrderStore } from '@/stores/production-order.store';
 import { useProductStore } from '@/stores/product.store';
 import type { ProductionOrder } from '@/services/production-order.service';
+import AppLayout from '@/components/common/AppLayout.vue';
+import AppModal from '@/components/common/AppModal.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import DataTable from '@/components/common/DataTable.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge, { type BadgeTone } from '@/components/common/StatusBadge.vue';
 import ProductionOrderDetailsModal from '@/components/production/ProductionOrderDetailsModal.vue';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 import { useDebounce } from '@/composables/useDebounce';
 
-const router = useRouter();
-const authStore = useAuthStore();
 const orderStore = useProductionOrderStore();
 const productStore = useProductStore();
 const toast = useToast();
@@ -208,6 +168,8 @@ const toast = useToast();
 const orders = ref<ProductionOrder[]>([]);
 const products = ref<any[]>([]);
 const loading = ref(false);
+// §4.4-5 / I11: erro de carregamento e um estado proprio, nunca "lista vazia".
+const error = ref('');
 const showModal = ref(false);
 const showDetailsModal = ref(false);
 const selectedOrder = ref<ProductionOrder | null>(null);
@@ -229,11 +191,12 @@ onMounted(async () => {
 
 const loadOrders = async () => {
   loading.value = true;
+  error.value = '';
   try {
     const result = await orderStore.fetchOrders(filters.value);
     orders.value = result.data;
-  } catch (error) {
-    console.error('Erro ao carregar ordens:', error);
+  } catch (e: any) {
+    error.value = e.response?.data?.message || 'Erro ao carregar ordens de produção';
   } finally {
     loading.value = false;
   }
@@ -286,11 +249,6 @@ const openDetailsModal = (order: ProductionOrder) => {
   showDetailsModal.value = true;
 };
 
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
-
 const handleDelete = async (order: ProductionOrder) => {
   if (!(await confirmDialog(`Deseja realmente excluir a ordem ${order.orderNumber}?`))) return;
 
@@ -303,19 +261,18 @@ const handleDelete = async (order: ProductionOrder) => {
   }
 };
 
-const goBack = () => {
-  router.push('/dashboard');
-};
-
-const getStatusClass = (status: string) => {
-  const classes: Record<string, string> = {
-    PLANNED: 'bg-blue-100 text-blue-800',
-    RELEASED: 'bg-purple-100 text-purple-800',
-    IN_PROGRESS: 'bg-yellow-100 text-yellow-800',
-    COMPLETED: 'bg-green-100 text-green-800',
-    CANCELLED: 'bg-red-100 text-red-800',
+// blue/purple do badge antigo normalizados para a paleta do StatusBadge (§4.2):
+// PLANNED = neutral (ainda nao liberada), RELEASED = info, IN_PROGRESS = warning,
+// COMPLETED = success, CANCELLED = danger.
+const getStatusTone = (status: string): BadgeTone => {
+  const tones: Record<string, BadgeTone> = {
+    PLANNED: 'neutral',
+    RELEASED: 'info',
+    IN_PROGRESS: 'warning',
+    COMPLETED: 'success',
+    CANCELLED: 'danger',
   };
-  return classes[status] || 'bg-gray-100 text-gray-800';
+  return tones[status] || 'neutral';
 };
 
 const getStatusLabel = (status: string) => {
@@ -328,6 +285,9 @@ const getStatusLabel = (status: string) => {
   };
   return labels[status] || status;
 };
+
+const progressPercent = (order: ProductionOrder) =>
+  Math.round((order.producedQty / order.quantity) * 100);
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('pt-BR');
