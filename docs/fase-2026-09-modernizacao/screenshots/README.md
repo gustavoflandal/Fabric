@@ -2,7 +2,7 @@
 
 Gerados por `frontend/scripts/screenshot.mjs` (Playwright), um arquivo por rota, nome igual ao da rota no `router/index.ts`. Servem de checkpoint visual a cada lote de telas migrado para o padrão de `05_PADRAO_FRONTEND.md` — comparar o "antes" (este commit) com o "depois" de cada lote.
 
-**Como gerar:** com backend (porta 3001) e frontend (`npm run dev`, porta 5173) já rodando:
+**Como gerar:** com backend (porta 3005) e frontend (`npm run dev`, porta 5173) já rodando:
 
 ```bash
 cd frontend

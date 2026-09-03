@@ -6,7 +6,7 @@ API RESTful completa seguindo os mesmos padrões do VagaLume com autenticação 
 
 ## 🔐 Autenticação
 
-**Base URL:** `http://localhost:3001/api/v1`
+**Base URL:** `http://localhost:3005/api/v1`
 
 ### **Auth Endpoints**
 ```http

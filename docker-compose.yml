@@ -25,11 +25,11 @@ services:
       DATABASE_URL: "mysql://fabric:pYKz4wg7GJjwVRv7IoFEkw@mysql:3306/fabric"
       JWT_SECRET: "99d18635296e305de5674beafbd502d0a23c1e2c1b39bd21a100497d3deb3064"
       JWT_REFRESH_SECRET: "bab03802fdfbd9da8cebe1b3370b26db1281e915699eb7515bdfefacc02b310a"
-      PORT: 3001
+      PORT: 3005
       NODE_ENV: development
     command: sh -c "npx prisma generate && npm run dev"
     ports:
-      - "3005:3001"
+      - "3005:3005"
     depends_on:
       - mysql
     volumes:
@@ -45,7 +45,7 @@ services:
     container_name: fabric-frontend
     restart: unless-stopped
     environment:
-      VITE_API_PROXY_TARGET: "http://backend:3001"
+      VITE_API_PROXY_TARGET: "http://backend:3005"
     ports:
       - "5173:5173"
     volumes:

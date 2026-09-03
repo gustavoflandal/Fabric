@@ -158,7 +158,7 @@ npm run seed
 ```bash
 # Verificar portas em uso
 netstat -ano | findstr :3306
-netstat -ano | findstr :3001
+netstat -ano | findstr :3005
 
 # Parar todos containers
 docker-compose down
@@ -245,7 +245,7 @@ docker-compose logs -f mysql
 - [ ] Docker instalado
 - [ ] Node.js 18+ instalado
 - [ ] MySQL rodando (via Docker)
-- [ ] Backend rodando na porta 3001
+- [ ] Backend rodando na porta 3005
 - [ ] Frontend rodando na porta 5173/5175
 - [ ] Migrations aplicadas
 - [ ] Seed executado
@@ -290,11 +290,11 @@ watch(() => state.value, () => {
 **Solução**:
 ```bash
 # Windows
-netstat -ano | findstr :3001
+netstat -ano | findstr :3005
 taskkill /PID <PID> /F
 
 # Linux/Mac
-lsof -ti:3001 | xargs kill -9
+lsof -ti:3005 | xargs kill -9
 ```
 
 ## 📞 Suporte

@@ -240,7 +240,7 @@ Copie `.env.example` para `.env` e configure:
 ```bash
 # Aplicação
 NODE_ENV=development
-PORT=3001
+PORT=3005
 FRONTEND_URL=http://localhost:3000
 
 # Banco de Dados
@@ -454,7 +454,7 @@ server {
     
     # Backend API
     location /api/ {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://localhost:3005;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

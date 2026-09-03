@@ -99,7 +99,7 @@ npm run prisma:migrate
 # Terminal 1 - Backend
 cd backend
 npm run dev
-# Servidor em: http://localhost:3001
+# Servidor em: http://localhost:3005
 
 # Terminal 2 - Frontend
 cd frontend
@@ -109,8 +109,8 @@ npm run dev
 
 ### **5. Verificar Funcionamento**
 
-- **Backend Health Check**: http://localhost:3001/health
-- **Backend API**: http://localhost:3001/api/v1
+- **Backend Health Check**: http://localhost:3005/health
+- **Backend API**: http://localhost:3005/api/v1
 - **Frontend**: http://localhost:5173
 
 ## 📋 O Que Falta Implementar

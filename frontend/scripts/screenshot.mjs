@@ -4,7 +4,7 @@
  * docs/fase-2026-09-modernizacao/screenshots/ — usado como checkpoint visual
  * a cada lote de telas migradas para o padrão (05_PADRAO_FRONTEND.md).
  *
- * Pré-requisito: backend (porta 3001) e frontend (porta 5173, `npm run dev`)
+ * Pré-requisito: backend (porta 3005) e frontend (porta 5173, `npm run dev`)
  * já rodando. O script não sobe nenhum dos dois — é intencional, pra não
  * duplicar o servidor de dev que normalmente já está de pé.
  *
