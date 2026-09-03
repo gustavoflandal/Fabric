@@ -1,323 +1,334 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
+  <AppLayout title="Estruturas de Armazém" subtitle="Gerencie as estruturas dos armazéns do sistema">
+    <template #actions>
+      <Button @click="openCreateModal"><span class="mr-2">+</span>Nova Estrutura</Button>
+    </template>
 
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
+    <Card class="mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FormField id="ws-filter-search" label="Buscar" class="md:col-span-2">
+          <input
+            v-model="filters.search"
+            type="text"
+            placeholder="Código da rua, nome do armazém..."
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            @input="debouncedFilterChange"
+          />
+        </FormField>
+        <FormField id="ws-filter-blocked" label="Bloqueada">
+          <select
+            v-model="filters.blocked"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            @change="handleFilterChange"
+          >
+            <option value="">Todas</option>
+            <option value="true">Sim</option>
+            <option value="false">Não</option>
+          </select>
+        </FormField>
+      </div>
+    </Card>
+
+    <DataTable
+      :loading="loading"
+      :error="error"
+      :items="structures"
+      :pagination="pagination"
+      empty-title="Nenhuma estrutura encontrada"
+      empty-hint="Ajuste os filtros ou cadastre uma nova estrutura."
+      @retry="loadStructures"
+      @change-page="changePage"
+    >
+      <template #empty-action>
+        <Button @click="openCreateModal"><span class="mr-2">+</span>Nova Estrutura</Button>
+      </template>
+
+      <template #head>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código da Rua</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Armazém</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Andares</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posições</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posições Geradas</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Capacidade (kg)</th>
+        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bloqueada</th>
+        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+      </template>
+
+      <template #row="{ item }">
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.streetCode }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ item.warehouse?.name }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.floors }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.positions }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+          <span :class="(item.generatedPositionsCount ?? 0) > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'">
+            {{ item.generatedPositionsCount || 0 }}
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.weightCapacity }}</td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <StatusBadge
+            :label="item.blocked ? 'Sim' : 'Não'"
+            :tone="item.blocked ? 'danger' : 'success'"
+          />
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+          <button
+            v-if="(item.generatedPositionsCount ?? 0) > 0"
+            @click="openPositionsModal(item)"
+            class="text-primary-600 hover:text-primary-900"
+          >
+            Pos
+          </button>
+          <button
+            @click="openEditModal(item)"
+            :disabled="(item.generatedPositionsCount ?? 0) > 0"
+            :class="[
+              (item.generatedPositionsCount ?? 0) > 0
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-primary-600 hover:text-primary-900'
+            ]"
+            :title="(item.generatedPositionsCount ?? 0) > 0 ? 'Excluir as posições antes de editar' : 'Editar estrutura'"
+          >
+            Editar
+          </button>
+          <button
+            @click="handleDelete(item)"
+            :disabled="(item.generatedPositionsCount ?? 0) > 0"
+            :class="[
+              (item.generatedPositionsCount ?? 0) > 0
+                ? 'text-gray-400 cursor-not-allowed'
+                : 'text-red-600 hover:text-red-900'
+            ]"
+            :title="(item.generatedPositionsCount ?? 0) > 0 ? 'Excluir as posições antes de excluir a estrutura' : 'Excluir estrutura'"
+          >
+            Excluir
+          </button>
+        </td>
+      </template>
+    </DataTable>
+
+    <!-- Formulário da estrutura -->
+    <AppModal
+      v-model="showModal"
+      :title="editingStructure ? 'Editar Estrutura' : 'Nova Estrutura'"
+      @close="closeModal"
+    >
+      <form @submit.prevent="handleSubmit" class="space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <FormField id="ws-form-street-code" label="Código da Rua" required>
+            <input v-model="formData.streetCode" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          </FormField>
+          <FormField id="ws-form-warehouse" label="Armazém" required>
+            <select v-model="formData.warehouseId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+              <option v-for="warehouse in warehouses" :value="warehouse.id" :key="warehouse.id">{{ warehouse.name }}</option>
+            </select>
+          </FormField>
+        </div>
+
+        <!-- Sanitizacao inline dos campos numericos preservada como estava
+             (o modelo aceita string e so converte com Number() no submit). -->
+        <div class="grid grid-cols-3 gap-4">
+          <FormField id="ws-form-floors" label="Andares" required>
+            <input v-model="formData.floors" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.floors = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')" />
+          </FormField>
+          <FormField id="ws-form-positions" label="Posições" required>
+            <input v-model="formData.positions" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.positions = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')" />
+          </FormField>
+          <FormField id="ws-form-weight-capacity" label="Capacidade de Peso (kg)" required>
+            <input v-model="formData.weightCapacity" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.weightCapacity = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
+          </FormField>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4">
+          <FormField id="ws-form-height" label="Altura (cm)" required>
+            <input v-model="formData.height" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.height = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
+          </FormField>
+          <FormField id="ws-form-width" label="Largura (cm)" required>
+            <input v-model="formData.width" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.width = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
+          </FormField>
+          <FormField id="ws-form-depth" label="Profundidade (cm)" required>
+            <input v-model="formData.depth" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.depth = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
+          </FormField>
+        </div>
+
+        <FormField id="ws-form-max-height" label="Altura Máxima (cm)" required>
+          <input v-model="formData.maxHeight" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.maxHeight = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
+        </FormField>
+
+        <FormField id="ws-form-position-type" label="Tipo de Posição" required>
+          <select v-model="formData.positionType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <option v-for="type in positionTypes" :value="type" :key="type">{{ type }}</option>
+          </select>
+        </FormField>
+
+        <div class="flex items-center">
+          <input v-model="formData.blocked" type="checkbox" id="ws-form-blocked" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+          <label for="ws-form-blocked" class="ml-2 text-sm text-gray-700">Bloqueada</label>
+        </div>
+
+        <!-- Seção de Geração de Posições (apenas no modo de edição).
+             Precedente de seção condicional em formulário (§5.2) — fundo
+             `bg-primary-50` (era `bg-blue-50`, desvio I8). -->
+        <div v-if="editingStructure" class="border-t pt-4 mt-4">
+          <div class="bg-primary-50 p-4 rounded-lg">
+            <h4 class="text-sm font-semibold text-gray-900 mb-2">Geração de Posições</h4>
+            <p class="text-sm text-gray-600 mb-3">
+              Gere automaticamente {{ formData.floors }} andares com {{ formData.positions }} posições cada (total: {{ Number(formData.floors) * Number(formData.positions) }} posições).
+            </p>
+            <div class="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                @click="handleGeneratePositions"
+                :disabled="generatingPositions"
+                class="flex-1"
+              >
+                {{ generatingPositions ? 'Gerando...' : 'Gerar Posições' }}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                @click="handleDeletePositions"
+                :disabled="deletingPositions"
+                class="flex-1 bg-red-50 hover:bg-red-100 text-red-600"
+              >
+                {{ deletingPositions ? 'Excluindo...' : 'Excluir Posições' }}
+              </Button>
+            </div>
+            <p v-if="positionsCount !== null" class="text-sm text-gray-600 mt-2">
+              {{ positionsCount }} posições geradas atualmente
+            </p>
+          </div>
+        </div>
+
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="closeModal" class="flex-1">Cancelar</Button>
+          <Button type="submit" :disabled="saving" class="flex-1">{{ editingStructure ? 'Salvar' : 'Criar' }}</Button>
+        </div>
+      </form>
+    </AppModal>
+
+    <!-- Modal de Posições -->
+    <AppModal
+      v-model="showPositionsModal"
+      size="lg"
+      :title="`Posições - ${selectedStructure?.streetCode ?? ''}`"
+      @close="closePositionsModal"
+    >
+      <DataTable
+        :loading="loadingPositions"
+        :error="positionsError"
+        :items="storagePositions"
+        empty-title="Nenhuma posição encontrada"
+        empty-hint="Gere as posições da estrutura para vê-las aqui."
+        @retry="retryPositions"
+      >
+        <template #head>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Código</th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Andar</th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Posição</th>
+          <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+          <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+        </template>
+
+        <template #row="{ item }">
+          <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.code }}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ item.floor }}</td>
+          <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ item.position }}</td>
+          <td class="px-4 py-3 whitespace-nowrap">
+            <StatusBadge
+              :label="item.blocked ? 'Bloqueada' : 'Disponível'"
+              :tone="item.blocked ? 'danger' : 'success'"
+            />
+          </td>
+          <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2">
+            <button @click="toggleBlockPosition(item)" class="text-yellow-600 hover:text-yellow-900">
+              {{ item.blocked ? 'Desbloquear' : 'Bloquear' }}
+            </button>
+            <button @click="deletePosition(item)" class="text-red-600 hover:text-red-900">Excluir</button>
+          </td>
+        </template>
+      </DataTable>
+
+      <template #footer>
+        <div class="flex justify-between">
+          <div class="flex gap-3">
+            <Button @click="openStructureViewModal">
+              <Squares2X2Icon class="w-4 h-4 mr-2 inline" />
+              Ver Estrutura
+            </Button>
+            <Button
+              v-if="storagePositions.length > 0"
+              variant="danger"
+              @click="deleteAllPositions"
+              :disabled="deletingAllPositions"
+            >
+              <TrashIcon class="w-4 h-4 mr-2 inline" />
+              {{ deletingAllPositions ? 'Excluindo...' : 'Excluir Todas' }}
             </Button>
           </div>
+          <Button variant="outline" @click="closePositionsModal">Fechar</Button>
+        </div>
+      </template>
+    </AppModal>
+
+    <!-- Modal de Visualização de Estrutura (Grid) -->
+    <AppModal
+      v-model="showStructureViewModal"
+      size="xl"
+      :title="`Posições - ${selectedStructure?.streetCode ?? ''}`"
+      @close="closeStructureViewModal"
+    >
+      <p class="text-sm text-gray-500 mb-6">
+        {{ selectedStructure?.warehouse?.name }} | {{ selectedStructure?.floors }} andares x {{ selectedStructure?.positions }} posições
+      </p>
+
+      <!-- Legenda -->
+      <div class="mb-6 flex gap-6 justify-center">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 bg-green-200 border border-green-300 rounded"></div>
+          <span class="text-sm text-gray-700">Disponível</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 bg-red-200 border border-red-300 rounded"></div>
+          <span class="text-sm text-gray-700">Bloqueada</span>
         </div>
       </div>
-    </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="mb-6 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Estruturas de Armazém</h2>
-          <p class="mt-1 text-sm text-gray-600">Gerencie as estruturas dos armazéns do sistema</p>
-        </div>
-        <Button @click="openCreateModal">
-          <span class="mr-2">+</span>
-          Nova Estrutura
-        </Button>
-      </div>
-
-      <Card class="mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <input
-              v-model="filters.search"
-              type="text"
-              placeholder="Código da rua, nome do armazém..."
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @input="debouncedFilterChange"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Bloqueada</label>
-            <select
-              v-model="filters.blocked"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              @change="handleFilterChange"
-            >
-              <option value="">Todas</option>
-              <option value="true">Sim</option>
-              <option value="false">Não</option>
-            </select>
-          </div>
-        </div>
-      </Card>
-
-      <Card>
-        <div v-if="loading" class="text-center py-12">
-          <p class="text-gray-500">Carregando...</p>
-        </div>
-
-        <div v-else-if="structures.length === 0" class="text-center py-12">
-          <p class="text-gray-500">Nenhuma estrutura encontrada</p>
-        </div>
-
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+      <!-- Grid de Posições por Andar -->
+      <div v-for="floor in floors" :key="floor" class="mb-8">
+        <h4 class="text-center font-semibold text-gray-800 mb-3">Andar {{ floor }}</h4>
+        <div class="overflow-x-auto">
+          <table class="mx-auto border-collapse">
+            <thead>
               <tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código da Rua</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Armazém</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Andares</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Posições</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Posições Geradas</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Capacidade (kg)</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bloqueada</th>
-                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+                <th class="border-2 border-gray-300 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700">
+                  Posição
+                </th>
+                <th
+                  v-for="pos in positions"
+                  :key="pos"
+                  class="border-2 border-gray-300 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 text-center"
+                >
+                  {{ pos }}
+                </th>
               </tr>
             </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="structure in structures" :key="structure.id" class="hover:bg-gray-50">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ structure.streetCode }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ structure.warehouse?.name }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ structure.floors }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ structure.positions }}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  <span :class="(structure.generatedPositionsCount ?? 0) > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'">
-                    {{ structure.generatedPositionsCount || 0 }}
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ structure.weightCapacity }}</td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                  <span :class="structure.blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium">
-                    {{ structure.blocked ? 'Sim' : 'Não' }}
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button 
-                    v-if="(structure.generatedPositionsCount ?? 0) > 0" 
-                    @click="openPositionsModal(structure)" 
-                    class="text-blue-600 hover:text-blue-900 font-semibold"
-                  >
-                    Pos
-                  </button>
-                  <button 
-                    @click="openEditModal(structure)" 
-                    :disabled="(structure.generatedPositionsCount ?? 0) > 0"
-                    :class="[
-                      (structure.generatedPositionsCount ?? 0) > 0 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-primary-600 hover:text-primary-900'
-                    ]"
-                    :title="(structure.generatedPositionsCount ?? 0) > 0 ? 'Excluir as posições antes de editar' : 'Editar estrutura'"
-                  >
-                    Editar
-                  </button>
-                  <button 
-                    @click="handleDelete(structure)" 
-                    :disabled="(structure.generatedPositionsCount ?? 0) > 0"
-                    :class="[
-                      (structure.generatedPositionsCount ?? 0) > 0 
-                        ? 'text-gray-400 cursor-not-allowed' 
-                        : 'text-red-600 hover:text-red-900'
-                    ]"
-                    :title="(structure.generatedPositionsCount ?? 0) > 0 ? 'Excluir as posições antes de excluir a estrutura' : 'Excluir estrutura'"
-                  >
-                    Excluir
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </main>
-
-    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click="closeModal">
-      <div class="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" @click.stop>
-        <div class="p-6">
-          <div class="flex justify-between items-start mb-6">
-            <h3 class="text-2xl font-bold text-gray-900">{{ editingStructure ? 'Editar Estrutura' : 'Nova Estrutura' }}</h3>
-            <button @click="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
-          </div>
-
-          <form @submit.prevent="handleSubmit" class="space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Código da Rua *</label>
-                <input v-model="formData.streetCode" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Armazém *</label>
-                <select v-model="formData.warehouseId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                  <option v-for="warehouse in warehouses" :value="warehouse.id" :key="warehouse.id">{{ warehouse.name }}</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Andares *</label>
-                <input v-model="formData.floors" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.floors = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Posições *</label>
-                <input v-model="formData.positions" type="text" inputmode="numeric" pattern="[0-9]*" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.positions = (e.target as HTMLInputElement).value.replace(/[^0-9]/g, '')" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Capacidade de Peso (kg) *</label>
-                <input v-model="formData.weightCapacity" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.weightCapacity = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
-              </div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Altura (cm) *</label>
-                <input v-model="formData.height" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.height = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Largura (cm) *</label>
-                <input v-model="formData.width" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.width = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Profundidade (cm) *</label>
-                <input v-model="formData.depth" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.depth = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Altura Máxima (cm) *</label>
-              <input v-model="formData.maxHeight" type="text" inputmode="decimal" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @input="e => formData.maxHeight = (e.target as HTMLInputElement).value.replace(/[^0-9.]/g, '')" />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Posição *</label>
-              <select v-model="formData.positionType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-                <option v-for="type in positionTypes" :value="type" :key="type">{{ type }}</option>
-              </select>
-            </div>
-
-            <div class="flex items-center">
-              <input v-model="formData.blocked" type="checkbox" id="blocked" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
-              <label for="blocked" class="ml-2 text-sm text-gray-700">Bloqueada</label>
-            </div>
-
-            <!-- Seção de Geração de Posições (apenas no modo de edição) -->
-            <div v-if="editingStructure" class="border-t pt-4 mt-4">
-              <div class="bg-blue-50 p-4 rounded-lg">
-                <h4 class="text-sm font-semibold text-gray-900 mb-2">Geração de Posições</h4>
-                <p class="text-sm text-gray-600 mb-3">
-                  Gere automaticamente {{ formData.floors }} andares com {{ formData.positions }} posições cada (total: {{ Number(formData.floors) * Number(formData.positions) }} posições).
-                </p>
-                <div class="flex gap-2">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    @click="handleGeneratePositions"
-                    :disabled="generatingPositions"
-                    class="flex-1"
-                  >
-                    {{ generatingPositions ? 'Gerando...' : 'Gerar Posições' }}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    @click="handleDeletePositions"
-                    :disabled="deletingPositions"
-                    class="flex-1 bg-red-50 hover:bg-red-100 text-red-600"
-                  >
-                    {{ deletingPositions ? 'Excluindo...' : 'Excluir Posições' }}
-                  </Button>
-                </div>
-                <p v-if="positionsCount !== null" class="text-sm text-gray-600 mt-2">
-                  {{ positionsCount }} posições geradas atualmente
-                </p>
-              </div>
-            </div>
-
-            <div class="flex gap-3 pt-4">
-              <Button type="button" variant="outline" @click="closeModal" class="flex-1">Cancelar</Button>
-              <Button type="submit" :disabled="loading" class="flex-1">{{ editingStructure ? 'Salvar' : 'Criar' }}</Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Posições -->
-  <div v-if="showPositionsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-        <h3 class="text-xl font-semibold text-gray-900">
-          Posições - {{ selectedStructure?.streetCode }}
-        </h3>
-        <button @click="closePositionsModal" class="text-gray-400 hover:text-gray-600">
-          <XMarkIcon class="w-6 h-6" />
-        </button>
-      </div>
-
-      <div class="p-6 overflow-y-auto" style="max-height: calc(90vh - 140px);">
-        <div v-if="loadingPositions" class="text-center py-12">
-          <p class="text-gray-500">Carregando posições...</p>
-        </div>
-
-        <div v-else-if="storagePositions.length === 0" class="text-center py-12">
-          <p class="text-gray-500">Nenhuma posição encontrada</p>
-        </div>
-
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
+            <tbody>
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Andar</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Posição</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="position in storagePositions" :key="position.id" class="hover:bg-gray-50">
-                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {{ position.code }}
+                <td class="border-2 border-gray-300 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 text-center">
+                  {{ selectedStructure?.streetCode }}
                 </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                  {{ position.floor }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                  {{ position.position }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <span 
-                    :class="position.blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'" 
-                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                  >
-                    {{ position.blocked ? 'Bloqueada' : 'Disponível' }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button 
-                    @click="toggleBlockPosition(position)" 
-                    :class="position.blocked ? 'text-green-600 hover:text-green-900' : 'text-orange-600 hover:text-orange-900'"
-                  >
-                    {{ position.blocked ? 'Desbloquear' : 'Bloquear' }}
-                  </button>
-                  <button 
-                    @click="deletePosition(position)" 
-                    class="text-red-600 hover:text-red-900"
-                  >
-                    Excluir
-                  </button>
+                <td
+                  v-for="pos in positions"
+                  :key="pos"
+                  :title="getPositionInfo(floor, pos)"
+                  :class="[
+                    'border-2 border-gray-300 w-12 h-12 cursor-help transition-all hover:scale-110',
+                    isPositionBlocked(floor, pos) ? 'bg-red-200 hover:bg-red-300' : 'bg-green-200 hover:bg-green-300'
+                  ]"
+                >
+                  <!-- Conteúdo vazio, tooltip mostra info -->
                 </td>
               </tr>
             </tbody>
@@ -325,123 +336,35 @@
         </div>
       </div>
 
-      <div class="px-6 py-4 border-t border-gray-200 flex justify-between">
-        <div class="flex gap-3">
-          <Button @click="openStructureViewModal" class="bg-blue-600 hover:bg-blue-700 text-white">
-            <Squares2X2Icon class="w-4 h-4 mr-2 inline" />
-            Ver Estrutura
-          </Button>
-          <Button 
-            v-if="storagePositions.length > 0"
-            @click="deleteAllPositions" 
-            :disabled="deletingAllPositions"
-            class="bg-red-600 hover:bg-red-700 text-white"
-          >
-            <TrashIcon class="w-4 h-4 mr-2 inline" />
-            {{ deletingAllPositions ? 'Excluindo...' : 'Excluir Todas' }}
-          </Button>
-        </div>
-        <Button variant="outline" @click="closePositionsModal">Fechar</Button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal de Visualização de Estrutura (Grid) -->
-  <div v-if="showStructureViewModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-        <div>
-          <h3 class="text-xl font-semibold text-gray-900">
-            Posições - {{ selectedStructure?.streetCode }}
-          </h3>
-          <p class="text-sm text-gray-500 mt-1">
-            {{ selectedStructure?.warehouse?.name }} | {{ selectedStructure?.floors }} andares x {{ selectedStructure?.positions }} posições
-          </p>
-        </div>
-        <button @click="closeStructureViewModal" class="text-gray-400 hover:text-gray-600">
-          <XMarkIcon class="w-6 h-6" />
-        </button>
+      <div v-if="storagePositions.length === 0" class="text-center py-12">
+        <p class="text-gray-500">Nenhuma posição gerada ainda</p>
       </div>
 
-      <div class="p-6 overflow-auto" style="max-height: calc(90vh - 140px);">
-        <!-- Legenda -->
-        <div class="mb-6 flex gap-6 justify-center">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-green-200 border border-green-300 rounded"></div>
-            <span class="text-sm text-gray-700">Disponível</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-red-200 border border-red-300 rounded"></div>
-            <span class="text-sm text-gray-700">Bloqueada</span>
-          </div>
+      <template #footer>
+        <div class="flex justify-end">
+          <Button variant="outline" @click="closeStructureViewModal">Fechar</Button>
         </div>
-
-        <!-- Grid de Posições por Andar -->
-        <div v-for="floor in floors" :key="floor" class="mb-8">
-          <h4 class="text-center font-semibold text-gray-800 mb-3">Andar {{ floor }}</h4>
-          <div class="overflow-x-auto">
-            <table class="mx-auto border-collapse">
-              <thead>
-                <tr>
-                  <th class="border-2 border-gray-300 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700">
-                    Posição
-                  </th>
-                  <th 
-                    v-for="pos in positions" 
-                    :key="pos" 
-                    class="border-2 border-gray-300 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 text-center"
-                  >
-                    {{ pos }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="border-2 border-gray-300 bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 text-center">
-                    {{ selectedStructure?.streetCode }}
-                  </td>
-                  <td 
-                    v-for="pos in positions" 
-                    :key="pos"
-                    :title="getPositionInfo(floor, pos)"
-                    :class="[
-                      'border-2 border-gray-300 w-12 h-12 cursor-help transition-all hover:scale-110',
-                      isPositionBlocked(floor, pos) ? 'bg-red-200 hover:bg-red-300' : 'bg-green-200 hover:bg-green-300'
-                    ]"
-                  >
-                    <!-- Conteúdo vazio, tooltip mostra info -->
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div v-if="storagePositions.length === 0" class="text-center py-12">
-          <p class="text-gray-500">Nenhuma posição gerada ainda</p>
-        </div>
-      </div>
-
-      <div class="px-6 py-4 border-t border-gray-200 flex justify-end">
-        <Button variant="outline" @click="closeStructureViewModal">Fechar</Button>
-      </div>
-    </div>
-  </div>
+      </template>
+    </AppModal>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth.store';
 import { useWarehouseStructureStore } from '@/stores/warehouse-structure.store';
 import { useWarehouseStore } from '@/stores/warehouse.store';
 import { storagePositionService } from '@/services/storage-position.service';
+import AppLayout from '@/components/common/AppLayout.vue';
+import AppModal from '@/components/common/AppModal.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import DataTable from '@/components/common/DataTable.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 import { useDebounce } from '@/composables/useDebounce';
-import { Squares2X2Icon, TrashIcon, XMarkIcon } from '@heroicons/vue/24/outline';
+import { Squares2X2Icon, TrashIcon } from '@heroicons/vue/24/outline';
 import type {
   ApiError,
   Pagination,
@@ -451,8 +374,6 @@ import type {
   WarehouseStructureFormData,
 } from '@/types/warehouse.types';
 
-const router = useRouter();
-const authStore = useAuthStore();
 const warehouseStructureStore = useWarehouseStructureStore();
 const warehouseStore = useWarehouseStore();
 const toast = useToast();
@@ -460,6 +381,9 @@ const toast = useToast();
 const structures = ref<WarehouseStructure[]>([]);
 const warehouses = ref<Warehouse[]>([]);
 const loading = ref(false);
+// §4.4-5 / I11: erro de carregamento e um estado proprio, nunca "lista vazia".
+const error = ref('');
+const saving = ref(false);
 const showModal = ref(false);
 const editingStructure = ref<WarehouseStructure | null>(null);
 const generatingPositions = ref(false);
@@ -471,6 +395,7 @@ const showPositionsModal = ref(false);
 const selectedStructure = ref<WarehouseStructure | null>(null);
 const storagePositions = ref<StoragePosition[]>([]);
 const loadingPositions = ref(false);
+const positionsError = ref('');
 
 // Modal de visualização de estrutura (grid)
 const showStructureViewModal = ref(false);
@@ -514,9 +439,12 @@ const positionTypes = [
 const loadStructures = async () => {
   try {
     loading.value = true;
+    error.value = '';
     const result = await warehouseStructureStore.fetchStructures(pagination.value.page, pagination.value.limit, filters.value);
     structures.value = result.data;
     pagination.value = result.pagination;
+  } catch (e) {
+    error.value = (e as ApiError).response?.data?.message || 'Erro ao carregar estruturas';
   } finally {
     loading.value = false;
   }
@@ -532,6 +460,11 @@ const handleFilterChange = () => {
   loadStructures();
 };
 const debouncedFilterChange = useDebounce(handleFilterChange, 350);
+
+const changePage = (page: number) => {
+  pagination.value.page = page;
+  loadStructures();
+};
 
 const openCreateModal = () => {
   editingStructure.value = null;
@@ -560,11 +493,12 @@ const openEditModal = async (structure: WarehouseStructure) => {
   editingStructure.value = structure;
   formData.value = { ...structure } as unknown as WarehouseStructureFormData;
   showModal.value = true;
-  
+
   // Carregar contagem de posições
   await loadPositionsCount(structure.id);
 };
 
+// Esc, focus trap e devolucao de foco agora vem do AppModal (§4.2).
 const closeModal = () => {
   showModal.value = false;
   editingStructure.value = null;
@@ -583,7 +517,7 @@ const loadPositionsCount = async (structureId: string) => {
 
 const handleGeneratePositions = async () => {
   if (!editingStructure.value) return;
-  
+
   if (!(await confirmDialog(`Deseja gerar ${Number(formData.value.floors) * Number(formData.value.positions)} posições para esta estrutura?`))) {
     return;
   }
@@ -622,6 +556,7 @@ const handleDeletePositions = async () => {
 
 const handleSubmit = async () => {
   try {
+    saving.value = true;
     const submitData = {
       ...formData.value,
       floors: Number(formData.value.floors),
@@ -632,7 +567,7 @@ const handleSubmit = async () => {
       depth: Number(formData.value.depth),
       maxHeight: Number(formData.value.maxHeight),
     };
-    
+
     if (editingStructure.value) {
       await warehouseStructureStore.updateStructure(editingStructure.value.id, submitData);
       toast.success('Estrutura atualizada com sucesso!');
@@ -644,6 +579,8 @@ const handleSubmit = async () => {
     await loadStructures();
   } catch (error) {
     toast.error((error as ApiError).response?.data?.message || 'Erro ao salvar estrutura');
+  } finally {
+    saving.value = false;
   }
 };
 
@@ -664,11 +601,6 @@ const handleDelete = async (structure: WarehouseStructure) => {
   }
 };
 
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
-
 // Funções do modal de posições
 const openPositionsModal = async (structure: WarehouseStructure) => {
   selectedStructure.value = structure;
@@ -680,19 +612,28 @@ const closePositionsModal = () => {
   showPositionsModal.value = false;
   selectedStructure.value = null;
   storagePositions.value = [];
+  positionsError.value = '';
 };
 
 const loadStoragePositions = async (structureId: string) => {
   try {
     loadingPositions.value = true;
+    positionsError.value = '';
     const response = await storagePositionService.getPositions(structureId);
     storagePositions.value = response.data;
   } catch (error) {
+    // I10/I11: a falha vira estado de tela com "Tentar Novamente" em vez de
+    // um console.error mudo + toast que some.
     console.error('Erro ao carregar posições:', error);
-    toast.error('Erro ao carregar posições');
+    positionsError.value = (error as ApiError).response?.data?.message || 'Erro ao carregar posições';
   } finally {
     loadingPositions.value = false;
   }
+};
+
+const retryPositions = () => {
+  if (!selectedStructure.value) return;
+  loadStoragePositions(selectedStructure.value.id);
 };
 
 const toggleBlockPosition = async (position: StoragePosition) => {
@@ -735,11 +676,11 @@ const deletePosition = async (position: StoragePosition) => {
 // Funções do modal de visualização de estrutura
 const openStructureViewModal = () => {
   if (!selectedStructure.value) return;
-  
+
   // Gerar arrays de andares e posições
   floors.value = Array.from({ length: selectedStructure.value.floors }, (_, i) => i + 1).reverse();
   positions.value = Array.from({ length: selectedStructure.value.positions }, (_, i) => i + 1);
-  
+
   showStructureViewModal.value = true;
 };
 
@@ -750,11 +691,11 @@ const closeStructureViewModal = () => {
 const getPositionInfo = (floor: number, position: number) => {
   const code = `${selectedStructure.value?.streetCode}-${String(floor).padStart(2, '0')}-${String(position).padStart(2, '0')}`;
   const pos = storagePositions.value.find(p => p.floor === floor && p.position === position);
-  
+
   if (!pos) {
     return `${code} - Posição não gerada`;
   }
-  
+
   return `${code}\nStatus: ${pos.blocked ? 'Bloqueada' : 'Disponível'}`;
 };
 
@@ -765,7 +706,7 @@ const isPositionBlocked = (floor: number, position: number) => {
 
 const deleteAllPositions = async () => {
   if (!selectedStructure.value) return;
-  
+
   const count = storagePositions.value.length;
 
   if (!(await confirmDialog(`Deseja realmente excluir todas as ${count} posições desta estrutura?\n\nEsta ação não pode ser desfeita.`))) {
