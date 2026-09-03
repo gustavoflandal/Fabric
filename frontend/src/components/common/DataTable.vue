@@ -77,7 +77,7 @@
   </Card>
 </template>
 
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends Record<string, unknown>">
 import { ClipboardDocumentListIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
@@ -93,7 +93,7 @@ interface Props {
   loading?: boolean
   /** String vazia = sem erro. §4.4-5: os 4 estados sao distintos. */
   error?: string
-  items?: unknown[]
+  items?: T[]
   pagination?: Pagination | null
   emptyTitle?: string
   emptyHint?: string
@@ -113,8 +113,20 @@ const emit = defineEmits<{
   'change-page': [page: number]
 }>()
 
-function rowKey(item: unknown, index: number): string | number {
-  const candidate = (item as Record<string, unknown> | null)?.id
+// Genérico desde a revisão pós-Lote-1: consumidores usam `#row="{ item }"`
+// com `item` já tipado como T, sem precisar de cast manual (`asItem()`) em
+// cada view — o Lote 1 (Suppliers/Customers/Units/WorkCenters/Warehouses)
+// foi migrado antes desta mudança e ainda usa o cast; não retroagir só por
+// consistência, mas lotes novos não devem precisar dele.
+defineSlots<{
+  head(): unknown
+  row(props: { item: T; index: number }): unknown
+  'empty-icon'(): unknown
+  'empty-action'(): unknown
+}>()
+
+function rowKey(item: T, index: number): string | number {
+  const candidate = item?.id
   return typeof candidate === 'string' || typeof candidate === 'number' ? candidate : index
 }
 </script>
