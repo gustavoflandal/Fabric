@@ -1,28 +1,10 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
-      </div>
-    </header>
-
+  <!-- Esta tela e o fluxo de contagem item-a-item (uso em coletor/tablet no
+       chao de fabrica). Ao adotar o AppLayout ela passa a ficar dentro do
+       container max-w-7xl centralizado — sem efeito visual abaixo de 1280px,
+       que e a faixa de uso real, e em troca o cabecalho canonico (logo/Sair)
+       volta. Mesmo trade-off aceito no PCPDashboardView (Lote 7). -->
+  <AppLayout>
     <!-- Progress Bar -->
     <div class="bg-white border-b border-gray-200 px-4 py-3">
       <div class="flex justify-between text-sm text-gray-600 mb-2">
@@ -37,157 +19,155 @@
       </div>
     </div>
 
-    <!-- Main Content -->
-    <main class="px-4 py-6">
-      
-      <!-- Loading -->
-      <div v-if="loading" class="flex justify-center items-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+    <!-- Loading -->
+    <div v-if="loading" class="flex justify-center items-center py-12">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
 
-      <!-- Current Item -->
-      <div v-else-if="currentItem" class="space-y-4">
-        <!-- Item Info Card -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="mb-4">
-            <h2 class="text-2xl font-bold text-gray-900">{{ currentItem.product?.code }}</h2>
-            <p class="text-gray-600">{{ currentItem.product?.name }}</p>
+    <!-- Erro — antes o catch so logava no console e zerava `items`, o que caia
+         no estado "Contagem Concluida!" e mentia sobre o resultado. -->
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <p class="text-red-600">{{ error }}</p>
+      <Button class="mt-4" @click="loadSession">Tentar Novamente</Button>
+    </div>
+
+    <!-- Current Item -->
+    <div v-else-if="currentItem" class="space-y-4">
+      <!-- Item Info Card -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="mb-4">
+          <h2 class="text-2xl font-bold text-gray-900">{{ currentItem.product?.code }}</h2>
+          <p class="text-gray-600">{{ currentItem.product?.name }}</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <p class="text-sm text-gray-600">Localização</p>
+            <p class="font-semibold">{{ currentItem.location?.code }}</p>
           </div>
-
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <p class="text-sm text-gray-600">Localização</p>
-              <p class="font-semibold">{{ currentItem.location?.code }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-600">Qtd. Sistema</p>
-              <p class="font-semibold text-blue-600">{{ currentItem.systemQty }}</p>
-            </div>
+          <div>
+            <p class="text-sm text-gray-600">Qtd. Sistema</p>
+            <p class="font-semibold text-blue-600">{{ currentItem.systemQty }}</p>
           </div>
+        </div>
 
-          <!-- Count Input -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Quantidade Contada
-            </label>
-            <input
-              v-model.number="countedQty"
-              type="number"
-              min="0"
-              step="0.01"
-              class="w-full text-2xl text-center border-2 border-blue-600 rounded-lg py-3 font-bold"
-              placeholder="0"
-              autofocus
-            />
+        <!-- Count Input -->
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Quantidade Contada
+          </label>
+          <input
+            v-model.number="countedQty"
+            type="number"
+            min="0"
+            step="0.01"
+            class="w-full text-2xl text-center border-2 border-blue-600 rounded-lg py-3 font-bold"
+            placeholder="0"
+            autofocus
+          />
+        </div>
+
+        <!-- Difference Alert -->
+        <div v-if="countedQty !== null && countedQty !== currentItem.systemQty" class="mb-4">
+          <div :class="[
+            'p-4 rounded-lg',
+            countedQty < currentItem.systemQty ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'
+          ]">
+            <p class="text-sm font-medium" :class="countedQty < currentItem.systemQty ? 'text-red-800' : 'text-yellow-800'">
+              Divergência: {{ countedQty - currentItem.systemQty > 0 ? '+' : '' }}{{ countedQty - currentItem.systemQty }}
+              ({{ ((countedQty - currentItem.systemQty) / currentItem.systemQty * 100).toFixed(1) }}%)
+            </p>
           </div>
+        </div>
 
-          <!-- Difference Alert -->
-          <div v-if="countedQty !== null && countedQty !== currentItem.systemQty" class="mb-4">
-            <div :class="[
-              'p-4 rounded-lg',
-              countedQty < currentItem.systemQty ? 'bg-red-50 border border-red-200' : 'bg-yellow-50 border border-yellow-200'
-            ]">
-              <p class="text-sm font-medium" :class="countedQty < currentItem.systemQty ? 'text-red-800' : 'text-yellow-800'">
-                Divergência: {{ countedQty - currentItem.systemQty > 0 ? '+' : '' }}{{ countedQty - currentItem.systemQty }}
-                ({{ ((countedQty - currentItem.systemQty) / currentItem.systemQty * 100).toFixed(1) }}%)
-              </p>
-            </div>
-          </div>
-
-          <!-- Notes -->
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Observações (opcional)
-            </label>
+        <!-- Notes -->
+        <div class="mb-4">
+          <FormField id="counting-execute-notes" label="Observações (opcional)">
             <textarea
               v-model="notes"
               rows="3"
               class="w-full border-gray-300 rounded-md shadow-sm"
               placeholder="Adicione observações sobre a contagem..."
             ></textarea>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex space-x-3">
-            <button
-              @click="skipItem"
-              class="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-            >
-              Pular
-            </button>
-            <button
-              @click="submitCount"
-              :disabled="countedQty === null"
-              class="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
-              Confirmar
-            </button>
-          </div>
+          </FormField>
         </div>
 
-        <!-- Quick Actions -->
-        <div class="grid grid-cols-3 gap-3">
+        <!-- Actions -->
+        <div class="flex space-x-3">
           <button
-            @click="countedQty = 0"
-            class="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            @click="skipItem"
+            class="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
           >
-            Zero
+            Pular
           </button>
           <button
-            @click="countedQty = currentItem.systemQty"
-            class="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            @click="submitCount"
+            :disabled="countedQty === null"
+            class="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            Sistema
-          </button>
-          <button
-            @click="countedQty = null"
-            class="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            Limpar
+            Confirmar
           </button>
         </div>
       </div>
 
-      <!-- Completed -->
-      <div v-else-if="!loading" class="text-center py-12">
-        <svg class="mx-auto h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h3 class="mt-4 text-lg font-medium text-gray-900">Contagem Concluída!</h3>
-        <p class="mt-2 text-sm text-gray-600">Todos os itens foram contados.</p>
-        <div class="mt-6 space-x-3">
-          <button
-            @click="completeSession"
-            class="px-6 py-3 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
-          >
-            Finalizar Sessão
-          </button>
-        </div>
+      <!-- Quick Actions -->
+      <div class="grid grid-cols-3 gap-3">
+        <button
+          @click="countedQty = 0"
+          class="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Zero
+        </button>
+        <button
+          @click="countedQty = currentItem.systemQty"
+          class="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Sistema
+        </button>
+        <button
+          @click="countedQty = null"
+          class="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Limpar
+        </button>
       </div>
-    </main>
-  </div>
+    </div>
+
+    <!-- Completed -->
+    <div v-else-if="!loading && !error" class="text-center py-12">
+      <svg class="mx-auto h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <h3 class="mt-4 text-lg font-medium text-gray-900">Contagem Concluída!</h3>
+      <p class="mt-2 text-sm text-gray-600">Todos os itens foram contados.</p>
+      <div class="mt-6 space-x-3">
+        <button
+          @click="completeSession"
+          class="px-6 py-3 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700"
+        >
+          Finalizar Sessão
+        </button>
+      </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useCountingStore } from '@/stores/counting.store';
-import { useAuthStore } from '@/stores/auth.store';
+import AppLayout from '@/components/common/AppLayout.vue';
 import Button from '@/components/common/Button.vue';
+import FormField from '@/components/common/FormField.vue';
 import { useToast } from '@/composables/useToast';
 
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 const countingStore = useCountingStore();
-const authStore = useAuthStore();
-
-const handleLogout = () => {
-  authStore.logout();
-  router.push('/login');
-};
 
 const loading = ref(false);
+const error = ref('');
 const session = ref<any>(null);
 const items = ref<any[]>([]);
 const currentIndex = ref(0);
@@ -206,6 +186,7 @@ onMounted(async () => {
 const loadSession = async () => {
   try {
     loading.value = true;
+    error.value = '';
     const sessionId = route.params.id as string;
     session.value = await countingStore.fetchSession(sessionId);
     await countingStore.fetchItems({ sessionId });
@@ -218,8 +199,9 @@ const loadSession = async () => {
     if (pendingIndex >= 0) {
       currentIndex.value = pendingIndex;
     }
-  } catch (error) {
-    console.error('Erro ao carregar sessão:', error);
+  } catch (err: any) {
+    console.error('Erro ao carregar sessão:', err);
+    error.value = err.response?.data?.message || err.message || 'Erro ao carregar sessão';
     items.value = []; // Garantir que items nunca seja undefined
   } finally {
     loading.value = false;
@@ -237,8 +219,8 @@ const submitCount = async () => {
 
     // Move to next pending item
     nextItem();
-  } catch (error) {
-    console.error('Erro ao registrar contagem:', error);
+  } catch (err) {
+    console.error('Erro ao registrar contagem:', err);
     toast.error('Erro ao registrar contagem. Tente novamente.');
   }
 };
@@ -265,8 +247,8 @@ const completeSession = async () => {
   try {
     await countingStore.completeSession(route.params.id as string);
     router.push(`/counting/sessions/${route.params.id}/report`);
-  } catch (error) {
-    console.error('Erro ao finalizar sessão:', error);
+  } catch (err) {
+    console.error('Erro ao finalizar sessão:', err);
     toast.error('Erro ao finalizar sessão. Tente novamente.');
   }
 };

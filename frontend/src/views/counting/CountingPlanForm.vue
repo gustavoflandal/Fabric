@@ -1,52 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Header -->
-      <div class="mb-8">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">
-            {{ isEditing ? 'Editar Plano' : 'Novo Plano de Contagem' }}
-          </h2>
-          <p class="mt-2 text-sm text-gray-600">
-            {{ isEditing ? 'Atualize as informações do plano' : 'Crie um novo plano de contagem de estoque' }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Form -->
-      <form @submit.prevent="handleSubmit" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+  <AppLayout
+    :title="isEditing ? 'Editar Plano' : 'Novo Plano de Contagem'"
+    :subtitle="isEditing ? 'Atualize as informações do plano' : 'Crie um novo plano de contagem de estoque'"
+  >
+    <!-- Form — o Card ja fornece bg/borda/sombra e o padding px-6 py-4. -->
+    <Card>
+      <form @submit.prevent="handleSubmit">
         <!-- Informações Básicas -->
         <div class="mb-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Código <span class="text-red-500">*</span>
-              </label>
+            <FormField id="counting-plan-code" label="Código" required>
               <input
                 v-model="form.code"
                 type="text"
@@ -54,11 +18,8 @@
                 class="w-full border-gray-300 rounded-md shadow-sm"
                 placeholder="Ex: CONT-001"
               />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Nome <span class="text-red-500">*</span>
-              </label>
+            </FormField>
+            <FormField id="counting-plan-name" label="Nome" required>
               <input
                 v-model="form.name"
                 type="text"
@@ -66,7 +27,7 @@
                 class="w-full border-gray-300 rounded-md shadow-sm"
                 placeholder="Ex: Contagem Mensal"
               />
-            </div>
+            </FormField>
           </div>
         </div>
 
@@ -74,10 +35,7 @@
         <div class="mb-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Configurações</h3>
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Tipo <span class="text-red-500">*</span>
-              </label>
+            <FormField id="counting-plan-type" label="Tipo" required>
               <select v-model="form.type" required class="w-full border-gray-300 rounded-md shadow-sm">
                 <option value="">Selecione...</option>
                 <option value="FULL_INVENTORY">Contagem Completa</option>
@@ -85,11 +43,8 @@
                 <option value="CYCLIC">Contagem Cíclica</option>
                 <option value="BLIND">Contagem Cega</option>
               </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Frequência <span class="text-red-500">*</span>
-              </label>
+            </FormField>
+            <FormField id="counting-plan-frequency" label="Frequência" required>
               <select v-model="form.frequency" required class="w-full border-gray-300 rounded-md shadow-sm">
                 <option value="">Selecione...</option>
                 <option value="DAILY">Diária</option>
@@ -98,17 +53,14 @@
                 <option value="QUARTERLY">Trimestral</option>
                 <option value="YEARLY">Anual</option>
               </select>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Prioridade <span class="text-red-500">*</span>
-              </label>
+            </FormField>
+            <FormField id="counting-plan-priority" label="Prioridade" required>
               <select v-model.number="form.priority" required class="w-full border-gray-300 rounded-md shadow-sm">
                 <option :value="1">1 - Baixa</option>
                 <option :value="5">5 - Média</option>
                 <option :value="10">10 - Alta</option>
               </select>
-            </div>
+            </FormField>
           </div>
         </div>
 
@@ -116,41 +68,34 @@
         <div class="mb-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Agendamento</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Data de Início <span class="text-red-500">*</span>
-              </label>
+            <FormField id="counting-plan-start-date" label="Data de Início" required>
               <input
                 v-model="form.startDate"
                 type="date"
                 required
                 class="w-full border-gray-300 rounded-md shadow-sm"
               />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Data de Término
-              </label>
+            </FormField>
+            <FormField id="counting-plan-end-date" label="Data de Término">
               <input
                 v-model="form.endDate"
                 type="date"
                 class="w-full border-gray-300 rounded-md shadow-sm"
               />
-            </div>
+            </FormField>
           </div>
         </div>
 
         <!-- Descrição -->
         <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-1">
-            Descrição
-          </label>
-          <textarea
-            v-model="form.description"
-            rows="3"
-            class="w-full border-gray-300 rounded-md shadow-sm"
-            placeholder="Descreva o objetivo e detalhes do plano..."
-          ></textarea>
+          <FormField id="counting-plan-description" label="Descrição">
+            <textarea
+              v-model="form.description"
+              rows="3"
+              class="w-full border-gray-300 rounded-md shadow-sm"
+              placeholder="Descreva o objetivo e detalhes do plano..."
+            ></textarea>
+          </FormField>
         </div>
 
         <!-- Status Control (apenas em edição) -->
@@ -168,20 +113,16 @@
                 {{ isPaused ? 'Plano pausado' : 'Pausar plano' }}
               </span>
               <p class="text-xs text-gray-500 mt-1">
-                {{ isPaused 
-                  ? 'Desmarque para reativar o plano de contagem' 
-                  : 'Marque para pausar temporariamente o plano de contagem' 
+                {{ isPaused
+                  ? 'Desmarque para reativar o plano de contagem'
+                  : 'Marque para pausar temporariamente o plano de contagem'
                 }}
               </p>
             </label>
-            <span
-              :class="[
-                'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                isPaused ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-              ]"
-            >
-              {{ isPaused ? 'Pausado' : 'Ativo' }}
-            </span>
+            <StatusBadge
+              :label="isPaused ? 'Pausado' : 'Ativo'"
+              :tone="isPaused ? 'warning' : 'success'"
+            />
           </div>
         </div>
 
@@ -264,8 +205,8 @@
           </div>
         </div>
       </form>
-    </main>
-    
+    </Card>
+
     <!-- Product Selector Modal -->
     <ProductSelectorModal
       :is-open="showProductModal"
@@ -273,7 +214,7 @@
       @close="showProductModal = false"
       @select="handleProductsSelected"
     />
-  </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
@@ -281,7 +222,10 @@ import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useCountingStore } from '@/stores/counting.store';
 import { useAuthStore } from '@/stores/auth.store';
-import Button from '@/components/common/Button.vue';
+import AppLayout from '@/components/common/AppLayout.vue';
+import Card from '@/components/common/Card.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
 import ProductSelectorModal from '@/components/counting/ProductSelectorModal.vue';
 import axios from 'axios';
 import jsPDF from 'jspdf';
@@ -293,11 +237,6 @@ const route = useRoute();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
 const toast = useToast();
-
-const handleLogout = () => {
-  authStore.logout();
-  router.push('/login');
-};
 
 const loading = ref(false);
 const isEditing = ref(false);
