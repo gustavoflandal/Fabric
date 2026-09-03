@@ -1,99 +1,69 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
+  <!-- O header antigo tinha apenas o link "Início" — que ja e o fallback padrao do
+       slot #nav do AppLayout — entao o slot nao precisa ser sobrescrito aqui. -->
+  <AppLayout
+    title="Notificações"
+    subtitle="Gerencie todas as suas notificações do sistema"
+  >
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Críticas</p>
+            <p class="text-3xl font-bold text-red-600 mt-2">{{ priorityCounts.critical }}</p>
           </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-gray-900">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <button
-              @click="handleLogout"
-              class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Sair
-            </button>
-          </div>
-        </div>
-      </div>
-    </header>
-
-    <!-- Main Content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Page Title -->
-      <div class="mb-8">
-        <h2 class="text-3xl font-bold text-gray-900">Notificações</h2>
-        <p class="mt-2 text-sm text-gray-600">
-          Gerencie todas as suas notificações do sistema
-        </p>
-      </div>
-
-      <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Críticas</p>
-              <p class="text-3xl font-bold text-red-600 mt-2">{{ priorityCounts.critical }}</p>
-            </div>
-            <div class="p-3 bg-red-100 rounded-full">
-              <span class="text-2xl">🔴</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Altas</p>
-              <p class="text-3xl font-bold text-orange-600 mt-2">{{ priorityCounts.high }}</p>
-            </div>
-            <div class="p-3 bg-orange-100 rounded-full">
-              <span class="text-2xl">⚠️</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Não Lidas</p>
-              <p class="text-3xl font-bold text-blue-600 mt-2">{{ unreadCount }}</p>
-            </div>
-            <div class="p-3 bg-blue-100 rounded-full">
-              <span class="text-2xl">📬</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-medium text-gray-600">Total</p>
-              <p class="text-3xl font-bold text-gray-600 mt-2">{{ pagination.total }}</p>
-            </div>
-            <div class="p-3 bg-gray-100 rounded-full">
-              <span class="text-2xl">📋</span>
-            </div>
+          <div class="p-3 bg-red-100 rounded-full">
+            <span class="text-2xl">🔴</span>
           </div>
         </div>
       </div>
 
-      <!-- Filters and Actions -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <!-- Filters -->
-          <div class="flex flex-wrap gap-4">
-            <!-- Category Filter -->
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Altas</p>
+            <p class="text-3xl font-bold text-orange-600 mt-2">{{ priorityCounts.high }}</p>
+          </div>
+          <div class="p-3 bg-orange-100 rounded-full">
+            <span class="text-2xl">⚠️</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Não Lidas</p>
+            <p class="text-3xl font-bold text-blue-600 mt-2">{{ unreadCount }}</p>
+          </div>
+          <div class="p-3 bg-blue-100 rounded-full">
+            <span class="text-2xl">📬</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-600">Total</p>
+            <p class="text-3xl font-bold text-gray-600 mt-2">{{ pagination.total }}</p>
+          </div>
+          <div class="p-3 bg-gray-100 rounded-full">
+            <span class="text-2xl">📋</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters and Actions — caixa de filtros passa a usar o Card compartilhado e
+         cada select ganha rotulo real via FormField. -->
+    <Card class="mb-6">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-4">
+          <!-- Category Filter -->
+          <FormField id="notifications-filter-category" label="Categoria">
             <select
               v-model="filters.category"
               @change="applyFilters"
@@ -106,8 +76,10 @@
               <option value="QUALITY">Qualidade</option>
               <option value="CAPACITY">Capacidade</option>
             </select>
+          </FormField>
 
-            <!-- Priority Filter -->
+          <!-- Priority Filter -->
+          <FormField id="notifications-filter-priority" label="Prioridade">
             <select
               v-model="filters.priority"
               @change="applyFilters"
@@ -119,8 +91,10 @@
               <option value="2">📊 Médias</option>
               <option value="1">📋 Baixas</option>
             </select>
+          </FormField>
 
-            <!-- Read Filter -->
+          <!-- Read Filter -->
+          <FormField id="notifications-filter-read" label="Lida">
             <select
               v-model="filters.read"
               @change="applyFilters"
@@ -130,169 +104,177 @@
               <option value="false">Não Lidas</option>
               <option value="true">Lidas</option>
             </select>
-          </div>
+          </FormField>
+        </div>
 
-          <!-- Actions -->
-          <div class="flex gap-2">
-            <button
-              v-if="unreadCount > 0"
-              @click="markAllAsRead"
-              class="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-600 hover:border-blue-800 rounded-lg transition-colors"
-            >
-              Marcar todas como lidas
-            </button>
-            <button
-              @click="refreshNotifications"
-              class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 hover:border-gray-400 rounded-lg transition-colors"
-            >
-              🔄 Atualizar
-            </button>
-          </div>
+        <!-- Actions -->
+        <div class="flex gap-2">
+          <button
+            v-if="unreadCount > 0"
+            @click="markAllAsRead"
+            class="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-600 hover:border-blue-800 rounded-lg transition-colors"
+          >
+            Marcar todas como lidas
+          </button>
+          <button
+            @click="refreshNotifications"
+            class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 hover:border-gray-400 rounded-lg transition-colors"
+          >
+            🔄 Atualizar
+          </button>
         </div>
       </div>
+    </Card>
 
-      <!-- Notifications List -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200">
-        <!-- Loading State -->
-        <div v-if="loading" class="p-12 text-center">
-          <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p class="mt-4 text-gray-600">Carregando notificações...</p>
-        </div>
+    <!-- Notifications List -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+      <!-- Loading State -->
+      <div v-if="loading" class="p-12 text-center">
+        <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p class="mt-4 text-gray-600">Carregando notificações...</p>
+      </div>
 
-        <!-- Empty State -->
-        <div v-else-if="notifications.length === 0" class="p-12 text-center">
-          <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <p class="mt-4 text-lg font-medium text-gray-900">Nenhuma notificação encontrada</p>
-          <p class="mt-2 text-sm text-gray-500">Tente ajustar os filtros ou aguarde novos eventos</p>
-        </div>
+      <!-- Error State — antes um load com falha ficava indistinguivel de "sem
+           notificacoes"; mesma ordem de estados do DataTable (loading/erro/vazio/dados). -->
+      <div v-else-if="error" class="m-6 bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+        <p class="text-red-600">{{ error }}</p>
+        <Button class="mt-4" @click="fetchNotifications">Tentar Novamente</Button>
+      </div>
 
-        <!-- Notifications -->
-        <div v-else class="divide-y divide-gray-200">
-          <div
-            v-for="notification in notifications"
-            :key="notification.id"
-            class="p-6 hover:bg-gray-50 transition-colors"
-            :class="{ 'bg-blue-50': !notification.read }"
-          >
-            <div class="flex items-start">
-              <!-- Icon -->
-              <div class="flex-shrink-0 mt-1">
-                <span
-                  class="inline-flex items-center justify-center h-10 w-10 rounded-full"
-                  :class="getIconClass(notification)"
-                >
-                  {{ getIcon(notification) }}
-                </span>
-              </div>
+      <!-- Empty State -->
+      <div v-else-if="notifications.length === 0" class="p-12 text-center">
+        <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+        <p class="mt-4 text-lg font-medium text-gray-900">Nenhuma notificação encontrada</p>
+        <p class="mt-2 text-sm text-gray-500">Tente ajustar os filtros ou aguarde novos eventos</p>
+      </div>
 
-              <!-- Content -->
-              <div class="ml-4 flex-1 min-w-0">
-                <div class="flex items-start justify-between">
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                      <h3 class="text-base font-semibold text-gray-900">
-                        {{ notification.title }}
-                      </h3>
-                      <span
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                        :class="getCategoryClass(notification.category)"
-                      >
-                        {{ getCategoryLabel(notification.category) }}
-                      </span>
-                    </div>
-                    <p class="mt-1 text-sm text-gray-600">
-                      {{ notification.message }}
-                    </p>
-                    <div class="mt-2 flex items-center gap-4 text-xs text-gray-500">
-                      <span>{{ formatTimeAgo(notification.createdAt) }}</span>
-                      <span v-if="notification.read" class="text-green-600">✓ Lida</span>
-                    </div>
-                  </div>
+      <!-- Notifications -->
+      <div v-else class="divide-y divide-gray-200">
+        <div
+          v-for="notification in notifications"
+          :key="notification.id"
+          class="p-6 hover:bg-gray-50 transition-colors"
+          :class="{ 'bg-blue-50': !notification.read }"
+        >
+          <div class="flex items-start">
+            <!-- Icon -->
+            <div class="flex-shrink-0 mt-1">
+              <span
+                class="inline-flex items-center justify-center h-10 w-10 rounded-full"
+                :class="getIconClass(notification)"
+              >
+                {{ getIcon(notification) }}
+              </span>
+            </div>
 
-                  <!-- Actions -->
-                  <div class="ml-4 flex-shrink-0 flex items-center gap-2">
-                    <button
-                      v-if="!notification.read"
-                      @click.stop="markAsRead(notification.id)"
-                      class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                      title="Marcar como lida"
+            <!-- Content -->
+            <div class="ml-4 flex-1 min-w-0">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-semibold text-gray-900">
+                      {{ notification.title }}
+                    </h3>
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                      :class="getCategoryClass(notification.category)"
                     >
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </button>
-                    <button
-                      @click.stop="archiveNotification(notification.id)"
-                      class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                      title="Arquivar"
-                    >
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                      </svg>
-                    </button>
+                      {{ getCategoryLabel(notification.category) }}
+                    </span>
                   </div>
+                  <p class="mt-1 text-sm text-gray-600">
+                    {{ notification.message }}
+                  </p>
+                  <div class="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                    <span>{{ formatTimeAgo(notification.createdAt) }}</span>
+                    <span v-if="notification.read" class="text-green-600">✓ Lida</span>
+                  </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="ml-4 flex-shrink-0 flex items-center gap-2">
+                  <button
+                    v-if="!notification.read"
+                    @click.stop="markAsRead(notification.id)"
+                    class="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                    title="Marcar como lida"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button
+                    @click.stop="archiveNotification(notification.id)"
+                    class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                    title="Arquivar"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Pagination -->
-        <div v-if="pagination.totalPages > 1" class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div class="flex items-center justify-between">
-            <div class="text-sm text-gray-600">
-              Mostrando {{ (pagination.page - 1) * pagination.limit + 1 }} a 
-              {{ Math.min(pagination.page * pagination.limit, pagination.total) }} de 
-              {{ pagination.total }} notificações
-            </div>
-            <div class="flex gap-2">
-              <button
-                @click="goToPage(pagination.page - 1)"
-                :disabled="pagination.page === 1"
-                class="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-              >
-                Anterior
-              </button>
-              <button
-                v-for="page in visiblePages"
-                :key="page"
-                @click="goToPage(page)"
-                class="px-4 py-2 text-sm font-medium border rounded-lg transition-colors"
-                :class="page === pagination.page 
-                  ? 'bg-blue-600 text-white border-blue-600' 
-                  : 'border-gray-300 hover:bg-gray-100'"
-              >
-                {{ page }}
-              </button>
-              <button
-                @click="goToPage(pagination.page + 1)"
-                :disabled="pagination.page === pagination.totalPages"
-                class="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
-              >
-                Próxima
-              </button>
-            </div>
+      <!-- Pagination -->
+      <div v-if="pagination.totalPages > 1" class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div class="flex items-center justify-between">
+          <div class="text-sm text-gray-600">
+            Mostrando {{ (pagination.page - 1) * pagination.limit + 1 }} a 
+            {{ Math.min(pagination.page * pagination.limit, pagination.total) }} de 
+            {{ pagination.total }} notificações
+          </div>
+          <div class="flex gap-2">
+            <button
+              @click="goToPage(pagination.page - 1)"
+              :disabled="pagination.page === 1"
+              class="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            >
+              Anterior
+            </button>
+            <button
+              v-for="page in visiblePages"
+              :key="page"
+              @click="goToPage(page)"
+              class="px-4 py-2 text-sm font-medium border rounded-lg transition-colors"
+              :class="page === pagination.page 
+                ? 'bg-blue-600 text-white border-blue-600' 
+                : 'border-gray-300 hover:bg-gray-100'"
+            >
+              {{ page }}
+            </button>
+            <button
+              @click="goToPage(pagination.page + 1)"
+              :disabled="pagination.page === pagination.totalPages"
+              class="px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            >
+              Próxima
+            </button>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
 import { useNotificationStore } from '@/stores/notification.store';
-import { useAuthStore } from '@/stores/auth.store';
+import AppLayout from '@/components/common/AppLayout.vue';
+import Button from '@/components/common/Button.vue';
+import Card from '@/components/common/Card.vue';
+import FormField from '@/components/common/FormField.vue';
 import type { Notification } from '@/services/notification.service';
 
-const router = useRouter();
 const notificationStore = useNotificationStore();
-const authStore = useAuthStore();
 
 const loading = ref(false);
+const error = ref('');
 const notifications = ref<Notification[]>([]);
 const pagination = ref({
   page: 1,
@@ -327,7 +309,8 @@ const visiblePages = computed(() => {
 
 const fetchNotifications = async () => {
   loading.value = true;
-  
+  error.value = '';
+
   try {
     const filterParams: any = {};
     
@@ -343,8 +326,9 @@ const fetchNotifications = async () => {
     
     notifications.value = result.data;
     pagination.value = result.pagination;
-  } catch (error) {
-    console.error('Erro ao carregar notificações:', error);
+  } catch (e: any) {
+    error.value = e.response?.data?.message || e.message || 'Erro ao carregar notificações';
+    console.error('Erro ao carregar notificações:', e);
   } finally {
     loading.value = false;
   }
@@ -449,11 +433,6 @@ const formatTimeAgo = (dateString: string) => {
   if (diffInSeconds < 3600) return `há ${Math.floor(diffInSeconds / 60)} minutos`;
   if (diffInSeconds < 86400) return `há ${Math.floor(diffInSeconds / 3600)} horas`;
   return `há ${Math.floor(diffInSeconds / 86400)} dias`;
-};
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
 };
 
 onMounted(async () => {
