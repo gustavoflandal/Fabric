@@ -1,5 +1,5 @@
 <template>
-  <AppLayout title="Planos de Contagem" subtitle="Gerencie os planos de contagem de estoque">
+  <AppLayout title="Planos de Inventário" subtitle="Gerencie os planos de inventário de estoque">
     <template #actions>
       <RouterLink
         to="/counting/plans/new"
@@ -58,7 +58,7 @@
       :error="error"
       :items="plans"
       empty-title="Nenhum plano encontrado"
-      empty-hint="Comece criando um novo plano de contagem."
+      empty-hint="Comece criando um novo plano de inventário."
       @retry="loadPlans"
     >
       <template #head>
@@ -206,7 +206,7 @@ const pausePlan = async (id: string) => {
 };
 
 const deletePlan = async (id: string) => {
-  if (!(await confirmDialog('Tem certeza que deseja excluir este plano de contagem?'))) {
+  if (!(await confirmDialog('Tem certeza que deseja excluir este plano de inventário?'))) {
     return;
   }
 

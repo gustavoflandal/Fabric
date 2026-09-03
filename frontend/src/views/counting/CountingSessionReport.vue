@@ -1,6 +1,6 @@
 <template>
   <AppLayout
-    title="Relatório de Contagem"
+    title="Relatório de Inventário"
     :subtitle="reportSubtitle"
   >
     <template #actions>

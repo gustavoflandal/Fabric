@@ -283,8 +283,8 @@ const getResourceLabel = (resource: string) => {
     purchases: 'Compras',
     
     // WMS
-    counting: 'Contagem de Estoque',
-    'counting.plans': 'Planos de Contagem',
+    counting: 'Inventário',
+    'counting.plans': 'Planos de Inventário',
     warehouse_receipts: 'Recebimento de Mercadorias',
     warehouse_locations: 'Localizações do Armazém',
     warehouse_transfers: 'Transferências Internas',
@@ -338,8 +338,8 @@ const getActionLabel = (action: string) => {
     view: 'Visualizar Dashboard',
     
     // Contagem de Estoque
-    create_plan: 'Criar Planos de Contagem',
-    execute_counting: 'Executar Contagem',
+    create_plan: 'Criar Planos de Inventário',
+    execute_counting: 'Executar Inventário',
     approve_adjustments: 'Aprovar Ajustes',
     
     // Estruturas de Armazém

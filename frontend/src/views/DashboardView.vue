@@ -242,7 +242,7 @@
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>
-                <p class="text-sm font-medium text-gray-700">Contagem de Estoque</p>
+                <p class="text-sm font-medium text-gray-700">Inventário</p>
               </div>
             </RouterLink>
             <RouterLink
