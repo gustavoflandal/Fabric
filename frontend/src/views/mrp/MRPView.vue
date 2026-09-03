@@ -1,41 +1,26 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <AppLayout title="MRP - Planejamento de Materiais" subtitle="Cálculo de necessidades de materiais">
+    <template #actions>
+      <Button :disabled="loading" @click="handleExecuteAll">🔄 Executar MRP Completo</Button>
+    </template>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="mb-6 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">MRP - Planejamento de Materiais</h2>
-          <p class="mt-1 text-sm text-gray-600">
-            Cálculo de necessidades de materiais
-          </p>
-        </div>
-        <Button @click="handleExecuteAll" :disabled="loading">
-          🔄 Executar MRP Completo
-        </Button>
-      </div>
+    <!-- Carregando — mesma linguagem visual do spinner do DataTable/PCPDashboardView
+         (§4.2 variante C). Antes `loading` só desabilitava o botão: a área de
+         conteúdo ficava vazia, sem explicação nenhuma. -->
+    <div v-if="loading" class="text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <p class="mt-4 text-gray-600">Carregando dados do MRP...</p>
+    </div>
 
+    <!-- Erro — faixa canônica de PCPDashboardView.vue:12-15 / DataTable (I11).
+         Antes uma falha caía num `console.error` mudo e a página ficava sem os
+         cards (`v-if="summary"`), como se não houvesse dado nenhum. -->
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <p class="text-red-600">{{ error }}</p>
+      <Button class="mt-4" @click="loadData">Tentar Novamente</Button>
+    </div>
+
+    <div v-else>
       <!-- Summary Cards -->
       <div v-if="summary" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         <Card>
@@ -73,24 +58,24 @@
         <div class="border-b border-gray-200">
           <nav class="-mb-px flex space-x-8">
             <button
-              @click="activeTab = 'suggestions'"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm',
                 activeTab === 'suggestions'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
+              @click="activeTab = 'suggestions'"
             >
               Sugestões
             </button>
             <button
-              @click="activeTab = 'results'"
               :class="[
                 'py-4 px-1 border-b-2 font-medium text-sm',
                 activeTab === 'results'
                   ? 'border-primary-500 text-primary-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               ]"
+              @click="activeTab = 'results'"
             >
               Resultados Detalhados
             </button>
@@ -117,18 +102,10 @@
                     <p class="font-semibold text-gray-900">{{ suggestion.product.code }}</p>
                     <p class="text-sm text-gray-600">{{ suggestion.product.name }}</p>
                   </div>
-                  <span
-                    :class="[
-                      'px-2 py-1 text-xs font-semibold rounded',
-                      suggestion.priority === 'HIGH'
-                        ? 'bg-red-100 text-red-800'
-                        : suggestion.priority === 'MEDIUM'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    ]"
-                  >
-                    {{ suggestion.priority }}
-                  </span>
+                  <StatusBadge
+                    :label="getPriorityLabel(suggestion.priority)"
+                    :tone="getPriorityTone(suggestion.priority)"
+                  />
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-sm">
                   <div>
@@ -164,18 +141,10 @@
                     <p class="font-semibold text-gray-900">{{ suggestion.product.code }}</p>
                     <p class="text-sm text-gray-600">{{ suggestion.product.name }}</p>
                   </div>
-                  <span
-                    :class="[
-                      'px-2 py-1 text-xs font-semibold rounded',
-                      suggestion.priority === 'HIGH'
-                        ? 'bg-red-100 text-red-800'
-                        : suggestion.priority === 'MEDIUM'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-green-100 text-green-800'
-                    ]"
-                  >
-                    {{ suggestion.priority }}
-                  </span>
+                  <StatusBadge
+                    :label="getPriorityLabel(suggestion.priority)"
+                    :tone="getPriorityTone(suggestion.priority)"
+                  />
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-sm">
                   <div>
@@ -213,8 +182,8 @@
                 <div>
                   <h3 class="text-lg font-bold text-gray-900">{{ result.orderNumber }}</h3>
                   <p class="text-sm text-gray-600">
-                    {{ result.totalItems }} itens | 
-                    {{ result.itemsToBuy }} para comprar | 
+                    {{ result.totalItems }} itens |
+                    {{ result.itemsToBuy }} para comprar |
                     {{ result.itemsToProduce }} para produzir
                   </p>
                 </div>
@@ -223,16 +192,22 @@
                 </span>
               </div>
 
+              <!-- Tabela de requisitos: tabela simples, não DataTable. Ela vive
+                   dentro de um resultado já carregado com a página, então
+                   carregando/erro/vazio próprios não existem aqui — os 3 estados
+                   são da página inteira, tratados nos blocos acima. Mesmo
+                   raciocínio da tabela de itens do modal de PurchaseOrdersView
+                   (Lote 4). -->
               <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                   <thead class="bg-gray-50">
                     <tr>
-                      <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Necessário</th>
-                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Disponível</th>
-                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Em Pedido</th>
-                      <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Necessidade Líquida</th>
-                      <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ação</th>
+                      <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                      <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Necessário</th>
+                      <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Disponível</th>
+                      <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Em Pedido</th>
+                      <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Necessidade Líquida</th>
+                      <th scope="col" class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Ação</th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200">
@@ -248,18 +223,10 @@
                         {{ req.netRequirement.toFixed(2) }}
                       </td>
                       <td class="px-4 py-2 text-center">
-                        <span
-                          :class="[
-                            'px-2 py-1 text-xs font-semibold rounded',
-                            req.suggestedAction === 'BUY'
-                              ? 'bg-blue-100 text-blue-800'
-                              : req.suggestedAction === 'PRODUCE'
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                          ]"
-                        >
-                          {{ req.suggestedAction === 'BUY' ? 'Comprar' : req.suggestedAction === 'PRODUCE' ? 'Produzir' : 'OK' }}
-                        </span>
+                        <StatusBadge
+                          :label="getActionLabel(req.suggestedAction)"
+                          :tone="getActionTone(req.suggestedAction)"
+                        />
                       </td>
                     </tr>
                   </tbody>
@@ -269,29 +236,79 @@
           </div>
         </Card>
       </div>
-    </main>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth.store';
 import { useMRPStore } from '@/stores/mrp.store';
+import type {
+  MRPResult,
+  MRPSummary,
+  ProductionSuggestion,
+  PurchaseSuggestion,
+} from '@/services/mrp.service';
+import AppLayout from '@/components/common/AppLayout.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import StatusBadge, { type BadgeTone } from '@/components/common/StatusBadge.vue';
 
-const router = useRouter();
-const authStore = useAuthStore();
 const mrpStore = useMRPStore();
 
 const activeTab = ref<'suggestions' | 'results'>('suggestions');
 const loading = ref(false);
+// §4.4-5 / I11: falha de carregamento agora é um estado visível, não um
+// `console.error` mudo com a tela em branco.
+const error = ref('');
 
-const summary = ref(mrpStore.summary);
-const results = ref(mrpStore.results);
-const purchaseSuggestions = ref(mrpStore.purchaseSuggestions);
-const productionSuggestions = ref(mrpStore.productionSuggestions);
+const summary = ref<MRPSummary | null>(mrpStore.summary);
+const results = ref<MRPResult[]>(mrpStore.results);
+const purchaseSuggestions = ref<PurchaseSuggestion[]>(mrpStore.purchaseSuggestions);
+const productionSuggestions = ref<ProductionSuggestion[]>(mrpStore.productionSuggestions);
+
+// red/yellow/green do badge antigo normalizados para a paleta do StatusBadge
+// (§4.2): HIGH = danger (ruptura iminente), MEDIUM = warning, LOW = success
+// (folga confortável — era o verde do código antigo).
+const PRIORITY_TONES: Record<string, BadgeTone> = {
+  HIGH: 'danger',
+  MEDIUM: 'warning',
+  LOW: 'success',
+};
+
+const PRIORITY_LABELS: Record<string, string> = {
+  HIGH: 'Alta',
+  MEDIUM: 'Média',
+  LOW: 'Baixa',
+};
+
+function getPriorityTone(priority: string): BadgeTone {
+  return PRIORITY_TONES[priority] || 'neutral';
+}
+
+function getPriorityLabel(priority: string): string {
+  return PRIORITY_LABELS[priority] || priority;
+}
+
+// BUY = info (ação de compra, azul do código antigo), PRODUCE = success (verde),
+// tudo o mais (NONE/OK) = neutral (cinza) — nada a fazer.
+const ACTION_TONES: Record<string, BadgeTone> = {
+  BUY: 'info',
+  PRODUCE: 'success',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  BUY: 'Comprar',
+  PRODUCE: 'Produzir',
+};
+
+function getActionTone(action: string): BadgeTone {
+  return ACTION_TONES[action] || 'neutral';
+}
+
+function getActionLabel(action: string): string {
+  return ACTION_LABELS[action] || 'OK';
+}
 
 onMounted(async () => {
   await loadData();
@@ -299,6 +316,7 @@ onMounted(async () => {
 
 async function loadData() {
   loading.value = true;
+  error.value = '';
   try {
     await Promise.all([
       mrpStore.fetchSummary(),
@@ -308,8 +326,8 @@ async function loadData() {
     summary.value = mrpStore.summary;
     purchaseSuggestions.value = mrpStore.purchaseSuggestions;
     productionSuggestions.value = mrpStore.productionSuggestions;
-  } catch (error) {
-    console.error('Erro ao carregar dados do MRP:', error);
+  } catch (e: any) {
+    error.value = e.response?.data?.message || e.message || 'Erro ao carregar dados do MRP';
   } finally {
     loading.value = false;
   }
@@ -317,13 +335,14 @@ async function loadData() {
 
 async function handleExecuteAll() {
   loading.value = true;
+  error.value = '';
   try {
     await mrpStore.executeForAllPending();
     results.value = mrpStore.results;
     activeTab.value = 'results';
     await loadData();
-  } catch (error) {
-    console.error('Erro ao executar MRP:', error);
+  } catch (e: any) {
+    error.value = e.response?.data?.message || e.message || 'Erro ao executar MRP';
   } finally {
     loading.value = false;
   }
@@ -336,9 +355,4 @@ function formatDate(date: string) {
 function formatDateTime(date: string) {
   return new Date(date).toLocaleString('pt-BR');
 }
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
 </script>

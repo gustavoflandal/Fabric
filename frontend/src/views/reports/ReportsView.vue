@@ -1,124 +1,106 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
+  <AppLayout title="Relatórios" subtitle="Análises e indicadores de produção">
+    <!-- Seletor de período -->
+    <Card class="mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <FormField id="reports-filter-start-date" label="Data Inicial">
+          <input
+            v-model="filters.startDate"
+            type="date"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          />
+        </FormField>
+        <FormField id="reports-filter-end-date" label="Data Final">
+          <input
+            v-model="filters.endDate"
+            type="date"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+          />
+        </FormField>
+        <div class="flex items-end">
+          <Button :disabled="loading" full-width @click="loadReports">📊 Gerar Relatórios</Button>
         </div>
       </div>
-    </header>
+    </Card>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="mb-6">
-        <h2 class="text-3xl font-bold text-gray-900">Relatórios</h2>
-        <p class="mt-1 text-sm text-gray-600">
-          Análises e indicadores de produção
-        </p>
+    <!-- Tabs -->
+    <div class="mb-6">
+      <div class="border-b border-gray-200">
+        <nav class="-mb-px flex space-x-8">
+          <button
+            :class="[
+              'py-4 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'consolidated'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+            @click="activeTab = 'consolidated'"
+          >
+            📊 Consolidado
+          </button>
+          <button
+            :class="[
+              'py-4 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'production'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+            @click="activeTab = 'production'"
+          >
+            🏭 Produção
+          </button>
+          <button
+            :class="[
+              'py-4 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'efficiency'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+            @click="activeTab = 'efficiency'"
+          >
+            ⚡ Eficiência
+          </button>
+          <button
+            :class="[
+              'py-4 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'quality'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+            @click="activeTab = 'quality'"
+          >
+            ✅ Qualidade
+          </button>
+        </nav>
       </div>
+    </div>
 
-      <!-- Period Selector -->
-      <Card class="mb-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
-            <input
-              v-model="filters.startDate"
-              type="date"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
-            <input
-              v-model="filters.endDate"
-              type="date"
-              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-          <div class="flex items-end">
-            <Button @click="loadReports" :disabled="loading" full-width>
-              📊 Gerar Relatórios
-            </Button>
-          </div>
-        </div>
-      </Card>
+    <!-- Carregando — mesma linguagem visual do spinner do DataTable /
+         PCPDashboardView (§4.2 variante C). Antes `loading` só desabilitava o
+         botão: gerar os 4 relatórios não dava sinal nenhum de progresso. -->
+    <div v-if="loading" class="text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <p class="mt-4 text-gray-600">Gerando relatórios...</p>
+    </div>
 
-      <!-- Tabs -->
-      <div class="mb-6">
-        <div class="border-b border-gray-200">
-          <nav class="-mb-px flex space-x-8">
-            <button
-              @click="activeTab = 'consolidated'"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === 'consolidated'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              📊 Consolidado
-            </button>
-            <button
-              @click="activeTab = 'production'"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === 'production'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              🏭 Produção
-            </button>
-            <button
-              @click="activeTab = 'efficiency'"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === 'efficiency'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              ⚡ Eficiência
-            </button>
-            <button
-              @click="activeTab = 'quality'"
-              :class="[
-                'py-4 px-1 border-b-2 font-medium text-sm',
-                activeTab === 'quality'
-                  ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              ]"
-            >
-              ✅ Qualidade
-            </button>
-          </nav>
-        </div>
+    <!-- Erro — faixa canônica de PCPDashboardView.vue:12-15 / DataTable (I11).
+         Antes a falha só virava toast + `console.error`, e a tela voltava ao
+         estado "Nenhum relatório gerado", indistinguível de "ainda não pedi". -->
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <p class="text-red-600">{{ error }}</p>
+      <Button class="mt-4" @click="loadReports">Tentar Novamente</Button>
+    </div>
+
+    <!-- Vazio: nenhum relatório pedido ainda. -->
+    <Card v-else-if="!hasReports">
+      <div class="text-center py-12 text-gray-500">
+        <div class="text-6xl mb-4">📊</div>
+        <p class="text-lg font-medium mb-2">Nenhum relatório gerado</p>
+        <p class="text-sm">Selecione um período e clique em "Gerar Relatórios"</p>
       </div>
+    </Card>
 
-      <!-- Empty State -->
-      <Card v-if="!hasReports">
-        <div class="text-center py-12 text-gray-500">
-          <div class="text-6xl mb-4">📊</div>
-          <p class="text-lg font-medium mb-2">Nenhum relatório gerado</p>
-          <p class="text-sm">Selecione um período e clique em "Gerar Relatórios"</p>
-        </div>
-      </Card>
-
+    <template v-else>
       <!-- Consolidated Report -->
       <div v-if="activeTab === 'consolidated' && consolidatedReport" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -244,16 +226,22 @@
           </Card>
         </div>
 
+        <!-- Tabela de detalhe: tabela simples, não DataTable. Ela só é renderizada
+             depois que os 4 relatórios do período já resolveram (os estados
+             carregando/erro/vazio são da página inteira, tratados acima), então
+             3 dos 4 estados do DataTable seriam inalcançáveis aqui — mesmo
+             raciocínio da tabela de itens do modal de PurchaseOrdersView (Lote 4).
+             Vale para as 3 tabelas de detalhe desta view. -->
         <Card title="Produção por Produto">
           <div v-if="productionReport.byProduct?.length > 0" class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ordens</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Planejado</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produzido</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
+                  <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ordens</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Planejado</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produzido</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
@@ -314,11 +302,11 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ordem</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Planej.</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produz.</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Efic. Qtd</th>
-                  <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Prazo</th>
+                  <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ordem</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Planej.</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produz.</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Efic. Qtd</th>
+                  <th scope="col" class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">Prazo</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
@@ -330,9 +318,10 @@
                   <td class="px-4 py-2 text-right text-sm">{{ order.produced }}</td>
                   <td class="px-4 py-2 text-right text-sm font-semibold">{{ order.quantityEfficiency?.toFixed(1) }}%</td>
                   <td class="px-4 py-2 text-center">
-                    <span :class="['px-2 py-1 text-xs font-semibold rounded', order.onTime ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800']">
-                      {{ order.onTime ? 'Sim' : 'Não' }}
-                    </span>
+                    <StatusBadge
+                      :label="order.onTime ? 'Sim' : 'Não'"
+                      :tone="order.onTime ? 'success' : 'danger'"
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -382,11 +371,11 @@
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50">
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produzido</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Taxa Refugo</th>
-                  <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qualidade</th>
+                  <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Produzido</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Refugo</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Taxa Refugo</th>
+                  <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Qualidade</th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
@@ -407,26 +396,28 @@
           </div>
         </Card>
       </div>
-    </main>
-  </div>
+    </template>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth.store';
+import { ref, computed } from 'vue';
 import { useReportsStore } from '@/stores/reports.store';
+import AppLayout from '@/components/common/AppLayout.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import FormField from '@/components/common/FormField.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
 import { useToast } from '@/composables/useToast';
 
-const router = useRouter();
-const authStore = useAuthStore();
 const reportsStore = useReportsStore();
 const toast = useToast();
 
 const activeTab = ref<'consolidated' | 'production' | 'efficiency' | 'quality'>('consolidated');
 const loading = ref(false);
+// §4.4-5 / I11: erro de geração é um estado próprio da área de conteúdo,
+// não mais só um toast que some.
+const error = ref('');
 
 const filters = ref({
   startDate: new Date(new Date().setDate(1)).toISOString().split('T')[0],
@@ -439,7 +430,7 @@ const qualityReport = computed(() => reportsStore.qualityReport);
 const consolidatedReport = computed(() => reportsStore.consolidatedReport);
 
 const hasReports = computed(() => {
-  return productionReport.value || efficiencyReport.value || 
+  return productionReport.value || efficiencyReport.value ||
          qualityReport.value || consolidatedReport.value;
 });
 
@@ -450,6 +441,7 @@ async function loadReports() {
   }
 
   loading.value = true;
+  error.value = '';
   try {
     await Promise.all([
       reportsStore.fetchProductionReport(filters.value.startDate, filters.value.endDate),
@@ -457,8 +449,8 @@ async function loadReports() {
       reportsStore.fetchQualityReport(filters.value.startDate, filters.value.endDate),
       reportsStore.fetchConsolidatedReport(filters.value.startDate, filters.value.endDate),
     ]);
-  } catch (error) {
-    console.error('Erro ao carregar relatórios:', error);
+  } catch (e: any) {
+    error.value = e.response?.data?.message || e.message || 'Erro ao carregar relatórios';
     toast.error('Erro ao carregar relatórios');
   } finally {
     loading.value = false;
@@ -472,9 +464,4 @@ function formatDate(date: string) {
 function formatDateTime(date: string) {
   return new Date(date).toLocaleString('pt-BR');
 }
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
-};
 </script>
