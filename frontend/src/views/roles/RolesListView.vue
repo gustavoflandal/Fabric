@@ -1,123 +1,101 @@
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
-            <img src="/logo.png" alt="Fabric" class="h-10 w-auto" />
-            <h1 class="ml-4 text-2xl font-bold text-primary-800">Fabric</h1>
-          </div>
-          
-          <div class="flex items-center space-x-4">
-            <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
-              Início
-            </RouterLink>
-            <RouterLink to="/users" class="text-sm text-gray-700 hover:text-primary-600">
-              Usuários
-            </RouterLink>
-            <span class="text-sm text-gray-700">
-              Olá, <span class="font-semibold">{{ authStore.userName }}</span>
-            </span>
-            <Button variant="outline" size="sm" @click="handleLogout">
-              Sair
-            </Button>
-          </div>
-        </div>
-      </div>
-    </header>
+  <AppLayout title="Perfis de Acesso" subtitle="Gerencie os perfis e suas permissões">
+    <!-- O slot #nav substitui o "Início" padrão do AppLayout, então os 2 links
+         do header antigo (Início / Usuários) são redeclarados aqui. -->
+    <template #nav>
+      <RouterLink to="/dashboard" class="text-sm text-gray-700 hover:text-primary-600">
+        Início
+      </RouterLink>
+      <RouterLink to="/users" class="text-sm text-gray-700 hover:text-primary-600">
+        Usuários
+      </RouterLink>
+    </template>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Page Header -->
-      <div class="mb-6 flex justify-between items-center">
-        <div>
-          <h2 class="text-3xl font-bold text-gray-900">Perfis de Acesso</h2>
-          <p class="mt-1 text-sm text-gray-600">
-            Gerencie os perfis e suas permissões
-          </p>
-        </div>
-        <Button variant="primary" @click="openCreateModal">
-          + Novo Perfil
-        </Button>
-      </div>
+    <template #actions>
+      <Button variant="primary" @click="openCreateModal">
+        + Novo Perfil
+      </Button>
+    </template>
 
-      <!-- Roles Grid -->
-      <div v-if="loading" class="text-center py-8">
-        <p class="text-gray-500">Carregando...</p>
-      </div>
+    <!-- Grid de cards, não tabela: em vez de forçar o DataTable, replicamos aqui a
+         linguagem visual dos seus estados (spinner primary / faixa vermelha com
+         "Tentar Novamente"), como MRPView e ReportsView no Lote 5. -->
+    <div v-if="loading" class="text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <p class="mt-4 text-gray-600">Carregando...</p>
+    </div>
 
-      <div v-else-if="roles.length === 0" class="text-center py-8">
-        <Card>
-          <p class="text-gray-500">Nenhum perfil encontrado</p>
-        </Card>
-      </div>
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+      <p class="text-red-600">{{ error }}</p>
+      <Button class="mt-4" @click="loadRoles">Tentar Novamente</Button>
+    </div>
 
-      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card v-for="role in roles" :key="role.id" class="hover:shadow-lg transition-shadow">
-          <div class="space-y-4">
-            <!-- Header -->
-            <div class="flex justify-between items-start">
-              <div>
-                <h3 class="text-lg font-bold text-gray-900">{{ role.name }}</h3>
-                <span class="inline-block mt-1 px-2 py-1 text-xs font-mono bg-gray-100 text-gray-700 rounded">
-                  {{ role.code }}
-                </span>
-              </div>
-              <span
-                :class="[
-                  'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                  role.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                ]"
-              >
-                {{ role.active ? 'Ativo' : 'Inativo' }}
+    <div v-else-if="roles.length === 0" class="text-center py-8">
+      <Card>
+        <p class="text-gray-500">Nenhum perfil encontrado</p>
+      </Card>
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <Card v-for="role in roles" :key="role.id" class="hover:shadow-lg transition-shadow">
+        <div class="space-y-4">
+          <!-- Header -->
+          <div class="flex justify-between items-start">
+            <div>
+              <h3 class="text-lg font-bold text-gray-900">{{ role.name }}</h3>
+              <span class="inline-block mt-1 px-2 py-1 text-xs font-mono bg-gray-100 text-gray-700 rounded">
+                {{ role.code }}
               </span>
             </div>
+            <StatusBadge
+              :label="role.active ? 'Ativo' : 'Inativo'"
+              :tone="role.active ? 'success' : 'danger'"
+            />
+          </div>
 
-            <!-- Description -->
-            <p v-if="role.description" class="text-sm text-gray-600">
-              {{ role.description }}
-            </p>
+          <!-- Description -->
+          <p v-if="role.description" class="text-sm text-gray-600">
+            {{ role.description }}
+          </p>
 
-            <!-- Stats -->
-            <div class="flex items-center justify-between text-sm">
-              <div class="flex items-center text-gray-600">
-                <span class="font-medium">{{ role.permissions?.length || 0 }}</span>
-                <span class="ml-1">permissões</span>
-              </div>
-              <div class="flex items-center text-gray-600">
-                <span class="font-medium">{{ role.usersCount || 0 }}</span>
-                <span class="ml-1">usuários</span>
-              </div>
+          <!-- Stats -->
+          <div class="flex items-center justify-between text-sm">
+            <div class="flex items-center text-gray-600">
+              <span class="font-medium">{{ role.permissions?.length || 0 }}</span>
+              <span class="ml-1">permissões</span>
             </div>
-
-            <!-- Actions -->
-            <div class="flex gap-2 pt-4 border-t">
-              <button
-                @click="managePermissions(role)"
-                class="flex-1 px-3 py-2 text-sm bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100"
-              >
-                Permissões
-              </button>
-              <button
-                @click="editRole(role)"
-                class="flex-1 px-3 py-2 text-sm bg-secondary-50 text-secondary-700 rounded-lg hover:bg-secondary-100"
-              >
-                Editar
-              </button>
-              <button
-                @click="deleteRole(role)"
-                class="px-3 py-2 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
-              >
-                Excluir
-              </button>
+            <div class="flex items-center text-gray-600">
+              <span class="font-medium">{{ role.usersCount || 0 }}</span>
+              <span class="ml-1">usuários</span>
             </div>
           </div>
-        </Card>
-      </div>
-    </main>
 
-    <!-- Role Form Modal -->
+          <!-- Actions -->
+          <div class="flex gap-2 pt-4 border-t">
+            <button
+              class="flex-1 px-3 py-2 text-sm bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100"
+              @click="managePermissions(role)"
+            >
+              Permissões
+            </button>
+            <button
+              class="flex-1 px-3 py-2 text-sm bg-secondary-50 text-secondary-700 rounded-lg hover:bg-secondary-100"
+              @click="editRole(role)"
+            >
+              Editar
+            </button>
+            <button
+              class="px-3 py-2 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100"
+              @click="deleteRole(role)"
+            >
+              Excluir
+            </button>
+          </div>
+        </div>
+      </Card>
+    </div>
+
+    <!-- Role Form Modal — componente extraído, fora do escopo do Lote 6. -->
     <RoleFormModal
       :is-open="showRoleModal"
       :role="selectedRole"
@@ -125,34 +103,36 @@
       @success="handleModalSuccess"
     />
 
-    <!-- Permissions Modal -->
+    <!-- Permissions Modal — componente extraído, fora do escopo do Lote 6. -->
     <PermissionsModal
       :is-open="showPermissionsModal"
       :role="selectedRole"
       @close="showPermissionsModal = false"
       @success="handleModalSuccess"
     />
-  </div>
+  </AppLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '@/stores/auth.store';
+import { RouterLink } from 'vue-router';
 import roleService, { type Role } from '@/services/role.service';
+import AppLayout from '@/components/common/AppLayout.vue';
 import Button from '@/components/common/Button.vue';
 import Card from '@/components/common/Card.vue';
+import StatusBadge from '@/components/common/StatusBadge.vue';
 import RoleFormModal from '@/components/roles/RoleFormModal.vue';
 import PermissionsModal from '@/components/roles/PermissionsModal.vue';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 
-const router = useRouter();
-const authStore = useAuthStore();
 const toast = useToast();
 
 const roles = ref<Role[]>([]);
 const loading = ref(false);
+// §4.4-5 / I11: antes a falha só ia para o console e a tela mostrava
+// "Nenhum perfil encontrado", indistinguível de lista realmente vazia.
+const error = ref('');
 const showRoleModal = ref(false);
 const showPermissionsModal = ref(false);
 const selectedRole = ref<Role | null>(null);
@@ -160,10 +140,11 @@ const selectedRole = ref<Role | null>(null);
 const loadRoles = async () => {
   try {
     loading.value = true;
+    error.value = '';
     const response = await roleService.getAll();
     roles.value = response.data;
-  } catch (error) {
-    console.error('Erro ao carregar perfis:', error);
+  } catch (e: any) {
+    error.value = e.response?.data?.message || e.message || 'Erro ao carregar perfis';
   } finally {
     loading.value = false;
   }
@@ -199,11 +180,6 @@ const deleteRole = async (role: Role) => {
 
 const handleModalSuccess = () => {
   loadRoles();
-};
-
-const handleLogout = async () => {
-  await authStore.logout();
-  router.push('/login');
 };
 
 onMounted(() => {
