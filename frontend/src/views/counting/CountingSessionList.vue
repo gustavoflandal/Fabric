@@ -169,7 +169,9 @@ import { useCountingStore } from '@/stores/counting.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { storeToRefs } from 'pinia';
 import Button from '@/components/common/Button.vue';
+import { useToast } from '@/composables/useToast';
 
+const toast = useToast();
 const router = useRouter();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
@@ -203,8 +205,8 @@ const startSession = async (id: string) => {
   try {
     await countingStore.startSession(id);
     router.push(`/counting/sessions/${id}/execute`);
-  } catch (error) {
-    console.error('Erro ao iniciar sessão:', error);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao iniciar sessão');
   }
 };
 

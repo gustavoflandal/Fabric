@@ -130,7 +130,7 @@
               </div>
               <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-600">Concluídas:</span>
-                <span class="font-bold text-lg text-success-600">{{ consolidatedReport.production.completed }}</span>
+                <span class="font-bold text-lg text-green-600">{{ consolidatedReport.production.completed }}</span>
               </div>
               <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-600">Em Andamento:</span>
@@ -159,7 +159,7 @@
               </div>
               <div class="flex justify-between py-2">
                 <span class="text-gray-600">Entregas no Prazo:</span>
-                <span class="font-bold text-xl text-success-600">{{ consolidatedReport.efficiency.onTimeRate?.toFixed(1) }}%</span>
+                <span class="font-bold text-xl text-green-600">{{ consolidatedReport.efficiency.onTimeRate?.toFixed(1) }}%</span>
               </div>
             </div>
           </Card>
@@ -168,7 +168,7 @@
             <div class="space-y-3">
               <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-600">Total Produzido:</span>
-                <span class="font-bold text-lg text-success-600">{{ consolidatedReport.quality.totalProduced }}</span>
+                <span class="font-bold text-lg text-green-600">{{ consolidatedReport.quality.totalProduced }}</span>
               </div>
               <div class="flex justify-between py-2 border-b">
                 <span class="text-gray-600">Total Refugo:</span>
@@ -180,7 +180,7 @@
               </div>
               <div class="flex justify-between py-2">
                 <span class="text-gray-600">Taxa de Qualidade:</span>
-                <span class="font-bold text-xl text-success-600">{{ consolidatedReport.quality.avgQualityRate?.toFixed(1) }}%</span>
+                <span class="font-bold text-xl text-green-600">{{ consolidatedReport.quality.avgQualityRate?.toFixed(1) }}%</span>
               </div>
             </div>
           </Card>
@@ -217,7 +217,7 @@
           <Card>
             <div class="text-center">
               <div class="text-3xl mb-2">✅</div>
-              <p class="text-2xl font-bold text-success-600">{{ productionReport.summary.completed }}</p>
+              <p class="text-2xl font-bold text-green-600">{{ productionReport.summary.completed }}</p>
               <p class="text-xs text-gray-600">Concluídas</p>
             </div>
           </Card>
@@ -296,7 +296,7 @@
           <Card>
             <div class="text-center">
               <div class="text-3xl mb-2">⏱️</div>
-              <p class="text-2xl font-bold text-success-600">{{ efficiencyReport.summary.avgTimeEfficiency?.toFixed(1) }}%</p>
+              <p class="text-2xl font-bold text-green-600">{{ efficiencyReport.summary.avgTimeEfficiency?.toFixed(1) }}%</p>
               <p class="text-xs text-gray-600">Efic. Tempo</p>
             </div>
           </Card>
@@ -357,7 +357,7 @@
           <Card>
             <div class="text-center">
               <div class="text-3xl mb-2">✅</div>
-              <p class="text-2xl font-bold text-success-600">{{ qualityReport.summary.totalProduced }}</p>
+              <p class="text-2xl font-bold text-green-600">{{ qualityReport.summary.totalProduced }}</p>
               <p class="text-xs text-gray-600">Produzido</p>
             </div>
           </Card>
@@ -397,7 +397,7 @@
                   <td class="px-4 py-2 text-right text-sm">{{ item.produced }}</td>
                   <td class="px-4 py-2 text-right text-sm text-red-600">{{ item.scrap }}</td>
                   <td class="px-4 py-2 text-right text-sm font-semibold text-red-600">{{ item.scrapRate?.toFixed(1) }}%</td>
-                  <td class="px-4 py-2 text-right text-sm font-semibold text-success-600">{{ item.qualityRate?.toFixed(1) }}%</td>
+                  <td class="px-4 py-2 text-right text-sm font-semibold text-green-600">{{ item.qualityRate?.toFixed(1) }}%</td>
                 </tr>
               </tbody>
             </table>

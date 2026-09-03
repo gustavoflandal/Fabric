@@ -56,7 +56,7 @@
         <Card>
           <div class="text-center">
             <div class="text-3xl mb-2">✅</div>
-            <p class="text-2xl font-bold text-success-600">{{ summary.ok }}</p>
+            <p class="text-2xl font-bold text-green-600">{{ summary.ok }}</p>
             <p class="text-sm text-gray-600">Estoque OK</p>
           </div>
         </Card>

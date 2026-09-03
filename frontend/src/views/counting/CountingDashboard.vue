@@ -37,9 +37,7 @@
           to="/counting/plans/new"
           class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm"
         >
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-          </svg>
+          <PlusIcon class="w-5 h-5 mr-2" />
           Novo Plano
         </RouterLink>
       </div>
@@ -63,9 +61,7 @@
                 </p>
               </div>
               <div class="p-3 bg-blue-100 rounded-full">
-                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
+                <ClipboardDocumentListIcon class="w-6 h-6 text-blue-600" />
               </div>
             </div>
           </div>
@@ -80,9 +76,7 @@
                 </p>
               </div>
               <div class="p-3 bg-green-100 rounded-full">
-                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <CheckCircleIcon class="w-6 h-6 text-green-600" />
               </div>
             </div>
           </div>
@@ -97,9 +91,7 @@
                 </p>
               </div>
               <div class="p-3 bg-orange-100 rounded-full">
-                <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <ClockIcon class="w-6 h-6 text-orange-600" />
               </div>
             </div>
           </div>
@@ -114,9 +106,7 @@
                 </p>
               </div>
               <div class="p-3 bg-purple-100 rounded-full">
-                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+                <ChartBarIcon class="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </div>
@@ -246,9 +236,7 @@
 
             <!-- Empty State -->
             <div v-if="plans.length === 0" class="text-center py-12">
-              <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+              <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-gray-400" />
               <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum plano encontrado</h3>
               <p class="mt-1 text-sm text-gray-500">Comece criando um novo plano de contagem.</p>
             </div>
@@ -277,14 +265,10 @@
                     </h3>
                   </div>
                   <div class="mt-2 flex items-center text-sm text-gray-500">
-                    <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                    <ClockIcon class="mr-1.5 h-4 w-4" />
                     {{ formatTime(session.scheduledDate) }}
                     <span v-if="session.assignedUser" class="ml-4 flex items-center">
-                      <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
+                      <UserIcon class="mr-1.5 h-4 w-4" />
                       {{ session.assignedUser.name }}
                     </span>
                   </div>
@@ -370,7 +354,17 @@ import { useAuthStore } from '@/stores/auth.store';
 import { storeToRefs } from 'pinia';
 import type { PlanFilters } from '@/types/counting.types';
 import Button from '@/components/common/Button.vue';
+import {
+  ChartBarIcon,
+  CheckCircleIcon,
+  ClipboardDocumentListIcon,
+  ClockIcon,
+  PlusIcon,
+  UserIcon,
+} from '@heroicons/vue/24/outline';
+import { useToast } from '@/composables/useToast';
 
+const toast = useToast();
 const router = useRouter();
 const countingStore = useCountingStore();
 const authStore = useAuthStore();
@@ -408,8 +402,8 @@ const activatePlan = async (id: string) => {
     await countingStore.activatePlan(id);
     await loadPlans();
     await countingStore.fetchDashboard();
-  } catch (error) {
-    console.error('Erro ao ativar plano:', error);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao ativar plano');
   }
 };
 
@@ -418,8 +412,8 @@ const pausePlan = async (id: string) => {
     await countingStore.pausePlan(id);
     await loadPlans();
     await countingStore.fetchDashboard();
-  } catch (error) {
-    console.error('Erro ao pausar plano:', error);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao pausar plano');
   }
 };
 

@@ -39,9 +39,7 @@
             @click="exportReport"
             class="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50"
           >
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <DocumentArrowDownIcon class="w-5 h-5 mr-2" />
             Exportar
           </button>
           <button
@@ -157,9 +155,7 @@
 
         <!-- No Divergences -->
         <div v-else class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <svg class="mx-auto h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <CheckCircleIcon class="mx-auto h-16 w-16 text-green-600" />
           <h3 class="mt-4 text-lg font-medium text-gray-900">Nenhuma Divergência Encontrada</h3>
           <p class="mt-2 text-sm text-gray-600">
             Todas as contagens estão de acordo com o sistema. Parabéns!
@@ -176,6 +172,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useCountingStore } from '@/stores/counting.store';
 import { useAuthStore } from '@/stores/auth.store';
 import Button from '@/components/common/Button.vue';
+import { CheckCircleIcon, DocumentArrowDownIcon } from '@heroicons/vue/24/outline';
 import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 
@@ -202,8 +199,8 @@ const loadReport = async () => {
     loading.value = true;
     const sessionId = route.params.id as string;
     report.value = await countingStore.fetchSessionReport(sessionId);
-  } catch (error) {
-    console.error('Erro ao carregar relatório:', error);
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || 'Erro ao carregar relatório');
   } finally {
     loading.value = false;
   }
