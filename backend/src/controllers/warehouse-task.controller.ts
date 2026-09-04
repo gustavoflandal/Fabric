@@ -25,6 +25,17 @@ export class WarehouseTaskController {
     }
   }
 
+  /** Painel de operações — recebimentos ativos com a cadeia completa. */
+  async getPanel(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const scope = (req.query.scope as 'all' | 'mine' | undefined) ?? 'all';
+      const data = await warehouseTaskService.listActiveReceiptOperations(scope, req.userId!);
+      return res.status(200).json({ status: 'success', data });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   /** F4.3 — conclusão de DESCARGA/CONFERENCIA/ETIQUETAGEM/QUARENTENA. */
   async complete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
