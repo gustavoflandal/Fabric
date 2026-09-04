@@ -39,4 +39,21 @@ describe('ConditionRuleBuilder', () => {
 
     expect(wrapper.emitted('update:modelValue')![0][0]).toBeNull()
   })
+
+  it('reage corretamente quando modelValue muda após a montagem (reatividade)', async () => {
+    const wrapper = mount(ConditionRuleBuilder, { props: { modelValue: null } })
+
+    // Inicialmente deve mostrar o botão de adicionar condição
+    expect(wrapper.text()).toContain('adicionar condição')
+
+    // Agora atualiza o prop com uma condição leaf
+    await wrapper.setProps({
+      modelValue: { field: 'product.weight', operator: 'eq', value: 1 },
+    })
+
+    // Deve renderizar os controles da condição leaf (selects e input)
+    const selects = wrapper.findAll('select')
+    expect(selects.length).toBeGreaterThan(0)
+    expect(wrapper.find('input').exists()).toBe(true)
+  })
 })

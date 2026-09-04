@@ -63,6 +63,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { CONDITION_FIELDS } from '@/types/workflow.types'
 import type { ConditionRule, ConditionLeaf, ConditionGroup, ConditionField } from '@/types/workflow.types'
 
@@ -75,7 +76,7 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{ 'update:modelValue': [value: ConditionRule | null] }>()
 
-const rule = props.modelValue
+const rule = computed(() => props.modelValue)
 
 function isGroup(value: ConditionRule | null): value is ConditionGroup {
   return !!value && 'op' in value
@@ -86,18 +87,18 @@ function emitRule(value: ConditionRule | null): void {
 }
 
 function setGroupOp(op: 'AND' | 'OR'): void {
-  if (isGroup(rule)) emitRule({ ...rule, op })
+  if (isGroup(rule.value)) emitRule({ ...rule.value, op })
 }
 
 function updateClause(index: number, value: ConditionRule | null): void {
-  if (!isGroup(rule)) return
-  const clauses = [...rule.clauses]
+  if (!isGroup(rule.value)) return
+  const clauses = [...rule.value.clauses]
   if (value === null) {
     clauses.splice(index, 1)
   } else {
     clauses[index] = value
   }
-  emitRule({ ...rule, clauses })
+  emitRule({ ...rule.value, clauses })
 }
 
 function addClause(kind: 'leaf' | 'group'): void {
@@ -106,16 +107,16 @@ function addClause(kind: 'leaf' | 'group'): void {
       ? { field: CONDITION_FIELDS[0] as ConditionField, operator: 'eq', value: '' }
       : { op: 'AND', clauses: [] }
 
-  if (isGroup(rule)) {
-    emitRule({ ...rule, clauses: [...rule.clauses, newClause] })
+  if (isGroup(rule.value)) {
+    emitRule({ ...rule.value, clauses: [...rule.value.clauses, newClause] })
   } else {
     emitRule(newClause)
   }
 }
 
 function updateLeaf(partial: Partial<ConditionLeaf>): void {
-  if (!rule || isGroup(rule)) return
-  emitRule({ ...rule, ...partial })
+  if (!rule.value || isGroup(rule.value)) return
+  emitRule({ ...rule.value, ...partial })
 }
 
 function coerceValue(raw: string): string | number | boolean {
