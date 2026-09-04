@@ -454,7 +454,7 @@ const printOrderPDF = (order: PurchaseOrder) => {
         { header: 'Preço Unit.', key: 'unitario', align: 'right' },
         { header: 'Total', key: 'total', align: 'right' },
       ],
-      supplierSignature: true,
+      signature: { label: 'Assinatura do Fornecedor' },
     });
 
     pdf.save(`Pedido_${order.orderNumber}.pdf`);

@@ -434,7 +434,7 @@ const printQuotationPDF = (quotation: PurchaseQuotation) => {
         { header: 'Desconto', key: 'desconto', align: 'right' },
         { header: 'Total', key: 'total', align: 'right' },
       ],
-      supplierSignature: true,
+      signature: { label: 'Assinatura do Fornecedor' },
     });
 
     pdf.save(`Orcamento_${quotation.quotationNumber}.pdf`);
