@@ -1,7 +1,9 @@
-import { Prisma, WarehouseTaskStatus, WarehouseTaskType } from '@prisma/client';
+import { Prisma, WarehouseTaskStatus, WarehouseTaskType, WorkflowNodeType } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { resolveQuarantineRequirement } from './storage-rule.service';
+import { pickTemplate, resolveWorkflowTasks, ResolvableTemplate } from './workflow-resolver.service';
+import { ConditionRule, ReceivingContext } from './workflow-condition.service';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -219,23 +221,99 @@ const serializeTask = (task: any) => ({
  * ao operador como "etapa 5 de 5" tendo quatro etapas é ruído gratuito na tela
  * do coletor.
  */
+/**
+ * F-WORKFLOW — WorkflowNodeType e WarehouseTaskType compartilham os mesmos 7
+ * nomes de operação de propósito (ver o comentário do enum em schema.prisma).
+ * `resolveWorkflowTasks` nunca devolve DECISAO no array de steps (é consumido
+ * internamente pelo loop, nunca empurrado pro resultado) — o `throw` aqui é
+ * só a rede de segurança de tipo, não um caminho alcançável em uso normal.
+ */
+function toWarehouseTaskType(type: WorkflowNodeType): WarehouseTaskType {
+  if (type === 'DECISAO') {
+    throw new AppError(500, 'Nó de decisão não pode virar tarefa de armazém — erro interno do resolvedor.');
+  }
+  return type as unknown as WarehouseTaskType;
+}
+
 export const createReceiptTaskChain = async (
   tx: TransactionClient,
   receiptId: string
 ): Promise<void> => {
   const items = await tx.purchaseReceiptItem.findMany({
     where: { receiptId },
-    select: { productId: true },
+    select: {
+      productId: true,
+      product: {
+        select: {
+          weight: true,
+          volume: true,
+          packagingType: true,
+          segregationGroup: true,
+          maxStackQty: true,
+          lotTracked: true,
+          categoryId: true,
+        },
+      },
+    },
   });
 
-  const needsQuarantine = await resolveQuarantineRequirement(
-    tx,
-    items.map((item) => item.productId)
-  );
+  const receipt = await tx.purchaseReceipt.findUniqueOrThrow({
+    where: { id: receiptId },
+    select: { order: { select: { supplierId: true } } },
+  });
 
-  const chain = RECEIPT_TASK_CHAIN.filter(
-    (type) => type !== WarehouseTaskType.QUARENTENA || needsQuarantine
-  );
+  // F-WORKFLOW — o contexto que o motor de condições avalia. Lido na MESMA
+  // transação que criou os itens (mesmo motivo do resto desta função:
+  // `purchase-receipt.service.ts::create()` acabou de criá-los, ainda não
+  // visíveis fora da transação).
+  const context: ReceivingContext = {
+    order: { supplierId: receipt.order.supplierId },
+    items: items.map((item) => ({ product: item.product })),
+  };
+
+  const templateRows = await tx.workflowTemplate.findMany({
+    where: { active: true, direction: 'ENTRADA' },
+    include: { nodes: true, edges: true },
+  });
+
+  const templates: ResolvableTemplate[] = templateRows.map((t) => ({
+    id: t.id,
+    priority: t.priority,
+    updatedAt: t.updatedAt,
+    triggerRule: t.triggerRule as unknown as ConditionRule | null,
+    entryNodeId: t.entryNodeId ?? '',
+    nodes: t.nodes.map((n) => ({
+      id: n.id,
+      type: n.type,
+      conditionRule: n.conditionRule as unknown as ConditionRule | null,
+    })),
+    edges: t.edges.map((e) => ({
+      fromNodeId: e.fromNodeId,
+      toNodeId: e.toNodeId,
+      branch: e.branch,
+    })),
+  }));
+
+  const matched = pickTemplate(templates, context);
+
+  let chain: WarehouseTaskType[];
+
+  if (matched) {
+    // F-WORKFLOW — caminho NOVO: um template configurado pelo admin bate com
+    // este recebimento.
+    chain = resolveWorkflowTasks(matched, context).map(toWarehouseTaskType);
+  } else {
+    // Caminho ATUAL, inalterado: nenhum template configurado bate — o
+    // recebimento se comporta exatamente como antes deste projeto.
+    const needsQuarantine = await resolveQuarantineRequirement(
+      tx,
+      items.map((item) => item.productId)
+    );
+
+    chain = RECEIPT_TASK_CHAIN.filter(
+      (type) => type !== WarehouseTaskType.QUARENTENA || needsQuarantine
+    );
+  }
 
   await tx.warehouseTask.createMany({
     data: chain.map((type, index) => ({
