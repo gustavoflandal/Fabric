@@ -30,6 +30,7 @@ import storagePositionRoutes from './storage-position.routes';
 import stockPositionRoutes from './stock-position.routes';
 import warehouseTaskRoutes from './warehouse-task.routes';
 import storageRuleRoutes from './storage-rule.routes';
+import workflowTemplateRoutes from './workflow-template.routes';
 import systemRoutes from './system.routes';
 import { requireModule } from '../middleware/module.middleware';
 
@@ -87,6 +88,9 @@ router.use('/warehouse-tasks', requireModule('WMS'), warehouseTaskRoutes);
 // F4.6: regras de armazenagem e sugestão de endereço. Mesmo requireModule('WMS')
 // — uma regra sobre QUAL endereço usar não significa nada sem endereço.
 router.use('/storage-rules', requireModule('WMS'), storageRuleRoutes);
+// F-WORKFLOW: templates do motor de workflow dinâmico do WMS. Mesmo
+// requireModule('WMS') do resto do armazém.
+router.use('/wms-workflow-templates', requireModule('WMS'), workflowTemplateRoutes);
 
 // Rotas de produtos
 router.use('/products', productRoutes);
