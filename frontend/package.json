@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@heroicons/vue": "^2.1.5",
+    "@vue-flow/core": "^1.48.2",
     "axios": "^1.6.7",
     "chart.js": "^4.4.4",
     "jspdf": "^3.0.3",
