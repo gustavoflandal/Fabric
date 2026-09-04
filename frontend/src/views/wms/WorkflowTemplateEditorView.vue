@@ -26,6 +26,14 @@
       </FormField>
     </div>
 
+    <FormField label="Descrição" class="mb-4">
+      <textarea
+        v-model="description"
+        rows="2"
+        class="mock-input w-full rounded-md border-gray-300 text-sm"
+      ></textarea>
+    </FormField>
+
     <FormField label="Quando este workflow se aplica (condição de gatilho)" class="mb-4">
       <ConditionRuleBuilder v-model="triggerRule" />
     </FormField>
@@ -122,6 +130,7 @@ const isNew = computed(() => route.params.id === undefined)
 const clientErrors = ref<string[]>([])
 
 const name = ref('')
+const description = ref<string | null>('')
 const priority = ref(0)
 const active = ref(true)
 const triggerRule = ref<ConditionRule | null>(null)
@@ -137,13 +146,24 @@ const flowNodes = ref<Node<FlowNodeData>[]>([
 ])
 const flowEdges = ref<Edge[]>([])
 
+// F-WORKFLOW-FIX1 — id do nó de entrada ATUAL. No modo "novo" é a string fixa
+// 'entry' (o mesmo id com que o nó é semeado acima). No modo edição, o nó de
+// entrada carregado do backend tem seu uuid PERSISTIDO como id — não a string
+// 'entry' — então este ref é atualizado em onMounted para acompanhar. Usado
+// tanto em handleSave (entryClientId do DTO) quanto em removeSelectedNode (a
+// guarda contra remover o nó de entrada), no lugar da string 'entry' fixa que
+// quebrava o salvamento de edições (ver PR de revisão final).
+const entryClientId = ref('entry')
+
 onMounted(async () => {
   if (!isNew.value) {
     const template = await store.getTemplateById(route.params.id as string)
     name.value = template.name
+    description.value = template.description
     priority.value = template.priority
     active.value = template.active
     triggerRule.value = template.triggerRule
+    entryClientId.value = template.entryNodeId ?? 'entry'
 
     flowNodes.value = template.nodes.map((n) => ({
       id: n.id,
@@ -206,7 +226,7 @@ function onNodeClick({ node }: NodeMouseEvent): void {
 }
 
 function removeSelectedNode(): void {
-  if (!selectedNodeId.value || selectedNodeId.value === 'entry') return
+  if (!selectedNodeId.value || selectedNodeId.value === entryClientId.value) return
   flowNodes.value = flowNodes.value.filter((n) => n.id !== selectedNodeId.value)
   flowEdges.value = flowEdges.value.filter(
     (e) => e.source !== selectedNodeId.value && e.target !== selectedNodeId.value
@@ -220,10 +240,11 @@ async function handleSave(): Promise<void> {
 
   const dto: WorkflowTemplateDto = {
     name: name.value,
+    description: description.value,
     priority: priority.value,
     active: active.value,
     triggerRule: triggerRule.value,
-    entryClientId: 'entry',
+    entryClientId: entryClientId.value,
     // Non-null: todo item de `flowNodes` é criado (drop, carga inicial ou
     // node de entrada) sempre com `data` preenchido — ver comentário acima
     // de `FlowNodeData`. O tipo `Node.data` da lib é opcional porque cobre

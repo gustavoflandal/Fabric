@@ -48,10 +48,11 @@
         <option v-for="op in OPERATORS" :key="op" :value="op">{{ op }}</option>
       </select>
       <input
-        :value="String(rule.value)"
+        :value="localLeafValue"
         type="text"
         class="text-xs border-gray-300 rounded-md w-24"
-        @input="updateLeaf({ value: coerceValue(($event.target as HTMLInputElement).value) })"
+        @input="localLeafValue = ($event.target as HTMLInputElement).value"
+        @blur="commitLeafValue"
       />
       <button type="button" class="text-xs text-red-600 hover:underline" @click="emitRule(null)">✕</button>
     </div>
@@ -63,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { CONDITION_FIELDS } from '@/types/workflow.types'
 import type { ConditionRule, ConditionLeaf, ConditionGroup, ConditionField } from '@/types/workflow.types'
 
@@ -77,6 +78,27 @@ const props = defineProps<Props>()
 const emit = defineEmits<{ 'update:modelValue': [value: ConditionRule | null] }>()
 
 const rule = computed(() => props.modelValue)
+
+// F-WORKFLOW-FIX3 — string LOCAL, não-coercionada, do input de valor de uma
+// leaf. Antes, `coerceValue` rodava em todo @input e o valor coercionado
+// (número) voltava via v-model, reescrevendo o DOM com `String(rule.value)` —
+// digitar "1." virava "1" (Number('1.') === 1) e o "." era apagado debaixo do
+// usuário, tornando impossível digitar decimais como "1.5" num campo
+// peso/volume (Float no schema). Agora o @input só atualiza este ref local
+// (sem coagir, sem emitir); a coação + emit só acontece no @blur
+// (commitLeafValue), quando o usuário termina de digitar.
+const localLeafValue = ref(!isGroup(props.modelValue) && props.modelValue ? String(props.modelValue.value) : '')
+
+watch(
+  () => (rule.value && !isGroup(rule.value) ? rule.value.value : undefined),
+  (value) => {
+    if (value !== undefined) localLeafValue.value = String(value)
+  }
+)
+
+function commitLeafValue(): void {
+  updateLeaf({ value: coerceValue(localLeafValue.value) })
+}
 
 function isGroup(value: ConditionRule | null): value is ConditionGroup {
   return !!value && 'op' in value
@@ -102,10 +124,17 @@ function updateClause(index: number, value: ConditionRule | null): void {
 }
 
 function addClause(kind: 'leaf' | 'group'): void {
+  // F-WORKFLOW-FIX4 — um subgrupo novo NUNCA pode nascer com `clauses: []`:
+  // o Joi do backend exige `.min(1)` (um grupo AND vazio avalia `true` via
+  // `[].every()`, e isso nunca pode persistir — a regra do backend está
+  // certa e não deve ser relaxada). Antes disso, clicar em "+ subgrupo" e
+  // salvar sem preencher nada gerava um payload que o Joi rejeitava com um
+  // erro genérico. Semeando com uma leaf vazia (mesma forma que uma condição
+  // nova já usa) o payload sempre nasce válido.
   const newClause: ConditionRule =
     kind === 'leaf'
       ? { field: CONDITION_FIELDS[0] as ConditionField, operator: 'eq', value: '' }
-      : { op: 'AND', clauses: [] }
+      : { op: 'AND', clauses: [{ field: CONDITION_FIELDS[0] as ConditionField, operator: 'eq', value: '' }] }
 
   if (isGroup(rule.value)) {
     emitRule({ ...rule.value, clauses: [...rule.value.clauses, newClause] })

@@ -56,4 +56,44 @@ describe('ConditionRuleBuilder', () => {
     expect(selects.length).toBeGreaterThan(0)
     expect(wrapper.find('input').exists()).toBe(true)
   })
+
+  // F-WORKFLOW-FIX3 — regressão: antes, `coerceValue` rodava em todo @input e
+  // o número coercionado voltava via v-model, reescrevendo o DOM com
+  // `String(rule.value)` no meio da digitação — "1." virava "1" e o usuário
+  // nunca conseguia terminar de digitar "1.5". Agora o @input só atualiza o
+  // ref local (sem emitir); coação + emit só no @blur.
+  it('permite digitar um valor decimal ("1.5") sem que o "." seja apagado, emitindo o número só no blur', async () => {
+    const wrapper = mount(ConditionRuleBuilder, {
+      props: { modelValue: { field: 'product.weight', operator: 'gt', value: 0 } },
+    })
+    const input = wrapper.find('input')
+
+    await input.setValue('1.5')
+    // Ainda não deve ter emitido nada por causa do "." (nenhum evento de
+    // input deve ter disparado update:modelValue com o valor coercionado).
+    expect((input.element as HTMLInputElement).value).toBe('1.5')
+
+    await input.trigger('blur')
+
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted).toBeTruthy()
+    const lastEmitted = emitted![emitted!.length - 1][0] as { value: unknown }
+    expect(lastEmitted.value).toBe(1.5)
+  })
+
+  // F-WORKFLOW-FIX4 — regressão: "+ subgrupo" não pode mais gerar
+  // `clauses: []`, porque o Joi do backend exige `.min(1)` (grupo AND vazio
+  // avaliaria `true`). O novo subgrupo nasce com uma leaf vazia dentro.
+  it('semeia um novo subgrupo com uma leaf vazia dentro, nunca com clauses: []', async () => {
+    const wrapper = mount(ConditionRuleBuilder, {
+      props: { modelValue: { op: 'AND', clauses: [{ field: 'product.weight', operator: 'gt', value: 500 }] } },
+    })
+    const subgrupoButton = wrapper.findAll('button').find((b) => b.text() === '+ subgrupo')!
+    await subgrupoButton.trigger('click')
+
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted).toBeTruthy()
+    const newGroup = (emitted![0][0] as any).clauses[1]
+    expect(newGroup).toEqual({ op: 'AND', clauses: [{ field: 'product.weight', operator: 'eq', value: '' }] })
+  })
 })

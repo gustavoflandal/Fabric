@@ -1570,6 +1570,13 @@ model StorageRule {
 // `stock.service.ts::transfer()` (F2.3) sem tarefa nenhuma, e a contagem
 // ciclica tem seu proprio ciclo de vida (`CountingSession`/`CountingItem`, Fase
 // 3) - declarar os dois aqui seria enum morto no banco.
+// F-WORKFLOW — SEGREGACAO/AMOSTRAGEM foram inseridos no MEIO do enum (entre
+// QUARENTENA e ALOCACAO), não no fim, na migration original. Em uma
+// instalação com `warehouse_tasks` populada, isso faz o `ALTER TABLE ...
+// MODIFY COLUMN` reconstruir a tabela inteira (não é metadata-only) —
+// consideração de deploy (lock/downtime), não bug de correção (os dados
+// convertem por valor normalmente). Migrations futuras que adicionem valores
+// a este enum deveriam preferir apendar ao final.
 enum WarehouseTaskType {
   DESCARGA
   CONFERENCIA
