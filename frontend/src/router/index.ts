@@ -122,6 +122,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/purchases/receipts/new',
+    name: 'purchase-receipt-new',
+    component: () => import('../views/purchases/PurchaseReceiptFormView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/notifications',
     name: 'notifications',
     component: () => import('../views/NotificationsView.vue'),
