@@ -303,6 +303,16 @@ async function handleNfeFileSelected(event: Event) {
   try {
     const xml = await file.text();
     parsedNfe.value = await receiptStore.parseNfe(xml);
+    for (const previousOrderItemId of Object.values(nfeMatches.value)) {
+      const previousRow = itemRows.value.find((r) => r.orderItemId === previousOrderItemId);
+      if (previousRow) {
+        previousRow.quantityReceived = 0;
+        previousRow.nfeQuantity = null;
+        previousRow.nfeDivergence = false;
+        previousRow.lotNumber = '';
+        previousRow.expiresAt = '';
+      }
+    }
     nfeMatches.value = {};
     toast.success('NFe lida com sucesso. Associe os itens abaixo.');
   } catch (e: any) {
