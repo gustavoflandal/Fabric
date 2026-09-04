@@ -92,7 +92,28 @@ describe('nfe-parser.service — parseNfeXml', () => {
     expect(result.items[0].code).toBe('PROD-001');
   });
 
-  it('rejeita XML malformado com AppError 400', () => {
+  it('preserva zeros à esquerda em CNPJ, número da nota, código de produto e lote', () => {
+    const leadingZerosXml = VALID_NFE_XML.replace(
+      '<nNF>12345</nNF>',
+      '<nNF>00012345</nNF>'
+    )
+      .replace('<CNPJ>12345678000199</CNPJ>', '<CNPJ>01234567000199</CNPJ>')
+      .replace('<cProd>PROD-001</cProd>', '<cProd>00123</cProd>')
+      .replace('<nLote>L2026-08</nLote>', '<nLote>000456</nLote>');
+
+    const result = parseNfeXml(leadingZerosXml);
+
+    expect(result.supplierCnpj).toBe('01234567000199');
+    expect(result.number).toBe('00012345');
+    expect(result.items[0].code).toBe('00123');
+    expect(result.items[0].lotNumber).toBe('000456');
+  });
+
+  it('rejeita XML malformado (erro de sintaxe) com AppError 400', () => {
+    // '<not><valid</xml>' tem um nome de tag inválido — XMLValidator.validate()
+    // rejeita isso como erro de sintaxe genuíno (confirmado rodando contra a
+    // lib real), então esse caso exercita o catch em torno de parser.parse(),
+    // não o branch de "estrutura de NFe não reconhecida".
     expect(() => parseNfeXml('<not><valid</xml>')).toThrow(AppError);
     expect(() => parseNfeXml('<not><valid</xml>')).toThrow(/inválido|malformado/i);
   });
@@ -101,11 +122,29 @@ describe('nfe-parser.service — parseNfeXml', () => {
     expect(() => parseNfeXml('<algumaCoisa><outra>valor</outra></algumaCoisa>')).toThrow(
       AppError
     );
+    expect(() => parseNfeXml('<algumaCoisa><outra>valor</outra></algumaCoisa>')).toThrow(
+      /estrutura de NFe não reconhecida/i
+    );
   });
 
   it('rejeita NFe sem itens com AppError 400', () => {
     const noItemsXml = VALID_NFE_XML.replace(/<det nItem="1">[\s\S]*?<\/nfeProc>/, '</infNFe></NFe></nfeProc>');
 
     expect(() => parseNfeXml(noItemsXml)).toThrow(AppError);
+  });
+
+  it('rejeita NFe sem emitente/número da nota com AppError 400', () => {
+    const noEmitXml = VALID_NFE_XML.replace(
+      /<emit>[\s\S]*?<\/emit>/,
+      '<emit></emit>'
+    );
+
+    expect(() => parseNfeXml(noEmitXml)).toThrow(AppError);
+  });
+
+  it('rejeita item sem código/descrição/quantidade com AppError 400', () => {
+    const missingCProdXml = VALID_NFE_XML.replace('<cProd>PROD-001</cProd>', '');
+
+    expect(() => parseNfeXml(missingCProdXml)).toThrow(AppError);
   });
 });

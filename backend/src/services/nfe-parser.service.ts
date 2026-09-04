@@ -1,4 +1,4 @@
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { AppError } from '../middleware/error.middleware';
 
 /**
@@ -29,22 +29,34 @@ export interface ParsedNfe {
   items: ParsedNfeItem[];
 }
 
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+// parseTagValue: false desliga a coerção numérica automática do parser.
+// Sem isso, campos textuais com zero à esquerda (CNPJ, número da NFe, código
+// de produto, número de lote) são silenciosamente truncados pela lib antes
+// mesmo do serviço ver o valor (ex.: "01234567000199" vira 1234567000199).
+// Os únicos campos genuinamente numéricos (qCom, vUnCom) são convertidos
+// explicitamente com Number() abaixo — não dependemos da coerção implícita.
+const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', parseTagValue: false });
 
 export function parseNfeXml(xml: string): ParsedNfe {
-  let json: any;
-  try {
-    json = parser.parse(xml);
-  } catch (err) {
+  // Passo explícito de validação de sintaxe: com fast-xml-parser, XML
+  // malformado quase nunca lança em parser.parse() — ele silenciosamente
+  // interpreta o texto em alguma outra estrutura. XMLValidator.validate()
+  // é o jeito confiável de detectar erro de sintaxe genuíno (tag não
+  // fechada, nome de tag inválido etc.) e tratá-lo separadamente de um XML
+  // bem formado que simplesmente não tem o formato esperado de NFe.
+  const validation = XMLValidator.validate(xml);
+  if (validation !== true) {
     throw new AppError(400, 'XML inválido ou malformado');
   }
+
+  const json: any = parser.parse(xml);
 
   // Aceita tanto o envelope completo (nfeProc, com protocolo de autorização
   // anexado) quanto só a NFe isolada — ambos são exportados pelos emissores
   // fiscais dependendo de como o usuário baixou o arquivo.
   const infNFe = json?.nfeProc?.NFe?.infNFe ?? json?.NFe?.infNFe;
   if (!infNFe) {
-    throw new AppError(400, 'XML inválido - estrutura de NFe não reconhecida (esperado nfeProc/NFe/infNFe)');
+    throw new AppError(400, 'XML bem formado, mas estrutura de NFe não reconhecida (esperado nfeProc/NFe/infNFe)');
   }
 
   const emit = infNFe.emit;
