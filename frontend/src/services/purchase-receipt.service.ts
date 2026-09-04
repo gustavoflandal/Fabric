@@ -33,7 +33,7 @@ export interface PurchaseReceipt {
     orderNumber: string;
     status: string;
     supplier?: {
-      code: string;
+      id: string;
       name: string;
     };
   };

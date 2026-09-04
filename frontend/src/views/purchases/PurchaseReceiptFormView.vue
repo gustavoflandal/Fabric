@@ -73,7 +73,7 @@
             <select
               class="rounded-lg border-gray-300 shadow-sm text-sm"
               :value="nfeMatches[idx] ?? ''"
-              @change="applyNfeMatch(idx, ($event.target as HTMLSelectElement).value)"
+              @change="applyNfeMatch(idx, ($event.target as HTMLSelectElement).value, $event.target as HTMLSelectElement)"
             >
               <option value="">Não corresponde a nenhum item</option>
               <option v-for="row in itemRows" :key="row.orderItemId" :value="row.orderItemId">
@@ -323,8 +323,27 @@ async function handleNfeFileSelected(event: Event) {
   }
 }
 
-function applyNfeMatch(nfeItemIndex: number, orderItemId: string) {
+function applyNfeMatch(nfeItemIndex: number, orderItemId: string, selectEl?: HTMLSelectElement) {
   if (!parsedNfe.value) return;
+
+  if (orderItemId) {
+    const claimedByOtherIndex = Object.entries(nfeMatches.value).some(
+      ([key, value]) => Number(key) !== nfeItemIndex && value === orderItemId
+    );
+    if (claimedByOtherIndex) {
+      toast.error('Este item do pedido já está associado a outra linha da NFe.');
+      // A troca visual do <select> nativo já aconteceu no DOM antes deste
+      // evento disparar (o browser aplica a seleção antes de emitir
+      // `change`). Como não escrevemos em `nfeMatches.value`, o estado
+      // reativo do Vue não muda — e sem mudança reativa não há novo render
+      // para o binding `:value` reconciliar o DOM de volta. Por isso o reset
+      // é feito diretamente no elemento, fora do ciclo reativo do Vue.
+      if (selectEl) {
+        selectEl.value = nfeMatches.value[nfeItemIndex] ?? '';
+      }
+      return;
+    }
+  }
 
   const previousOrderItemId = nfeMatches.value[nfeItemIndex];
   if (previousOrderItemId && previousOrderItemId !== orderItemId) {

@@ -493,10 +493,11 @@ async function handleRegisterEntry() {
     const productId = movementForm.value.productId;
     const created = await stockStore.registerEntry(movementForm.value);
     lastMovement.value = created;
-    lastMovementProductLabel.value = productId;
     showMovementModal.value = false;
     movementForm.value = { productId: '', quantity: 0, reason: '', reference: '' };
     await loadData();
+    const balance = balances.value.find((b) => b.productId === productId);
+    lastMovementProductLabel.value = balance ? `${balance.product.code} - ${balance.product.name}` : productId;
     toast.success('Entrada registrada com sucesso! Use "Imprimir Último Comprovante" se precisar do papel.');
   } catch (error) {
     console.error('Erro ao registrar entrada:', error);
@@ -509,10 +510,11 @@ async function handleRegisterExit() {
     const productId = exitForm.value.productId;
     const created = await stockStore.registerExit(exitForm.value);
     lastMovement.value = created;
-    lastMovementProductLabel.value = productId;
     showExitModal.value = false;
     exitForm.value = { productId: '', quantity: 0, reason: '', reference: '' };
     await loadData();
+    const balance = balances.value.find((b) => b.productId === productId);
+    lastMovementProductLabel.value = balance ? `${balance.product.code} - ${balance.product.name}` : productId;
     toast.success('Saída registrada com sucesso! Use "Imprimir Último Comprovante" se precisar do papel.');
   } catch (error) {
     console.error('Erro ao registrar saída:', error);
@@ -525,10 +527,11 @@ async function handleRegisterAdjustment() {
     const productId = adjustmentForm.value.productId;
     const created = await stockStore.registerAdjustment(adjustmentForm.value);
     lastMovement.value = created;
-    lastMovementProductLabel.value = productId;
     showAdjustmentModal.value = false;
     adjustmentForm.value = { productId: '', quantity: 0, reason: '' };
     await loadData();
+    const balance = balances.value.find((b) => b.productId === productId);
+    lastMovementProductLabel.value = balance ? `${balance.product.code} - ${balance.product.name}` : productId;
     toast.success('Ajuste registrado com sucesso! Use "Imprimir Último Comprovante" se precisar do papel.');
   } catch (error) {
     console.error('Erro ao registrar ajuste:', error);
