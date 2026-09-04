@@ -263,13 +263,15 @@
                 <p class="text-sm font-medium text-gray-700">Estruturas de Armazém</p>
               </div>
             </RouterLink>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <RouterLink
+              to="/purchases/receipts"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+            >
               <div class="text-center">
                 <div class="text-3xl mb-2">📦</div>
-                <p class="text-sm font-medium text-gray-500">Recebimento</p>
-                <p class="text-xs text-gray-400 mt-1">Em breve</p>
+                <p class="text-sm font-medium text-gray-700">Recebimento</p>
               </div>
-            </div>
+            </RouterLink>
             <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
               <div class="text-center">
                 <div class="text-3xl mb-2">📍</div>
