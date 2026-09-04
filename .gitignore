@@ -51,3 +51,6 @@ temp/
 # Build artifacts
 *.tsbuildinfo
 
+# Superpowers scratch (SDD progress ledger, brainstorming companion mockups)
+.superpowers/
+
