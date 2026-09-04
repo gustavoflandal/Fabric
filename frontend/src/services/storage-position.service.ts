@@ -24,5 +24,10 @@ export const storagePositionService = {
   async deletePosition(positionId: string) {
     const response = await api.delete(`/storage-positions/position/${positionId}`);
     return response.data;
+  },
+
+  async getPositionByCode(code: string) {
+    const response = await api.get(`/storage-positions/by-code/${code}`);
+    return response.data;
   }
 };
