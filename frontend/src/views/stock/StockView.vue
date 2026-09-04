@@ -1,7 +1,14 @@
 <template>
   <AppLayout title="Estoque" subtitle="Controle de saldos e movimentações">
     <template #actions>
-      <div class="flex space-x-2">
+      <div class="flex items-center space-x-2">
+        <Button
+          v-if="lastMovement"
+          variant="outline"
+          @click="printMovementReceipt(lastMovement, lastMovementProductLabel)"
+        >
+          🖨️ Imprimir Último Comprovante
+        </Button>
         <Button variant="outline" @click="showMovementModal = true">⬆️ Entrada</Button>
         <Button variant="outline" @click="showExitModal = true">⬇️ Saída</Button>
         <Button @click="showAdjustmentModal = true">🔧 Ajuste</Button>
@@ -296,6 +303,7 @@
           <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
           <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
           <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Referência</th>
+          <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
         </template>
 
         <template #row="{ item }">
@@ -314,6 +322,14 @@
           </td>
           <td class="px-4 py-2 text-sm text-gray-600">{{ item.reason }}</td>
           <td class="px-4 py-2 text-sm text-gray-500">{{ item.reference || '-' }}</td>
+          <td class="px-4 py-2 text-right text-sm">
+            <button
+              class="text-primary-600 hover:text-primary-900 font-medium"
+              @click="printMovementReceipt(item, movementsProductLabel)"
+            >
+              Imprimir
+            </button>
+          </td>
         </template>
       </DataTable>
 
@@ -338,9 +354,12 @@ import DataTable from '@/components/common/DataTable.vue';
 import FormField from '@/components/common/FormField.vue';
 import StatusBadge, { type BadgeTone } from '@/components/common/StatusBadge.vue';
 import { useToast } from '@/composables/useToast';
+import { useAuthStore } from '@/stores/auth.store';
+import { generatePDF, formatDate as formatDatePDF } from '@/utils/pdf-generator';
 
 const stockStore = useStockStore();
 const toast = useToast();
+const authStore = useAuthStore();
 
 const loading = ref(false);
 // §4.4-5 / I11: erro de carregamento é um estado próprio, nunca "lista vazia".
@@ -362,7 +381,10 @@ const showMovementsModal = ref(false);
 const loadingMovements = ref(false);
 const movementsError = ref('');
 const movementsProductId = ref('');
+const movementsProductLabel = ref('');
 const movements = ref<StockMovement[]>([]);
+const lastMovement = ref<StockMovement | null>(null);
+const lastMovementProductLabel = ref('');
 
 const movementForm = ref({
   productId: '',
@@ -468,11 +490,14 @@ async function loadBalances() {
 
 async function handleRegisterEntry() {
   try {
-    await stockStore.registerEntry(movementForm.value);
+    const productId = movementForm.value.productId;
+    const created = await stockStore.registerEntry(movementForm.value);
+    lastMovement.value = created;
+    lastMovementProductLabel.value = productId;
     showMovementModal.value = false;
     movementForm.value = { productId: '', quantity: 0, reason: '', reference: '' };
     await loadData();
-    toast.success('Entrada registrada com sucesso!');
+    toast.success('Entrada registrada com sucesso! Use "Imprimir Último Comprovante" se precisar do papel.');
   } catch (error) {
     console.error('Erro ao registrar entrada:', error);
     toast.error('Erro ao registrar entrada');
@@ -481,11 +506,14 @@ async function handleRegisterEntry() {
 
 async function handleRegisterExit() {
   try {
-    await stockStore.registerExit(exitForm.value);
+    const productId = exitForm.value.productId;
+    const created = await stockStore.registerExit(exitForm.value);
+    lastMovement.value = created;
+    lastMovementProductLabel.value = productId;
     showExitModal.value = false;
     exitForm.value = { productId: '', quantity: 0, reason: '', reference: '' };
     await loadData();
-    toast.success('Saída registrada com sucesso!');
+    toast.success('Saída registrada com sucesso! Use "Imprimir Último Comprovante" se precisar do papel.');
   } catch (error) {
     console.error('Erro ao registrar saída:', error);
     toast.error('Erro ao registrar saída');
@@ -494,11 +522,14 @@ async function handleRegisterExit() {
 
 async function handleRegisterAdjustment() {
   try {
-    await stockStore.registerAdjustment(adjustmentForm.value);
+    const productId = adjustmentForm.value.productId;
+    const created = await stockStore.registerAdjustment(adjustmentForm.value);
+    lastMovement.value = created;
+    lastMovementProductLabel.value = productId;
     showAdjustmentModal.value = false;
     adjustmentForm.value = { productId: '', quantity: 0, reason: '' };
     await loadData();
-    toast.success('Ajuste registrado com sucesso!');
+    toast.success('Ajuste registrado com sucesso! Use "Imprimir Último Comprovante" se precisar do papel.');
   } catch (error) {
     console.error('Erro ao registrar ajuste:', error);
     toast.error('Erro ao registrar ajuste');
@@ -507,6 +538,8 @@ async function handleRegisterAdjustment() {
 
 function viewMovements(productId: string) {
   movementsProductId.value = productId;
+  const balance = balances.value.find((b) => b.productId === productId);
+  movementsProductLabel.value = balance ? `${balance.product.code} - ${balance.product.name}` : productId;
   showMovementsModal.value = true;
   return loadMovements(productId);
 }
@@ -530,5 +563,29 @@ async function loadMovements(productId: string) {
 
 function formatDateTime(date: string) {
   return new Date(date).toLocaleString('pt-BR');
+}
+
+function printMovementReceipt(movement: {
+  type: string;
+  quantity: number;
+  reason: string;
+  reference?: string;
+  createdAt: string;
+}, productLabel: string) {
+  const pdf = generatePDF({
+    title: 'Comprovante de Movimentação de Estoque',
+    subtitle: productLabel,
+    data: {
+      Tipo: getMovementTypeLabel(movement.type),
+      Quantidade: String(movement.quantity),
+      Motivo: movement.reason,
+      Referência: movement.reference || '-',
+      Data: formatDatePDF(movement.createdAt),
+      Usuário: authStore.userName,
+    },
+    signature: { label: 'Assinatura de Quem Executou' },
+  });
+
+  pdf.save(`Movimentacao_${movement.type}_${new Date(movement.createdAt).getTime()}.pdf`);
 }
 </script>
