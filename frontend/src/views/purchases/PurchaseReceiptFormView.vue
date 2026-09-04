@@ -275,6 +275,8 @@ function getOrderStatusLabel(status: string): string {
 
 function selectOrder(order: PurchaseOrder) {
   selectedOrder.value = order;
+  parsedNfe.value = null;
+  nfeMatches.value = {};
   itemRows.value = order.items.map((item) => ({
     orderItemId: item.id,
     productId: item.productId,
@@ -313,6 +315,19 @@ async function handleNfeFileSelected(event: Event) {
 
 function applyNfeMatch(nfeItemIndex: number, orderItemId: string) {
   if (!parsedNfe.value) return;
+
+  const previousOrderItemId = nfeMatches.value[nfeItemIndex];
+  if (previousOrderItemId && previousOrderItemId !== orderItemId) {
+    const previousRow = itemRows.value.find((r) => r.orderItemId === previousOrderItemId);
+    if (previousRow) {
+      previousRow.quantityReceived = 0;
+      previousRow.nfeQuantity = null;
+      previousRow.nfeDivergence = false;
+      previousRow.lotNumber = '';
+      previousRow.expiresAt = '';
+    }
+  }
+
   nfeMatches.value[nfeItemIndex] = orderItemId;
   if (!orderItemId) return;
 
