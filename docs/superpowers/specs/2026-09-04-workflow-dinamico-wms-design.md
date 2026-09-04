@@ -166,6 +166,8 @@ Validada com o usuário via mockup no companion visual de brainstorming (`.super
 
 Telas: lista de templates (nome, ativo, prioridade, resumo da regra de gatilho, ações: editar/duplicar/ativar-desativar/excluir) + editor de template (o canvas descrito acima, mais campos de nome/descrição/prioridade/regra de gatilho do template).
 
+**Consistência com o padrão visual do sistema (confirmado com o usuário):** a lista de templates usa os componentes de design system já padronizados no resto do frontend (`AppLayout`, `DataTable`, `FormField`, `AppModal`, `StatusBadge` para ativo/inativo) — mesmo padrão da migração de telas concluída antes deste projeto (`frontend/src/components/common/`). O construtor de regra de condição (campo/operador/valor + E/OU) e os campos de nome/descrição/prioridade do template também seguem esse padrão (`FormField`, botões e cores Tailwind já usados no resto de Compras/WMS). Só o canvas do grafo em si (nós, conectores, paleta, arrastar-e-soltar) é peça nova sem precedente no codebase — nada no sistema hoje desenha um grafo interativo — então essa parte não tem um componente existente para reaproveitar, mas usa a mesma paleta de cores/tipografia do tema Tailwind do projeto em vez de um visual dissonante.
+
 ### 7. Testes e tratamento de erro
 
 - **Backend:** testes unitários do avaliador de condição (`evaluateRule`) cobrindo E/OU aninhado e cada operador; testes do resolvedor de grafo (`resolveWorkflowTasks`) cobrindo decisão SIM/NAO, fallback pra cadeia padrão quando nenhum template bate, e o guard de ciclo em runtime; testes de integração do endpoint de salvar template cobrindo cada regra de validação da seção 3 (nó órfão, decisão sem 2 saídas, ciclo, caminho não terminando em ALOCACAO) retornando 400 com mensagem específica.
