@@ -53,6 +53,9 @@
       <p class="text-sm text-gray-700">
         Você vai assumir a etapa <strong>{{ pendingTask ? WAREHOUSE_TASK_TYPE_LABELS[pendingTask.type] : '' }}</strong>.
       </p>
+      <div v-if="pickupErrorMessage" class="mt-3 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+        {{ pickupErrorMessage }}
+      </div>
       <template #footer>
         <div class="flex justify-end gap-3">
           <button type="button" class="px-4 py-2 text-sm text-gray-700" @click="confirmPickupOpen = false">Cancelar</button>
@@ -129,7 +132,13 @@ function setScope(next: PanelScope): void {
 let pollHandle: ReturnType<typeof setInterval> | undefined
 
 async function load(): Promise<void> {
-  await store.fetchPanel(scope.value)
+  try {
+    await store.fetchPanel(scope.value)
+  } catch {
+    // store.fetchPanel já registra a mensagem em store.error, que o template
+    // exibe (v-if="store.error") — nada mais a fazer aqui além de evitar a
+    // unhandled promise rejection.
+  }
 }
 
 onMounted(() => {
@@ -160,6 +169,7 @@ const actionOperation = ref<ReceiptOperation | null>(null)
 const actionTask = ref<WarehouseTask | null>(null)
 const actionItems = ref<OperationItemForDocument[]>([])
 const actionSupplierName = ref('')
+const pickupErrorMessage = ref('')
 
 function handleRectangleClick(operation: ReceiptOperation, task: WarehouseTask): void {
   const state = computeTaskRectangleState(operation.tasks, task, authStore.user?.id ?? '')
@@ -175,6 +185,7 @@ function handleRectangleClick(operation: ReceiptOperation, task: WarehouseTask):
   if (task.assignedTo === null) {
     pendingOperation.value = operation
     pendingTask.value = task
+    pickupErrorMessage.value = ''
     confirmPickupOpen.value = true
     return
   }
@@ -186,7 +197,16 @@ async function confirmPickup(): Promise<void> {
   if (!pendingTask.value || !pendingOperation.value) return
   const taskId = pendingTask.value.id
   const receiptId = pendingOperation.value.receiptId
-  await warehouseTaskService.start(taskId)
+
+  try {
+    await warehouseTaskService.start(taskId)
+  } catch (error: any) {
+    pickupErrorMessage.value =
+      error?.response?.data?.message ?? 'Não foi possível assumir esta tarefa.'
+    return
+  }
+
+  pickupErrorMessage.value = ''
   confirmPickupOpen.value = false
   pendingOperation.value = null
   pendingTask.value = null
@@ -202,25 +222,32 @@ async function confirmPickup(): Promise<void> {
 }
 
 async function openAction(operation: ReceiptOperation, task: WarehouseTask): Promise<void> {
-  const response = await purchaseReceiptService.getById(operation.receiptId)
-  const receipt = response.data.data
-  actionOperation.value = operation
-  actionTask.value = task
-  actionItems.value = toOperationItems(
-    receipt.items.map((item) => ({
-      id: item.id,
-      productId: item.productId,
-      quantity: item.acceptedQty,
-      lotNumber: item.lotNumber,
-      product: item.product,
-    }))
-  )
-  actionSupplierName.value = receipt.order?.supplier?.name ?? ''
+  try {
+    const response = await purchaseReceiptService.getById(operation.receiptId)
+    const receipt = response.data.data
+    actionOperation.value = operation
+    actionTask.value = task
+    actionItems.value = toOperationItems(
+      receipt.items.map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        quantity: item.acceptedQty,
+        lotNumber: item.lotNumber,
+        product: item.product,
+      }))
+    )
+    actionSupplierName.value = receipt.order?.supplier?.name ?? ''
 
-  if (task.type === 'ALOCACAO') {
-    putawayActionOpen.value = true
-  } else {
-    simpleActionOpen.value = true
+    if (task.type === 'ALOCACAO') {
+      putawayActionOpen.value = true
+    } else {
+      simpleActionOpen.value = true
+    }
+  } catch (error: any) {
+    const serverMessage = error?.response?.data?.message
+    store.error = serverMessage
+      ? `Não foi possível carregar os detalhes do recebimento. ${serverMessage}`
+      : 'Não foi possível carregar os detalhes do recebimento.'
   }
 }
 
