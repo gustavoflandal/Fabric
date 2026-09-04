@@ -187,6 +187,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/wms/WorkflowTemplatesView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/wms/workflows/new',
+    name: 'wms-workflow-new',
+    component: () => import('../views/wms/WorkflowTemplateEditorView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/wms/workflows/:id',
+    name: 'wms-workflow-edit',
+    component: () => import('../views/wms/WorkflowTemplateEditorView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
