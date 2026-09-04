@@ -181,6 +181,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/warehouse-structures/WarehouseStructuresView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/wms/workflows',
+    name: 'wms-workflows',
+    component: () => import('../views/wms/WorkflowTemplatesView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
