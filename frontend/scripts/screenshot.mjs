@@ -47,6 +47,8 @@ const ROUTES = {
   'purchase-receipts': '/purchases/receipts',
   'purchase-receipts-new': '/purchases/receipts/new',
   'wms-operations': '/wms/operations',
+  'wms-workflows': '/wms/workflows',
+  'wms-workflow-new': '/wms/workflows/new',
   notifications: '/notifications',
   'counting-dashboard': '/counting/dashboard',
   'counting-plans': '/counting/plans',
