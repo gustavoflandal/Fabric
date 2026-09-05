@@ -7,6 +7,7 @@ import {
   assignWarehouseTaskSchema,
   completeWarehouseTaskSchema,
   executeWarehouseTaskSchema,
+  kpisQuerySchema,
   myWarehouseTasksQuerySchema,
   panelQuerySchema,
   putawayWarehouseTaskSchema,
@@ -91,6 +92,16 @@ router.get(
   requirePermission('recebimentos_compra', 'visualizar'),
   validateQuery(panelQuerySchema),
   warehouseTaskController.getPanel
+);
+
+// Dashboard de KPIs do WMS — as 4 abas de Recebimento. RBAC:
+// `tarefas_armazem:visualizar`, mesmo recurso de `GET /my` — é leitura
+// agregada, não dado sensível a mais que o painel operacional já expõe.
+router.get(
+  '/kpis',
+  requirePermission('tarefas_armazem', 'visualizar'),
+  validateQuery(kpisQuerySchema),
+  warehouseTaskController.getKpis
 );
 
 // F4.5 — cadeia de tarefas de um recebimento. Segmento fixo (`/receipt/`) antes
