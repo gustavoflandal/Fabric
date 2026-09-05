@@ -123,3 +123,12 @@ export const deletePosition = async (req: Request, res: Response, next: NextFunc
     next(error);
   }
 };
+
+export const getOccupancy = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const data = await storagePositionService.getOccupancy();
+    res.json({ success: true, data });
+  } catch (error: any) {
+    next(error);
+  }
+};

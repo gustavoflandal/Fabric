@@ -53,6 +53,16 @@ router.get(
   storagePositionController.getPositionMovements
 );
 
+// Dashboard de KPIs do WMS — aba Ocupação. Declarada antes de '/:structureId'
+// pela mesma razão de '/by-code/:code' e '/:id/movements' acima: rota
+// específica antes da paramétrica. RBAC: `estruturas_armazem:visualizar`,
+// mesmo recurso das demais leituras de posição deste arquivo.
+router.get(
+  '/occupancy',
+  requirePermission('estruturas_armazem', 'visualizar'),
+  storagePositionController.getOccupancy
+);
+
 // Listar posições de uma estrutura
 router.get(
   '/:structureId',
