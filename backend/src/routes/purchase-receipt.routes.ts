@@ -3,7 +3,7 @@ import purchaseReceiptController from '../controllers/purchase-receipt.controlle
 import { authMiddleware } from '../middleware/auth.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
 import { validate } from '../middleware/validation.middleware';
-import { createPurchaseReceiptSchema, cancelPurchaseReceiptSchema } from '../validators/purchase-receipt.validator';
+import { createPurchaseReceiptSchema, cancelPurchaseReceiptSchema, parseNfeSchema } from '../validators/purchase-receipt.validator';
 
 const router = Router();
 
@@ -22,6 +22,15 @@ router.get(
   '/:id',
   requirePermission('recebimentos_compra', 'visualizar'),
   purchaseReceiptController.getById
+);
+
+// Parse de XML de NFe para pré-preencher o formulário de recebimento —
+// segmento fixo, registrado antes de qualquer rota paramétrica do arquivo.
+router.post(
+  '/parse-nfe',
+  requirePermission('recebimentos_compra', 'criar'),
+  validate(parseNfeSchema),
+  purchaseReceiptController.parseNfe
 );
 
 // Criar recebimento

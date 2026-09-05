@@ -7,11 +7,11 @@ interface PdfOptions {
   data: Record<string, any>;
   items?: Array<Record<string, any>>;
   itemsColumns?: Array<{ header: string; key: string; align?: 'left' | 'center' | 'right' }>;
-  supplierSignature?: boolean;
+  signature?: { label: string };
 }
 
 export const generatePDF = (options: PdfOptions) => {
-  const { title, subtitle, data, items, itemsColumns, supplierSignature = false } = options;
+  const { title, subtitle, data, items, itemsColumns, signature } = options;
   
   // Criar documento PDF
   const doc = new jsPDF();
@@ -135,8 +135,10 @@ export const generatePDF = (options: PdfOptions) => {
     yPosition += splitObservacoes.length * 5 + 5;
   }
   
-  // Rodapé com assinatura do fornecedor (se solicitado)
-  if (supplierSignature) {
+  // Rodapé com assinatura (se solicitado) — rótulo customizável: comprovantes
+  // de movimentação/recebimento usam "Assinatura de Quem Executou"/"Recebido
+  // por", os documentos de compra usam "Assinatura do Fornecedor".
+  if (signature) {
     // Garantir espaço no final da página
     const signatureHeight = 40;
     const footerHeight = 15;
@@ -159,7 +161,7 @@ export const generatePDF = (options: PdfOptions) => {
     // Seção de assinatura
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('Assinatura do Fornecedor:', margin, yPosition);
+    doc.text(`${signature.label}:`, margin, yPosition);
     yPosition += 15;
     
     // Linha para assinatura
