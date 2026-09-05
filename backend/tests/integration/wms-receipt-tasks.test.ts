@@ -199,6 +199,73 @@ describe('Integração: recebimento orientado a tarefa (Fase 4a, F4.1-F4.5)', ()
       expect(orderItem?.receivedQty).toBe(100);
     });
 
+    describe('com um WorkflowTemplate ativo (F-WORKFLOW)', () => {
+      it('ignora templates inativos ou cujo triggerRule não bate, e cai na cadeia padrão', async () => {
+        const { user, token } = await loginReceiptUser();
+
+        // `createReceipt()` (helper já existente neste arquivo) cria o produto
+        // via `createTestProduct()` SEM overrides — `weight` fica `null`. Nenhum
+        // dos três templates abaixo bate: `inactive` está desligado; `noMatch`
+        // exige weight > 99999; `wouldMatchIfHeavy` exige weight > 500, mas um
+        // campo `null` nunca satisfaz condição nenhuma (workflow-condition.
+        // service.ts::evaluateLeaf). Resultado esperado: cai no fallback —
+        // a cadeia padrão de 5 tarefas, idêntica ao teste do baseline (Step 1).
+        const inactive = await testPrisma.workflowTemplate.create({
+          data: { name: 'Inativo', active: false, priority: 10, triggerRule: { field: 'product.weight', operator: 'gt', value: 0 } },
+        });
+        const noMatch = await testPrisma.workflowTemplate.create({
+          data: { name: 'Não bate', active: true, priority: 10, triggerRule: { field: 'product.weight', operator: 'gt', value: 99999 } },
+        });
+        const wouldMatchIfHeavy = await testPrisma.workflowTemplate.create({
+          data: { name: 'Só bate se pesado', active: true, priority: 5, triggerRule: { field: 'product.weight', operator: 'gt', value: 500 } },
+        });
+
+        const { res } = await createReceipt(token, user.id, 100);
+        expect(res.status).toBe(201);
+
+        const tasks = await testPrisma.warehouseTask.findMany({
+          where: { reference: res.body.data.id, referenceType: 'PURCHASE_RECEIPT' },
+          orderBy: { sequence: 'asc' },
+        });
+        expect(tasks.map((t) => t.type)).toEqual(['DESCARGA', 'CONFERENCIA', 'ETIQUETAGEM', 'QUARENTENA', 'ALOCACAO']);
+
+        await testPrisma.workflowTemplate.deleteMany({ where: { id: { in: [inactive.id, noMatch.id, wouldMatchIfHeavy.id] } } });
+      });
+
+      it('gera a cadeia definida pelo template (sem Quarentena) quando o produto bate com o triggerRule', async () => {
+        const { user, token } = await loginReceiptUser();
+
+        const matching = await testPrisma.workflowTemplate.create({
+          data: { name: 'Sem quarentena para produto pesado', active: true, priority: 1, triggerRule: { field: 'product.weight', operator: 'gt', value: 500 } },
+        });
+        const n1 = await testPrisma.workflowNode.create({ data: { templateId: matching.id, type: 'DESCARGA', positionX: 0, positionY: 0 } });
+        const n2 = await testPrisma.workflowNode.create({ data: { templateId: matching.id, type: 'ALOCACAO', positionX: 0, positionY: 0 } });
+        await testPrisma.workflowEdge.create({ data: { templateId: matching.id, fromNodeId: n1.id, toNodeId: n2.id } });
+        await testPrisma.workflowTemplate.update({ where: { id: matching.id }, data: { entryNodeId: n1.id } });
+
+        const product = await createTestProduct({ weight: 900 });
+        const { order } = await createTestPurchaseOrder(user.id, [{ productId: product.id, quantity: 100, unitPrice: 10 }]);
+
+        const res = await request(app)
+          .post('/api/v1/purchase-receipts')
+          .set('Authorization', `Bearer ${token}`)
+          .send({
+            purchaseOrderId: order.id,
+            receiptDate: new Date().toISOString(),
+            items: [{ orderItemId: order.items[0].id, productId: product.id, quantityReceived: 100 }],
+          });
+        expect(res.status).toBe(201);
+
+        const tasks = await testPrisma.warehouseTask.findMany({
+          where: { reference: res.body.data.id, referenceType: 'PURCHASE_RECEIPT' },
+          orderBy: { sequence: 'asc' },
+        });
+        expect(tasks.map((t) => t.type)).toEqual(['DESCARGA', 'ALOCACAO']);
+
+        await testPrisma.workflowTemplate.delete({ where: { id: matching.id } });
+      });
+    });
+
     it('respeita a ordem da cadeia: endereçar antes das etapas anteriores é 409', async () => {
       const { user, token } = await loginReceiptUser();
       const { product, res } = await createReceipt(token, user.id, 100);

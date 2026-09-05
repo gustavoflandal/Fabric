@@ -194,6 +194,24 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/wms/workflows',
+    name: 'wms-workflows',
+    component: () => import('../views/wms/WorkflowTemplatesView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/wms/workflows/new',
+    name: 'wms-workflow-new',
+    component: () => import('../views/wms/WorkflowTemplateEditorView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/wms/workflows/:id',
+    name: 'wms-workflow-edit',
+    component: () => import('../views/wms/WorkflowTemplateEditorView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/wms/operations',
     name: 'wms-operations',
     component: () => import('../views/wms/OperationsPanelView.vue'),

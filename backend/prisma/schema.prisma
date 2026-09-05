@@ -1570,14 +1570,124 @@ model StorageRule {
 // `stock.service.ts::transfer()` (F2.3) sem tarefa nenhuma, e a contagem
 // ciclica tem seu proprio ciclo de vida (`CountingSession`/`CountingItem`, Fase
 // 3) - declarar os dois aqui seria enum morto no banco.
+// F-WORKFLOW — SEGREGACAO/AMOSTRAGEM foram inseridos no MEIO do enum (entre
+// QUARENTENA e ALOCACAO), não no fim, na migration original. Em uma
+// instalação com `warehouse_tasks` populada, isso faz o `ALTER TABLE ...
+// MODIFY COLUMN` reconstruir a tabela inteira (não é metadata-only) —
+// consideração de deploy (lock/downtime), não bug de correção (os dados
+// convertem por valor normalmente). Migrations futuras que adicionem valores
+// a este enum deveriam preferir apendar ao final.
 enum WarehouseTaskType {
   DESCARGA
   CONFERENCIA
   ETIQUETAGEM
   QUARENTENA
+  SEGREGACAO
+  AMOSTRAGEM
   ALOCACAO
   PICKING
   REPLENISHMENT
+}
+
+// F-WORKFLOW — direção do fluxo. Só ENTRADA (Recebimento) tem executor nesta
+// fase; SAIDA existe no modelo para permitir que cross-docking seja plugado
+// depois sem migração nem redesenho de WorkflowTemplate/Node/Edge.
+enum WorkflowDirection {
+  ENTRADA
+  SAIDA
+}
+
+// F-WORKFLOW — paleta FIXA de operações do canvas visual. DECISAO é o único
+// valor que não vira WarehouseTask real (é controle de fluxo puro, resolvido
+// em tempo de criação do recebimento — ver workflow-resolver.service.ts). Os
+// outros 7 espelham WarehouseTaskType de propósito (mesmos nomes): um nó
+// DESCARGA no grafo produz uma WarehouseTask DESCARGA de verdade.
+enum WorkflowNodeType {
+  DESCARGA
+  CONFERENCIA
+  ETIQUETAGEM
+  QUARENTENA
+  SEGREGACAO
+  AMOSTRAGEM
+  ALOCACAO
+  DECISAO
+}
+
+// F-WORKFLOW — qual das duas saídas de um nó DECISAO uma aresta representa.
+enum WorkflowEdgeBranch {
+  SIM
+  NAO
+}
+
+// F-WORKFLOW — um fluxo configurável pelo admin (spec:
+// docs/superpowers/specs/2026-09-04-workflow-dinamico-wms-design.md).
+// `entryNodeId` é opcional no schema (não pode ser NOT NULL apontando pra uma
+// tabela filha que só existe DEPOIS do template criado — problema clássico de
+// referência circular na criação) mas é OBRIGATÓRIO por regra de negócio: o
+// service de CRUD (workflow-template.service.ts) nunca deixa um template
+// persistido sem entryNodeId válido.
+model WorkflowTemplate {
+  id          String            @id @default(uuid())
+  name        String
+  description String?
+  direction   WorkflowDirection @default(ENTRADA)
+  active      Boolean           @default(true)
+  // Maior prioridade vence quando mais de um template tem triggerRule
+  // batendo com o mesmo recebimento — ver pickTemplate() em
+  // workflow-resolver.service.ts.
+  priority    Int               @default(0)
+  // ConditionRule (workflow-condition.service.ts) serializado. NULL = este
+  // template nunca é selecionado automaticamente (precisa de condição
+  // explícita — não existe "template catch-all" implícito).
+  triggerRule Json?
+  entryNodeId String?
+
+  nodes WorkflowNode[]
+  edges WorkflowEdge[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // "Quais templates de ENTRADA ativos, do maior pro menor priority" — a
+  // consulta de pickTemplate().
+  @@index([direction, active, priority])
+  @@map("workflow_templates")
+}
+
+model WorkflowNode {
+  id         String           @id @default(uuid())
+  templateId String
+  type       WorkflowNodeType
+  label      String?
+  // ConditionRule serializado — só usado quando type = DECISAO.
+  conditionRule Json?
+  // Só layout do canvas (arrastar-e-soltar livre) — não participa da
+  // resolução do grafo.
+  positionX  Float
+  positionY  Float
+
+  // Cascade: apagar o template apaga seus nós/arestas — não faz sentido nó
+  // órfão de template nenhum.
+  template WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("workflow_nodes")
+}
+
+model WorkflowEdge {
+  id         String              @id @default(uuid())
+  templateId String
+  fromNodeId String
+  toNodeId   String
+  // NULL nos nós que não são DECISAO (só uma saída possível); SIM/NAO quando
+  // fromNode é DECISAO.
+  branch     WorkflowEdgeBranch?
+
+  template WorkflowTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([fromNodeId])
+  @@map("workflow_edges")
 }
 
 // DECISAO DE DESENHO (F4.1) - por que exatamente estes quatro valores:
