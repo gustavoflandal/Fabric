@@ -112,6 +112,7 @@ import { useWarehouseTaskPanelStore } from '@/stores/warehouse-task-panel.store'
 import { useAuthStore } from '@/stores/auth.store'
 import warehouseTaskService from '@/services/warehouse-task.service'
 import purchaseReceiptService from '@/services/purchase-receipt.service'
+import type { PurchaseReceiptItem } from '@/services/purchase-receipt.service'
 import { WAREHOUSE_TASK_TYPE_LABELS } from '@/types/warehouse-task.types'
 import type { WarehouseTask, ReceiptOperation, PanelScope } from '@/types/warehouse-task.types'
 import type { OperationItemForDocument } from './operations-panel-items'
@@ -228,7 +229,7 @@ async function openAction(operation: ReceiptOperation, task: WarehouseTask): Pro
     actionOperation.value = operation
     actionTask.value = task
     actionItems.value = toOperationItems(
-      receipt.items.map((item) => ({
+      receipt.items.map((item: PurchaseReceiptItem) => ({
         id: item.id,
         productId: item.productId,
         quantity: item.acceptedQty,
