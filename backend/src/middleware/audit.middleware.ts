@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import auditLogService from '../services/audit-log.service';
 import { AuthRequest } from './auth.middleware';
 import { config } from '../config/env';
+import { getSetting } from '../services/system-setting.service';
 
 // Middleware para capturar automaticamente todas as requisições
 export const auditMiddleware = async (
@@ -27,7 +28,8 @@ export const auditMiddleware = async (
   res.on('finish', async () => {
     try {
       // Verificar modo de auditoria
-      if (config.audit.mode === 'none') {
+      const auditMode = await getSetting('audit.mode', config.audit.mode);
+      if (auditMode === 'none') {
         return; // Não logar nada
       }
 
@@ -77,26 +79,34 @@ export const auditMiddleware = async (
       const isWriteOperation = !isReadOperation;
 
       // Modo: errors_only - Logar apenas erros
-      if (config.audit.mode === 'errors_only' && !isError) {
+      if (auditMode === 'errors_only' && !isError) {
         return;
       }
 
       // Modo: write_only - Logar apenas escritas e erros
-      if (config.audit.mode === 'write_only') {
+      if (auditMode === 'write_only') {
         if (isReadOperation && !isError) {
           return; // Não logar leituras bem-sucedidas
         }
       }
 
-      // Modo: all - Logar tudo (mas respeitar includeReads)
-      if (config.audit.mode === 'all') {
-        if (isReadOperation && !config.audit.includeReads && !isError) {
+      // Modo: all - Logar tudo (mas respeitar includeReads). Declarado fora
+      // do `if` (default `false`) porque o gate final abaixo precisa dele
+      // mesmo fora do modo 'all' — nos outros modos o valor não importa
+      // (correção do bug pré-existente descrito no relatório da Task 6: o
+      // gate final ignorava esta variável e nunca logava uma leitura
+      // bem-sucedida, mesmo com includeReads=true).
+      let includeReads = false;
+      if (auditMode === 'all') {
+        includeReads = await getSetting('audit.include_reads', config.audit.includeReads);
+        if (isReadOperation && !includeReads && !isError) {
           return; // Não logar leituras se includeReads for false
         }
       }
 
-      // Logar operações de escrita ou erros
-      if (isWriteOperation || isError) {
+      // Logar operações de escrita, erros, ou leituras bem-sucedidas quando
+      // o modo 'all' pediu explicitamente para incluí-las.
+      if (isWriteOperation || isError || (isReadOperation && includeReads)) {
         await auditLogService.create({
           userId: req.userId,
           action,
