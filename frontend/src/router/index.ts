@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/settings/system',
+    name: 'system-settings',
+    component: () => import('../views/settings/SystemSettingsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/roles',
     name: 'roles',
     component: () => import('../views/roles/RolesListView.vue'),

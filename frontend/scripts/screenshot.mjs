@@ -31,6 +31,7 @@ const ROUTES = {
   'pcp-dashboard': '/pcp/dashboard',
   users: '/users',
   'audit-logs': '/audit-logs',
+  'system-settings': '/settings/system',
   roles: '/roles',
   'units-of-measure': '/units-of-measure',
   suppliers: '/suppliers',
