@@ -193,7 +193,11 @@ async function main() {
     // Logs de Auditoria
     { resource: 'audit_logs', action: 'read', description: 'Visualizar logs de auditoria' },
     { resource: 'audit_logs', action: 'delete', description: 'Excluir logs de auditoria' },
-    
+
+    // Configurações do Sistema
+    { resource: 'system_settings', action: 'read', description: 'Visualizar configurações do sistema' },
+    { resource: 'system_settings', action: 'update', description: 'Editar configurações do sistema' },
+
     // Orçamentos de Compra
     { resource: 'orcamentos_compra', action: 'criar', description: 'Criar orçamentos de compra' },
     { resource: 'orcamentos_compra', action: 'visualizar', description: 'Visualizar orçamentos de compra' },
@@ -254,6 +258,120 @@ async function main() {
   }
 
   console.log(`✅ ${permissions.length} permissões criadas`);
+
+  // ============================================
+  // CONFIGURAÇÕES DO SISTEMA (system_settings)
+  // ============================================
+  // Parâmetros hoje fixos em .env/hardcoded, migrados para a tabela editável
+  // pela tela de Configurações. Valores abaixo = o comportamento ATUAL do
+  // sistema (ver backend/src/config/env.ts e
+  // backend/src/middleware/rate-limit.middleware.ts) — rodar este seed não
+  // muda nada até um admin editar pela tela.
+  //
+  // `update: {}` é deliberado, mesmo padrão de LicensedModule acima: rodar o
+  // seed de novo NÃO sobrescreve um valor que um admin já customizou.
+  console.log('⚙️  Configurando parâmetros do sistema...');
+  const systemSettings = [
+    {
+      key: 'wms.task_delay_threshold_hours',
+      value: '24',
+      type: 'NUMBER' as const,
+      category: 'wms',
+      label: 'Limiar de tarefa atrasada (horas)',
+      description:
+        'A partir de quantas horas parada em PENDING/IN_PROGRESS uma tarefa do WMS é sinalizada como atrasada no Dashboard de KPIs.',
+    },
+    {
+      key: 'wms.lot_expiry_alert_days',
+      value: '7',
+      type: 'NUMBER' as const,
+      category: 'wms',
+      label: 'Antecedência do alerta de validade de lote (dias)',
+      description:
+        'Quantos dias antes do vencimento um lote com saldo dispara o alerta LOT_EXPIRING_SOON. Antes migrado via LOT_EXPIRY_ALERT_DAYS.',
+    },
+    {
+      key: 'audit.retention_days',
+      value: '90',
+      type: 'NUMBER' as const,
+      category: 'auditoria',
+      label: 'Retenção de logs de auditoria (dias)',
+      description: 'Logs de auditoria mais antigos que isto são apagados pelo job diário de limpeza. Antes AUDIT_LOG_RETENTION_DAYS.',
+    },
+    {
+      key: 'audit.mode',
+      value: 'write_only',
+      type: 'STRING' as const,
+      category: 'auditoria',
+      label: 'Modo de auditoria',
+      description: '"all" loga tudo, "write_only" só escritas e erros, "errors_only" só erros, "none" desliga. Antes AUDIT_LOG_MODE.',
+    },
+    {
+      key: 'audit.include_reads',
+      value: 'false',
+      type: 'BOOLEAN' as const,
+      category: 'auditoria',
+      label: 'Incluir leituras no modo "all"',
+      description: 'Só tem efeito quando o modo é "all". Antes AUDIT_LOG_INCLUDE_READS.',
+    },
+    {
+      key: 'rate_limit.general.window_ms',
+      value: String(15 * 60 * 1000),
+      type: 'NUMBER' as const,
+      category: 'rate_limit',
+      label: 'Janela do limite geral (ms)',
+      description: 'Exige reiniciar o serviço para valer. Aplicado a toda a API.',
+    },
+    {
+      key: 'rate_limit.general.max_requests',
+      value: process.env.NODE_ENV === 'development' ? '1000' : '100',
+      type: 'NUMBER' as const,
+      category: 'rate_limit',
+      label: 'Máximo de requisições no limite geral',
+      description: 'Exige reiniciar o serviço para valer.',
+    },
+    {
+      key: 'rate_limit.login.window_ms',
+      value: String(15 * 60 * 1000),
+      type: 'NUMBER' as const,
+      category: 'rate_limit',
+      label: 'Janela do limite de login (ms)',
+      description: 'Exige reiniciar o serviço para valer. Aplicado a /auth/login e /auth/refresh.',
+    },
+    {
+      key: 'rate_limit.login.max_requests',
+      value: process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? '50' : '10',
+      type: 'NUMBER' as const,
+      category: 'rate_limit',
+      label: 'Máximo de tentativas de login',
+      description: 'Exige reiniciar o serviço para valer.',
+    },
+    {
+      key: 'rate_limit.strict.window_ms',
+      value: String(1 * 60 * 1000),
+      type: 'NUMBER' as const,
+      category: 'rate_limit',
+      label: 'Janela do limite de escrita (ms)',
+      description: 'Exige reiniciar o serviço para valer.',
+    },
+    {
+      key: 'rate_limit.strict.max_requests',
+      value: process.env.NODE_ENV === 'development' ? '100' : '30',
+      type: 'NUMBER' as const,
+      category: 'rate_limit',
+      label: 'Máximo de operações de escrita',
+      description: 'Exige reiniciar o serviço para valer.',
+    },
+  ];
+
+  for (const setting of systemSettings) {
+    await prisma.systemSetting.upsert({
+      where: { key: setting.key },
+      update: {},
+      create: setting,
+    });
+  }
+  console.log(`   - ${systemSettings.length} parâmetros configurados`);
 
   // ============================================
   // PERMISSÕES OBSOLETAS (renomeadas/removidas)
