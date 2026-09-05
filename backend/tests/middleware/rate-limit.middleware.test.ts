@@ -162,4 +162,33 @@ describe('rateLimit', () => {
     expect(second.headers['X-RateLimit-Limit']).toBe('5');
     expect(second.headers['X-RateLimit-Remaining']).toBe('3');
   });
+
+  it('configure() muda o limite em uso sem recriar o middleware nem perder o store', () => {
+    const limiter = rateLimit({ windowMs: 60_000, max: 2 });
+    const req = makeReq('203.0.113.200');
+
+    expect(hit(limiter, req).passed).toBe(true); // 1
+    expect(hit(limiter, req).passed).toBe(true); // 2 = max
+
+    limiter.configure({ max: 5 });
+
+    // Mesmo IP, mesma janela (store intacto): agora aceita até o novo máximo.
+    expect(hit(limiter, req).passed).toBe(true); // 3, dentro do novo max=5
+    expect(hit(limiter, req).passed).toBe(true); // 4
+    expect(hit(limiter, req).passed).toBe(true); // 5 = novo max
+    expect(hit(limiter, req).passed).toBe(false); // 6 > novo max
+  });
+
+  it('configure() aceita atualizar só windowMs, mantendo o max atual', () => {
+    const limiter = rateLimit({ windowMs: 60_000, max: 3 });
+    const req = makeReq('203.0.113.201');
+
+    hit(limiter, req);
+    hit(limiter, req);
+    limiter.configure({ windowMs: 120_000 });
+
+    // max continua 3 — a 4ª (contando as 2 já feitas) ainda passa, a 5ª não.
+    expect(hit(limiter, req).passed).toBe(true); // 3 = max
+    expect(hit(limiter, req).passed).toBe(false); // 4 > max
+  });
 });
