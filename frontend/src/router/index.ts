@@ -193,6 +193,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/warehouse-structures/WarehouseStructuresView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/wms/operations',
+    name: 'wms-operations',
+    component: () => import('../views/wms/OperationsPanelView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

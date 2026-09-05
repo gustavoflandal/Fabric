@@ -12,10 +12,11 @@ export interface PurchaseReceiptItem {
   lotNumber?: string;
   manufacturedAt?: string;
   expiresAt?: string;
-  product?: {
+  product: {
     id: string;
     code: string;
     name: string;
+    segregationGroup?: string | null;
   };
 }
 
@@ -105,4 +106,6 @@ class PurchaseReceiptService {
   }
 }
 
-export default new PurchaseReceiptService();
+export const purchaseReceiptService = new PurchaseReceiptService();
+
+export default purchaseReceiptService;

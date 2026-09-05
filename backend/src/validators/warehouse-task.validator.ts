@@ -91,3 +91,11 @@ export const myWarehouseTasksQuerySchema = Joi.object({
   includeUnassigned: Joi.boolean(),
   limit: Joi.number().integer().min(1).max(200),
 }).unknown(true);
+
+/**
+ * `GET /warehouse-tasks/panel`. `.unknown(true)` mesmo motivo de
+ * `myWarehouseTasksQuerySchema` — `validateQuery` não faz `stripUnknown`.
+ */
+export const panelQuerySchema = Joi.object({
+  scope: Joi.string().valid('all', 'mine'),
+}).unknown(true);
