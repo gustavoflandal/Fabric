@@ -6,6 +6,7 @@ import {
 } from '../../src/services/system-setting.service';
 import { testPrisma, cleanDatabase, disconnectTestDb } from '../helpers/db';
 import { AppError } from '../../src/middleware/error.middleware';
+import { prisma } from '../../src/config/database';
 
 const createSetting = (overrides: Partial<{
   key: string; value: string; type: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON';
@@ -47,7 +48,11 @@ describe('system-setting.service', () => {
 
     it('faz só uma consulta ao banco para chamadas concorrentes (dedupe do carregamento)', async () => {
       await createSetting();
-      const spy = jest.spyOn(testPrisma.systemSetting, 'findMany');
+      // O serviço usa `prisma` (backend/src/config/database) internamente —
+      // não `testPrisma`, que é uma instância DIFERENTE de PrismaClient usada
+      // pelos testes só para preparar/inspecionar dados. Espionar `testPrisma`
+      // não intercepta a chamada real feita pelo serviço.
+      const spy = jest.spyOn(prisma.systemSetting, 'findMany');
 
       await Promise.all([
         getSetting('wms.task_delay_threshold_hours', 24),
@@ -55,15 +60,7 @@ describe('system-setting.service', () => {
         getSetting('wms.task_delay_threshold_hours', 24),
       ]);
 
-      // A implementação usa `prisma` (backend/src/config/database), não
-      // `testPrisma` diretamente — o spy conta chamadas no MESMO processo/
-      // conexão porque os testes de integração deste projeto sempre validam
-      // efeito colateral via testPrisma, nunca mockando o client do serviço.
-      // Ver Nota de implementação abaixo: o serviço usa `prisma` importado de
-      // `../config/database`, cujo `findMany` é o mesmo builder de query —
-      // o spy em `testPrisma.systemSetting.findMany` não intercepta chamadas
-      // feitas por uma instância DIFERENTE de PrismaClient. Este teste,
-      // portanto, espiona diretamente o client que o serviço usa.
+      expect(spy).toHaveBeenCalledTimes(1);
       spy.mockRestore();
     });
   });
@@ -140,6 +137,103 @@ describe('system-setting.service', () => {
 
       await updateSetting('wms.task_delay_threshold_hours', '99', 'user-1');
 
+      expect(await getSetting('wms.task_delay_threshold_hours', 0)).toBe(99);
+    });
+
+    it('rejeita audit.retention_days = 0 com 400, sem alterar o banco', async () => {
+      await createSetting({
+        key: 'audit.retention_days',
+        value: '90',
+        type: 'NUMBER',
+        category: 'auditoria',
+        label: 'Retenção de logs de auditoria (dias)',
+      });
+
+      await expect(
+        updateSetting('audit.retention_days', '0', 'user-1')
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      const row = await testPrisma.systemSetting.findUnique({ where: { key: 'audit.retention_days' } });
+      expect(row!.value).toBe('90');
+    });
+
+    it('rejeita rate_limit.general.max_requests = 0 com 400', async () => {
+      await createSetting({
+        key: 'rate_limit.general.max_requests',
+        value: '100',
+        type: 'NUMBER',
+        category: 'rate_limit',
+        label: 'Máximo de requisições no limite geral',
+      });
+
+      await expect(
+        updateSetting('rate_limit.general.max_requests', '0', 'user-1')
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      const row = await testPrisma.systemSetting.findUnique({ where: { key: 'rate_limit.general.max_requests' } });
+      expect(row!.value).toBe('100');
+    });
+
+    it('aceita valor exatamente no mínimo permitido (audit.retention_days = 1)', async () => {
+      await createSetting({
+        key: 'audit.retention_days',
+        value: '90',
+        type: 'NUMBER',
+        category: 'auditoria',
+        label: 'Retenção de logs de auditoria (dias)',
+      });
+
+      const updated = await updateSetting('audit.retention_days', '1', 'user-1');
+      expect(updated.value).toBe('1');
+    });
+  });
+
+  describe('race de invalidação de cache (epoch guard)', () => {
+    it('não deixa um load em voo sobrescrever o cache com um snapshot pré-escrita', async () => {
+      await createSetting({ value: '24' });
+
+      // Popula o cache normalmente, depois zera para forçar um novo load.
+      expect(await getSetting('wms.task_delay_threshold_hours', 0)).toBe(24);
+      clearSettingCache();
+
+      // Controla manualmente quando o findMany do load "em voo" resolve.
+      let resolveFindMany!: (rows: any[]) => void;
+      const findManySpy = jest.spyOn(prisma.systemSetting, 'findMany').mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFindMany = resolve;
+          }) as any
+      );
+
+      // Dispara a leitura que vai ficar "presa" aguardando o findMany acima —
+      // essa é a leitura A do cenário descrito no achado 2.
+      const staleRead = getSetting('wms.task_delay_threshold_hours', 0);
+
+      // Enquanto a leitura A ainda está em voo, um PATCH concorrente grava um
+      // valor novo e invalida o cache (clearSettingCache real, chamado por
+      // updateSetting).
+      findManySpy.mockRestore();
+      await updateSetting('wms.task_delay_threshold_hours', '99', 'user-1');
+
+      // Agora deixa a leitura A resolver com o snapshot PRÉ-escrita (valor 24).
+      resolveFindMany([
+        {
+          key: 'wms.task_delay_threshold_hours',
+          value: '24',
+          type: 'NUMBER',
+          category: 'wms',
+          label: 'Limiar de tarefa atrasada (horas)',
+          description: null,
+          updatedAt: new Date(),
+          updatedBy: null,
+        },
+      ]);
+      expect(await staleRead).toBe(24); // a leitura A em si devolve o snapshot que buscou — comportamento esperado.
+
+      // O que importa: uma leitura SUBSEQUENTE não pode herdar o snapshot
+      // stale que a leitura A tentou gravar no cache — sem o epoch guard,
+      // `load()` teria feito `cache = loaded` incondicionalmente e essa
+      // leitura devolveria 24 em vez de 99.
       expect(await getSetting('wms.task_delay_threshold_hours', 0)).toBe(99);
     });
   });

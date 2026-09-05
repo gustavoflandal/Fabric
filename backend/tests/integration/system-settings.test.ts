@@ -2,6 +2,7 @@ import request from 'supertest';
 import { app } from '../../src/app';
 import { cleanDatabase, disconnectTestDb, testPrisma } from '../helpers/db';
 import { createUserWithPermissions } from '../helpers/fixtures';
+import { clearSettingCache } from '../../src/services/system-setting.service';
 
 const createSetting = (overrides: Partial<{
   key: string; value: string; type: 'STRING' | 'NUMBER' | 'BOOLEAN' | 'JSON'; category: string;
@@ -28,6 +29,7 @@ const loginWith = async (permissions: { resource: string; action: string }[]) =>
 
 describe('Integração: GET/PATCH /api/v1/system/settings', () => {
   afterEach(async () => {
+    clearSettingCache();
     await cleanDatabase();
   });
 

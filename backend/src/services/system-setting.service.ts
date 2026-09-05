@@ -25,6 +25,26 @@ const KEY_ENUM_VALUES: Record<string, readonly string[]> = {
 };
 
 /**
+ * Limites mínimos para chaves NUMBER cujo valor, embora numericamente válido,
+ * pode causar dano operacional se baixo demais: `audit.retention_days` <= 0
+ * faz o `log-cleanup.job.ts` apagar o audit log inteiro (cutoff em/após
+ * `now`); `rate_limit.*.max_requests` = 0 bloqueia todo mundo (inclusive
+ * login) após um restart. `coerceSettingValue` só garante "é um número" —
+ * a checagem de faixa por chave fica aqui, junto com `KEY_ENUM_VALUES`.
+ */
+const KEY_NUMERIC_BOUNDS: Record<string, { min: number }> = {
+  'audit.retention_days': { min: 1 },
+  'wms.lot_expiry_alert_days': { min: 1 },
+  'wms.task_delay_threshold_hours': { min: 1 },
+  'rate_limit.general.max_requests': { min: 1 },
+  'rate_limit.general.window_ms': { min: 1000 },
+  'rate_limit.login.max_requests': { min: 1 },
+  'rate_limit.login.window_ms': { min: 1000 },
+  'rate_limit.strict.max_requests': { min: 1 },
+  'rate_limit.strict.window_ms': { min: 1000 },
+};
+
+/**
  * Cache em memória dos valores JÁ CONVERTIDOS (não a string crua) — mesmo
  * padrão de `licensed-module.service.ts` (cache/loading module-level,
  * chamadas concorrentes compartilham a mesma promise de carregamento).
@@ -35,14 +55,29 @@ const KEY_ENUM_VALUES: Record<string, readonly string[]> = {
  */
 let cache: Map<string, unknown> | null = null;
 let loading: Promise<Map<string, unknown>> | null = null;
+/**
+ * Geração do cache. Incrementada por `clearSettingCache()`. Um `load()` em
+ * andamento só grava seu resultado em `cache` se o epoch não mudou enquanto
+ * ele esperava o `findMany` — senão seria um snapshot pré-escrita pisando
+ * num estado mais novo (ex.: um `updateSetting()` concorrente que já
+ * invalidou o cache antes desse load terminar).
+ */
+let epoch = 0;
 
 const load = async (): Promise<Map<string, unknown>> => {
+  const myEpoch = epoch;
   const rows = await prisma.systemSetting.findMany();
   const loaded = new Map<string, unknown>();
   for (const row of rows) {
     loaded.set(row.key, coerceSettingValue(row.type, row.value));
   }
-  cache = loaded;
+  // Só grava se nada invalidou o cache enquanto esse load estava em voo
+  // (ex.: um clearSettingCache() de um updateSetting() concorrente) —
+  // senão esse snapshot pré-escrita sobrescreveria silenciosamente o
+  // estado mais novo.
+  if (myEpoch === epoch) {
+    cache = loaded;
+  }
   return loaded;
 };
 
@@ -58,8 +93,13 @@ const loadCache = async (): Promise<Map<string, unknown>> => {
   return loading;
 };
 
-/** Só para testes: zera o cache sem tocar no banco. */
+/**
+ * Invalida o cache imediatamente. Chamado em produção por `updateSetting()`
+ * após cada escrita bem-sucedida; também exportado para testes zerarem o
+ * cache entre casos.
+ */
 export const clearSettingCache = (): void => {
+  epoch += 1;
   cache = null;
   loading = null;
 };
@@ -109,13 +149,21 @@ export async function updateSetting(
     throw new AppError(404, `Configuração "${key}" não encontrada.`);
   }
 
-  coerceSettingValue(existing.type, value);
+  const coerced = coerceSettingValue(existing.type, value);
 
   const allowedValues = KEY_ENUM_VALUES[key];
   if (allowedValues && !allowedValues.includes(value)) {
     throw new AppError(
       400,
       `Valor "${value}" inválido para "${key}". Valores aceitos: ${allowedValues.join(', ')}.`
+    );
+  }
+
+  const bounds = KEY_NUMERIC_BOUNDS[key];
+  if (bounds && typeof coerced === 'number' && coerced < bounds.min) {
+    throw new AppError(
+      400,
+      `Valor ${value} abaixo do mínimo permitido (${bounds.min}) para "${key}".`
     );
   }
 

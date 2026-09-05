@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupByCategory, CATEGORY_LABELS, validateSettingInput } from '../system-settings-form'
+import { groupByCategory, CATEGORY_LABELS, validateSettingInput, KEY_ENUM_VALUES } from '../system-settings-form'
 import type { SystemSetting } from '@/types/system-setting.types'
 
 const setting = (overrides: Partial<SystemSetting> = {}): SystemSetting => ({
@@ -24,6 +24,12 @@ describe('system-settings-form', () => {
       const grouped = groupByCategory(settings)
       expect(Object.keys(grouped)).toEqual(['wms', 'auditoria'])
       expect(grouped.wms.map((s) => s.key)).toEqual(['wms.a', 'wms.b'])
+    })
+  })
+
+  describe('KEY_ENUM_VALUES', () => {
+    it('espelha os valores fechados de audit.mode aceitos pelo backend', () => {
+      expect(KEY_ENUM_VALUES['audit.mode']).toEqual(['all', 'write_only', 'errors_only', 'none'])
     })
   })
 

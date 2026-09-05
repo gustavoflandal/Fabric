@@ -23,6 +23,13 @@
                   <option value="true">Verdadeiro</option>
                   <option value="false">Falso</option>
                 </select>
+                <select
+                  v-else-if="KEY_ENUM_VALUES[item.key]"
+                  v-model="drafts[item.key]"
+                  class="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                >
+                  <option v-for="option in KEY_ENUM_VALUES[item.key]" :key="option" :value="option">{{ option }}</option>
+                </select>
                 <input
                   v-else
                   :type="item.type === 'NUMBER' ? 'number' : 'text'"
@@ -49,14 +56,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, watch } from 'vue'
+import { onMounted, reactive, watch, computed } from 'vue'
 import AppLayout from '@/components/common/AppLayout.vue'
 import FormField from '@/components/common/FormField.vue'
 import { useSystemSettingStore } from '@/stores/system-setting.store'
 import { useToast } from '@/composables/useToast'
-import { groupByCategory, CATEGORY_LABELS, validateSettingInput } from './system-settings-form'
+import { groupByCategory, CATEGORY_LABELS, validateSettingInput, KEY_ENUM_VALUES } from './system-settings-form'
 import type { SystemSetting } from '@/types/system-setting.types'
-import { computed } from 'vue'
 
 const store = useSystemSettingStore()
 const toast = useToast()

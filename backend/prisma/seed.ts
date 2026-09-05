@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { config } from '../src/config/env';
 
 const prisma = new PrismaClient();
 
@@ -324,7 +325,7 @@ async function main() {
     },
     {
       key: 'rate_limit.general.max_requests',
-      value: process.env.NODE_ENV === 'development' ? '1000' : '100',
+      value: config.nodeEnv === 'development' ? '1000' : '100',
       type: 'NUMBER' as const,
       category: 'rate_limit',
       label: 'Máximo de requisições no limite geral',
@@ -340,7 +341,7 @@ async function main() {
     },
     {
       key: 'rate_limit.login.max_requests',
-      value: process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test' ? '50' : '10',
+      value: config.nodeEnv === 'development' || config.nodeEnv === 'test' ? '50' : '10',
       type: 'NUMBER' as const,
       category: 'rate_limit',
       label: 'Máximo de tentativas de login',
@@ -356,7 +357,7 @@ async function main() {
     },
     {
       key: 'rate_limit.strict.max_requests',
-      value: process.env.NODE_ENV === 'development' ? '100' : '30',
+      value: config.nodeEnv === 'development' ? '100' : '30',
       type: 'NUMBER' as const,
       category: 'rate_limit',
       label: 'Máximo de operações de escrita',
