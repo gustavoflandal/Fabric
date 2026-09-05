@@ -116,6 +116,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/purchases/receipts',
+    name: 'purchase-receipts',
+    component: () => import('../views/purchases/PurchaseReceiptsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/purchases/receipts/new',
+    name: 'purchase-receipt-new',
+    component: () => import('../views/purchases/PurchaseReceiptFormView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/notifications',
     name: 'notifications',
     component: () => import('../views/NotificationsView.vue'),
@@ -197,6 +209,12 @@ const routes: RouteRecordRaw[] = [
     path: '/wms/workflows/:id',
     name: 'wms-workflow-edit',
     component: () => import('../views/wms/WorkflowTemplateEditorView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/wms/operations',
+    name: 'wms-operations',
+    component: () => import('../views/wms/OperationsPanelView.vue'),
     meta: { requiresAuth: true },
   },
 ]

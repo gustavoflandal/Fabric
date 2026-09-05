@@ -422,6 +422,84 @@ export const listByReceipt = async (receiptId: string) => {
   return tasks.map(serializeTask);
 };
 
+export type PanelScope = 'all' | 'mine';
+
+export interface ReceiptOperation {
+  receiptId: string;
+  receiptNumber: string;
+  tasks: ReturnType<typeof serializeTask>[];
+}
+
+/**
+ * Painel de operações — recebimentos ATIVOS (com pelo menos uma tarefa
+ * PENDING/IN_PROGRESS), cada um com a cadeia de tarefas completa (incluindo
+ * as já concluídas e as ainda bloqueadas — o painel precisa do CONTEXTO
+ * inteiro da cadeia, não só do que está acionável agora).
+ *
+ * `scope='mine'` filtra os RECEBIMENTOS a quem tem pelo menos uma tarefa
+ * livre (`assignedTo: null`) ou já atribuída ao usuário — mesmo critério de
+ * `listMyTasks` (F4.9), aplicado aqui no nível do recebimento em vez da
+ * tarefa individual: um recebimento com uma etapa já tomada por outro
+ * operador ainda é "meu" se sobrar alguma etapa livre ou minha nele.
+ */
+export const listActiveReceiptOperations = async (
+  scope: PanelScope,
+  userId?: string
+): Promise<ReceiptOperation[]> => {
+  const activeTaskWhere = {
+    referenceType: RECEIPT_TASK_REFERENCE_TYPE,
+    status: { in: OPEN_STATUSES },
+    ...(scope === 'mine' ? { OR: [{ assignedTo: userId }, { assignedTo: null }] } : {}),
+  };
+
+  const activeRefs = await prisma.warehouseTask.findMany({
+    where: activeTaskWhere,
+    select: { reference: true },
+    distinct: ['reference'],
+  });
+  const receiptIds = activeRefs
+    .map((row) => row.reference)
+    .filter((id): id is string => id !== null);
+
+  if (receiptIds.length === 0) {
+    return [];
+  }
+
+  const [receipts, tasks] = await Promise.all([
+    prisma.purchaseReceipt.findMany({
+      where: { id: { in: receiptIds } },
+      select: { id: true, receiptNumber: true },
+    }),
+    prisma.warehouseTask.findMany({
+      where: { referenceType: RECEIPT_TASK_REFERENCE_TYPE, reference: { in: receiptIds } },
+      select: {
+        ...taskSelect,
+        assignee: { select: { id: true, name: true, email: true } },
+      },
+      orderBy: [{ sequence: 'asc' }, { createdAt: 'asc' }],
+    }),
+  ]);
+
+  const tasksByReceipt = new Map<string, typeof tasks>();
+  for (const task of tasks) {
+    if (!task.reference) continue;
+    const list = tasksByReceipt.get(task.reference) ?? [];
+    list.push(task);
+    tasksByReceipt.set(task.reference, list);
+  }
+
+  const receiptById = new Map(receipts.map((r) => [r.id, r]));
+
+  return receiptIds
+    .filter((id) => receiptById.has(id))
+    .map((id) => ({
+      receiptId: id,
+      receiptNumber: receiptById.get(id)!.receiptNumber,
+      tasks: (tasksByReceipt.get(id) ?? []).map(serializeTask),
+    }))
+    .sort((a, b) => a.receiptNumber.localeCompare(b.receiptNumber));
+};
+
 /**
  * Trava a linha da tarefa (`SELECT ... FOR UPDATE`) dentro da transação do
  * chamador.
@@ -1020,6 +1098,7 @@ export default {
   createReceiptTaskChain,
   createPickingTasks,
   listByReceipt,
+  listActiveReceiptOperations,
   listMyTasks,
   assignTask,
   startTask,

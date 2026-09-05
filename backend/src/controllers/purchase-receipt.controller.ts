@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import purchaseReceiptService from '../services/purchase-receipt.service';
+import { parseNfeXml } from '../services/nfe-parser.service';
 
 export class PurchaseReceiptController {
   async create(req: AuthRequest, res: Response, next: NextFunction) {
@@ -11,6 +12,19 @@ export class PurchaseReceiptController {
         status: 'success',
         message: 'Recebimento registrado com sucesso',
         data: receipt,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  async parseNfe(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const parsed = parseNfeXml(req.body.xml);
+
+      return res.status(200).json({
+        status: 'success',
+        data: parsed,
       });
     } catch (error) {
       return next(error);

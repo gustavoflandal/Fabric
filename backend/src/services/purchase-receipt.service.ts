@@ -838,6 +838,7 @@ export class PurchaseReceiptService {
           select: {
             id: true,
             orderNumber: true,
+            status: true,
             supplier: {
               select: {
                 id: true,

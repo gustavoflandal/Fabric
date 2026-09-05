@@ -8,6 +8,7 @@ import {
   completeWarehouseTaskSchema,
   executeWarehouseTaskSchema,
   myWarehouseTasksQuerySchema,
+  panelQuerySchema,
   putawayWarehouseTaskSchema,
   scanWarehouseTaskSchema,
 } from '../validators/warehouse-task.validator';
@@ -80,6 +81,16 @@ router.get(
   requirePermission('tarefas_armazem', 'visualizar'),
   validateQuery(myWarehouseTasksQuerySchema),
   warehouseTaskController.getMyTasks
+);
+
+// Painel de operações — recebimentos ativos com a cadeia completa de
+// tarefas. RBAC: `recebimentos_compra:visualizar`, o mesmo recurso de
+// `GET /receipt/:receiptId` logo abaixo — é a mesma leitura, só agregada.
+router.get(
+  '/panel',
+  requirePermission('recebimentos_compra', 'visualizar'),
+  validateQuery(panelQuerySchema),
+  warehouseTaskController.getPanel
 );
 
 // F4.5 — cadeia de tarefas de um recebimento. Segmento fixo (`/receipt/`) antes

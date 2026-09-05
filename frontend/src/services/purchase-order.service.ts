@@ -46,6 +46,7 @@ export interface PurchaseOrderItem {
     id: string;
     code: string;
     name: string;
+    lotTracked?: boolean;
     unit: {
       symbol: string;
     };

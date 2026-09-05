@@ -72,3 +72,10 @@ export const cancelPurchaseReceiptSchema = Joi.object({
     'any.required': 'Motivo do cancelamento é obrigatório',
   }),
 });
+
+export const parseNfeSchema = Joi.object({
+  xml: Joi.string().trim().min(1).required().messages({
+    'any.required': 'Conteúdo do XML é obrigatório',
+    'string.empty': 'Conteúdo do XML é obrigatório',
+  }),
+});
