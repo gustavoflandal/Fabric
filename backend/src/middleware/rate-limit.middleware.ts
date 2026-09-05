@@ -42,7 +42,12 @@ export interface RateLimitOptions {
  * ele não segure o event loop vivo sozinho (com o timer module-level anterior,
  * a suíte de testes só terminava por causa do `forceExit` do jest.config.js).
  */
-export function rateLimit(options: RateLimitOptions) {
+export interface RateLimiter {
+  (req: Request, res: Response, next: NextFunction): void;
+  configure(overrides: Partial<Pick<RateLimitOptions, 'windowMs' | 'max'>>): void;
+}
+
+export function rateLimit(options: RateLimitOptions): RateLimiter {
   const store: RateLimitStore = {};
 
   // Limpar entradas antigas a cada 5 minutos
@@ -56,9 +61,9 @@ export function rateLimit(options: RateLimitOptions) {
   }, 5 * 60 * 1000);
   cleanupTimer.unref?.();
 
+  const state = { windowMs: options.windowMs, max: options.max };
+
   const {
-    windowMs,
-    max,
     message = 'Muitas requisições deste IP, tente novamente mais tarde',
     skipSuccessfulRequests = false,
     keyGenerator = (req: Request) => {
@@ -67,7 +72,7 @@ export function rateLimit(options: RateLimitOptions) {
     }
   } = options;
 
-  return (req: Request, res: Response, next: NextFunction) => {
+  const handler = ((req: Request, res: Response, next: NextFunction) => {
     const key = keyGenerator(req);
     const now = Date.now();
 
@@ -75,7 +80,7 @@ export function rateLimit(options: RateLimitOptions) {
       // Nova janela de tempo
       store[key] = {
         count: 1,
-        resetTime: now + windowMs
+        resetTime: now + state.windowMs
       };
       return next();
     }
@@ -84,18 +89,18 @@ export function rateLimit(options: RateLimitOptions) {
     store[key].count++;
 
     // Adicionar headers informativos
-    const remaining = Math.max(0, max - store[key].count);
+    const remaining = Math.max(0, state.max - store[key].count);
     const resetTime = Math.ceil((store[key].resetTime - now) / 1000);
 
-    res.setHeader('X-RateLimit-Limit', max.toString());
+    res.setHeader('X-RateLimit-Limit', state.max.toString());
     res.setHeader('X-RateLimit-Remaining', remaining.toString());
     res.setHeader('X-RateLimit-Reset', resetTime.toString());
 
-    if (store[key].count > max) {
+    if (store[key].count > state.max) {
       logger.warn(`Rate limit exceeded for ${key}`, {
         ip: key,
         count: store[key].count,
-        limit: max
+        limit: state.max
       });
 
       return res.status(429).json({
@@ -115,7 +120,14 @@ export function rateLimit(options: RateLimitOptions) {
     }
 
     next();
+  }) as RateLimiter;
+
+  handler.configure = (overrides) => {
+    if (overrides.windowMs !== undefined) state.windowMs = overrides.windowMs;
+    if (overrides.max !== undefined) state.max = overrides.max;
   };
+
+  return handler;
 }
 /**
  * Rate limiter geral para toda a API

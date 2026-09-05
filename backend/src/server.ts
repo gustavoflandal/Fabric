@@ -9,12 +9,37 @@ import stockPositionReconciliationJob from './jobs/stock-position-reconciliation
 import replenishmentJob from './jobs/replenishment.job';
 import lotExpiryJob from './jobs/lot-expiry.job';
 import { loadLicensedModules } from './services/licensed-module.service';
+import { getSetting } from './services/system-setting.service';
+import { generalLimiter, authLimiter, writeLimiter } from './middleware/rate-limit.middleware';
 
 const startServer = async () => {
   try {
     // Test database connection
     await prisma.$connect();
     logger.info('✅ Database connected successfully');
+
+    // Configurações do Sistema — rate-limiting só aplica os valores do banco
+    // no PRÓXIMO restart (os limitadores já foram criados no import estático
+    // de app.ts, antes desta linha rodar; .configure() ajusta o estado em uso
+    // sem recriar o middleware nem perder os contadores por IP já em curso —
+    // ver rate-limit.middleware.ts). Fallback = os valores hardcoded de hoje,
+    // então nada muda até um admin editar pela tela e reiniciar o serviço.
+    const [
+      generalWindowMs, generalMax,
+      loginWindowMs, loginMax,
+      strictWindowMs, strictMax,
+    ] = await Promise.all([
+      getSetting('rate_limit.general.window_ms', 15 * 60 * 1000),
+      getSetting('rate_limit.general.max_requests', config.nodeEnv === 'development' ? 1000 : 100),
+      getSetting('rate_limit.login.window_ms', 15 * 60 * 1000),
+      getSetting('rate_limit.login.max_requests', config.nodeEnv === 'development' || config.nodeEnv === 'test' ? 50 : 10),
+      getSetting('rate_limit.strict.window_ms', 1 * 60 * 1000),
+      getSetting('rate_limit.strict.max_requests', config.nodeEnv === 'development' ? 100 : 30),
+    ]);
+    generalLimiter.configure({ windowMs: generalWindowMs, max: generalMax });
+    authLimiter.configure({ windowMs: loginWindowMs, max: loginMax });
+    writeLimiter.configure({ windowMs: strictWindowMs, max: strictMax });
+    logger.info('✅ Rate limiting configurado a partir das Configurações do Sistema');
 
     // F0.8: módulos licenciados desta instalação, lidos UMA vez e cacheados em
     // memória (uma instalação não muda de licença a cada request). O middleware

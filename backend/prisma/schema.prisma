@@ -1912,3 +1912,38 @@ model LicensedModule {
 
   @@map("licensed_modules")
 }
+
+// ============================================
+// CONFIGURAÇÕES DO SISTEMA
+// ============================================
+
+// Parâmetros de instalação hoje fixos em `.env` (ver backend/src/config/env.ts)
+// ou hardcoded, editáveis em runtime por um admin autenticado. `value` é
+// sempre String — `type` diz como interpretá-lo (ver
+// backend/src/utils/setting-type.util.ts::coerceSettingValue, usado tanto na
+// leitura quanto na validação de escrita, para não duplicar a lógica de tipo
+// entre os dois caminhos).
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}
+
+// Uma tabela genérica chave/valor (não uma tabela por domínio) de propósito:
+// qualquer parâmetro futuro entra com uma linha de seed nova, sem migração de
+// schema. `category` só agrupa a tela (não tem significado para o backend).
+model SystemSetting {
+  id          String      @id @default(uuid())
+  key         String      @unique
+  value       String
+  type        SettingType
+  category    String
+  label       String
+  description String?
+  updatedBy   String?
+  updatedAt   DateTime    @updatedAt
+
+  @@index([category])
+  @@map("system_settings")
+}

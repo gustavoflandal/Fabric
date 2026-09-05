@@ -1,6 +1,7 @@
 import notificationDetector from '../../src/services/notification-detector.service';
 import { clearLicensedModuleCache } from '../../src/services/licensed-module.service';
 import { config } from '../../src/config/env';
+import { clearSettingCache } from '../../src/services/system-setting.service';
 import { testPrisma, cleanDatabase, disconnectTestDb } from '../helpers/db';
 import {
   createTestLot,
@@ -271,6 +272,30 @@ describe('checkExpiringLots: WMS licenciado', () => {
 
       await expect(notificationsOf('LOT_EXPIRED')).resolves.toHaveLength(1);
       await expect(notificationsOf('LOT_EXPIRING_SOON')).resolves.toHaveLength(1);
+    });
+  });
+
+  describe('wms.lot_expiry_alert_days configurável', () => {
+    it('usa o valor do banco em vez do default de 7 dias', async () => {
+      await testPrisma.systemSetting.create({
+        data: {
+          key: 'wms.lot_expiry_alert_days',
+          value: '15',
+          type: 'NUMBER',
+          category: 'wms',
+          label: 'Antecedência do alerta de validade de lote (dias)',
+        },
+      });
+      clearSettingCache();
+
+      // Vence em 10 dias: com o default (7) NÃO entraria na janela; com 15
+      // (do banco) entra.
+      await seedLot({ expiresAt: inDays(10) });
+
+      const findings = await notificationDetector.checkExpiringLots();
+
+      expect(findings).toHaveLength(1);
+      expect(findings[0].days).toBe(10);
     });
   });
 

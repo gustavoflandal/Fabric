@@ -4,6 +4,7 @@ import { config } from '../config/env';
 import notificationService from './notification.service';
 import { isModuleEnabled } from './licensed-module.service';
 import { detectReplenishmentNeeds } from './replenishment.service';
+import { getSetting } from './system-setting.service';
 
 /**
  * Um lote com validade próxima (ou já vencida) e saldo parado em alguma posição.
@@ -867,9 +868,14 @@ export class NotificationDetectorService {
       return [];
     }
 
+    // Lido uma vez aqui — reaproveitado abaixo tanto no horizonte da consulta
+    // quanto no payload de notificação (~linha 1011), para os dois nunca
+    // divergirem entre si mesmo se o cache for invalidado no meio da execução.
+    const lotExpiryAlertDays = await getSetting('wms.lot_expiry_alert_days', config.wms.lotExpiryAlertDays);
+
     const now = new Date();
     const horizon = new Date(
-      now.getTime() + config.wms.lotExpiryAlertDays * MS_PER_DAY
+      now.getTime() + lotExpiryAlertDays * MS_PER_DAY
     );
 
     const lots = await prisma.lot.findMany({
@@ -1008,7 +1014,7 @@ export class NotificationDetectorService {
             days,
             totalQuantity,
             positions,
-            alertWindowDays: config.wms.lotExpiryAlertDays,
+            alertWindowDays: lotExpiryAlertDays,
           },
           // Não existe tela de lote no frontend (a Fase 5 foi backend-only), e
           // inventar uma rota morta seria pior que apontar para uma real: o

@@ -7,11 +7,12 @@ import cron from 'node-cron';
 import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { config } from '../config/env';
+import { getSetting } from '../services/system-setting.service';
 
 export class LogCleanupJob {
   private job: cron.ScheduledTask | null = null;
-  // ✅ Fase 5 item 5.6: configurável via AUDIT_LOG_RETENTION_DAYS (config/env.ts)
-  private readonly RETENTION_DAYS = config.audit.retentionDays;
+  // Removido: RETENTION_DAYS como readonly fixo no boot. Ver cleanup()/getStats(),
+  // que agora leem `audit.retention_days` a cada execução.
 
   /**
    * Inicia o job de limpeza (executa diariamente às 2h da manhã)
@@ -21,7 +22,7 @@ export class LogCleanupJob {
     this.job = cron.schedule('0 2 * * *', async () => {
       await this.cleanup();
     });
-    
+
     logger.info('✅ Job de limpeza de logs iniciado (execução diária às 2h)');
   }
 
@@ -42,24 +43,21 @@ export class LogCleanupJob {
   async cleanup() {
     try {
       logger.info('🧹 Iniciando limpeza de logs antigos...');
-      
+
+      const retentionDays = await getSetting('audit.retention_days', config.audit.retentionDays);
       const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - this.RETENTION_DAYS);
-      
+      cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
       const result = await prisma.auditLog.deleteMany({
-        where: {
-          createdAt: {
-            lt: cutoffDate
-          }
-        }
+        where: { createdAt: { lt: cutoffDate } },
       });
-      
+
       logger.info(`✅ ${result.count} logs antigos removidos (anteriores a ${cutoffDate.toISOString()})`);
-      
+
       // Estatísticas pós-limpeza
       const remaining = await prisma.auditLog.count();
       logger.info(`📊 Logs remanescentes no sistema: ${remaining}`);
-      
+
     } catch (error) {
       logger.error('❌ Erro na limpeza de logs:', error);
     }
@@ -78,22 +76,19 @@ export class LogCleanupJob {
    */
   async getStats() {
     const total = await prisma.auditLog.count();
-    
+
+    const retentionDays = await getSetting('audit.retention_days', config.audit.retentionDays);
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - this.RETENTION_DAYS);
-    
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
     const toBeDeleted = await prisma.auditLog.count({
-      where: {
-        createdAt: {
-          lt: cutoffDate
-        }
-      }
+      where: { createdAt: { lt: cutoffDate } },
     });
-    
+
     return {
       total,
       toBeDeleted,
-      retentionDays: this.RETENTION_DAYS,
+      retentionDays,
       cutoffDate
     };
   }
