@@ -15,8 +15,24 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
   // navega para outra tela, cai a conexão) — sem isso, com o modelo rodando
   // CPU-only, o backend continuaria consumindo a resposta até o fim sem
   // ninguém para recebê-la.
+  //
+  // IMPORTANTE: escuta em `res` ('close' da CONEXÃO/socket), não em `req`.
+  // `req` (IncomingMessage) emite 'close' assim que a MENSAGEM DE
+  // REQUISIÇÃO termina de ser lida — no Node 22 + Express isso acontece
+  // quase imediatamente após `express.json()` consumir o body, bem antes de
+  // qualquer desconexão real do cliente. Usar `req.on('close', ...)`
+  // abortava o AbortSignal ~1ms depois do handler começar, derrubando TODA
+  // pergunta contra um Ollama real com `AbortError` (achado numa revisão
+  // posterior). `res.on('close', ...)` só dispara quando o socket é
+  // encerrado de fato. O guard `!res.writableEnded` evita abortar
+  // desnecessariamente no caminho feliz, quando `res.end()` já foi chamado
+  // e a conexão fecha normalmente logo em seguida.
   const abortController = new AbortController();
-  req.on('close', () => abortController.abort());
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      abortController.abort();
+    }
+  });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
