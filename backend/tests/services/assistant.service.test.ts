@@ -110,4 +110,24 @@ describe('assistant.service.answerQuestion', () => {
     expect(sentMessages[0].content).toContain('conteúdo do manual');
     expect(sentMessages[0].content).toContain('manual.pdf');
   });
+
+  it('trata um chunk com distance exatamente igual ao limiar como relevante (limiar é inclusivo)', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([
+      { document: 'no limite', metadata: { arquivo: 'limite.pdf', indice: 0 }, distance: config.assistant.maxCosineDistance },
+    ]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield 'ok';
+    });
+
+    const onToken = jest.fn();
+    const onSources = jest.fn();
+    const onDone = jest.fn();
+
+    await answerQuestion('pergunta', [], { onToken, onSources, onDone });
+
+    expect(mockedOllama.chatStream).toHaveBeenCalled();
+    expect(onSources).toHaveBeenCalledWith([{ arquivo: 'limite.pdf', trecho: 'no limite' }]);
+    expect(onToken).not.toHaveBeenCalledWith('Não encontrei essa informação nos manuais do sistema.');
+  });
 });
