@@ -2,12 +2,15 @@ import { answerQuestion, NAO_ENCONTREI, FORA_ESCOPO } from '../../src/services/a
 import * as ollamaClient from '../../src/services/ollama-client.service';
 import * as chromaClient from '../../src/services/chroma-client.service';
 import { config } from '../../src/config/env';
+import { getSaldoProduto } from '../../src/services/stock-query.service';
 
 jest.mock('../../src/services/ollama-client.service');
 jest.mock('../../src/services/chroma-client.service');
+jest.mock('../../src/services/stock-query.service');
 
 const mockedOllama = ollamaClient as jest.Mocked<typeof ollamaClient>;
 const mockedChroma = chromaClient as jest.Mocked<typeof chromaClient>;
+const mockedStockQuery = { getSaldoProduto } as jest.Mocked<{ getSaldoProduto: typeof getSaldoProduto }>;
 
 describe('assistant.service.answerQuestion', () => {
   beforeEach(() => {
@@ -38,8 +41,8 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'Passo 1: confirme a contagem.', metadata: { arquivo: 'contagem.pdf', indice: 0 }, distance: 0.1 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'Primeiro ';
-      yield 'passo.';
+      yield { type: 'token', text: 'Primeiro ' };
+      yield { type: 'token', text: 'passo.' };
     });
 
     const onToken = jest.fn();
@@ -61,7 +64,7 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'irrelevante', metadata: { arquivo: 'b.pdf', indice: 0 }, distance: config.assistant.maxCosineDistance + 0.5 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'ok';
+      yield { type: 'token', text: 'ok' };
     });
 
     const onSources = jest.fn();
@@ -76,7 +79,7 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'doc', metadata: { arquivo: 'a.pdf', indice: 0 }, distance: 0.1 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'ok';
+      yield { type: 'token', text: 'ok' };
     });
 
     const history = Array.from({ length: 10 }, (_, i) => ({
@@ -99,7 +102,7 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'conteúdo do manual', metadata: { arquivo: 'manual.pdf', indice: 0 }, distance: 0.1 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'ok';
+      yield { type: 'token', text: 'ok' };
     });
 
     await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() });
@@ -117,7 +120,7 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'no limite', metadata: { arquivo: 'limite.pdf', indice: 0 }, distance: config.assistant.maxCosineDistance },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'ok';
+      yield { type: 'token', text: 'ok' };
     });
 
     const onToken = jest.fn();
@@ -139,8 +142,8 @@ describe('assistant.service.answerQuestion', () => {
     // Chunk passou o corte determinístico, mas o modelo (mockado) decide que
     // não sabe responder e gera a frase fixa via streaming, token a token.
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'Não encontrei essa informação ';
-      yield 'nos manuais do sistema.';
+      yield { type: 'token', text: 'Não encontrei essa informação ' };
+      yield { type: 'token', text: 'nos manuais do sistema.' };
     });
 
     const onSources = jest.fn();
@@ -159,8 +162,8 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'conteúdo relevante', metadata: { arquivo: 'manual.pdf', indice: 0 }, distance: 0.1 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'Desculpe, sou um assistente focado ';
-      yield 'exclusivamente nas operações deste sistema.';
+      yield { type: 'token', text: 'Desculpe, sou um assistente focado ' };
+      yield { type: 'token', text: 'exclusivamente nas operações deste sistema.' };
     });
 
     const onSources = jest.fn();
@@ -179,7 +182,7 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'doc', metadata: { arquivo: 'a.pdf', indice: 0 }, distance: 0.1 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'ok';
+      yield { type: 'token', text: 'ok' };
     });
 
     const abortController = new AbortController();
@@ -187,10 +190,13 @@ describe('assistant.service.answerQuestion', () => {
       'pergunta',
       [],
       { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() },
-      abortController.signal
+      { signal: abortController.signal }
     );
 
-    expect(mockedOllama.chatStream).toHaveBeenCalledWith(expect.any(Array), abortController.signal);
+    expect(mockedOllama.chatStream).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ signal: abortController.signal })
+    );
   });
 
   it('continua funcionando normalmente quando nenhum signal é passado (parâmetro opcional)', async () => {
@@ -199,16 +205,174 @@ describe('assistant.service.answerQuestion', () => {
       { document: 'doc', metadata: { arquivo: 'a.pdf', indice: 0 }, distance: 0.1 },
     ]);
     mockedOllama.chatStream.mockImplementation(async function* () {
-      yield 'ok';
+      yield { type: 'token', text: 'ok' };
     });
 
     await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() });
 
-    expect(mockedOllama.chatStream).toHaveBeenCalledWith(expect.any(Array), undefined);
+    expect(mockedOllama.chatStream).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ signal: undefined })
+    );
   });
 
   it('exporta NAO_ENCONTREI e FORA_ESCOPO com os textos fixos usados no guardrail', () => {
     expect(NAO_ENCONTREI).toBe('Não encontrei essa informação nos manuais do sistema.');
     expect(FORA_ESCOPO).toBe('Desculpe, sou um assistente focado exclusivamente nas operações deste sistema.');
+  });
+});
+
+describe('assistant.service.answerQuestion — tool calling (Fase 2)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('sem hasStockAccess, NÃO envia tools ao chatStream mesmo com pergunta de dado', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield { type: 'token', text: 'Não encontrei essa informação nos manuais do sistema.' };
+    });
+
+    await answerQuestion('qual o saldo do PROD-001?', [], {
+      onToken: jest.fn(),
+      onSources: jest.fn(),
+      onDone: jest.fn(),
+      onConsulta: jest.fn(),
+    });
+
+    // Sem hasStockAccess, o corte determinístico da Fase 1 se aplica normalmente:
+    // nenhum chunk relevante -> nunca chama o modelo.
+    expect(mockedOllama.chatStream).not.toHaveBeenCalled();
+  });
+
+  it('com hasStockAccess, chama o modelo (com tools) mesmo sem nenhum chunk relevante', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield { type: 'token', text: 'resposta qualquer' };
+    });
+
+    await answerQuestion(
+      'qual o saldo do PROD-001?',
+      [],
+      { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn(), onConsulta: jest.fn() },
+      { hasStockAccess: true }
+    );
+
+    expect(mockedOllama.chatStream).toHaveBeenCalled();
+    const [, streamOptions] = mockedOllama.chatStream.mock.calls[0];
+    expect(streamOptions.tools).toBeDefined();
+    expect(streamOptions.tools!.map((t: any) => t.function.name)).toEqual([
+      'getSaldoProduto',
+      'getMovimentacoesRecentes',
+      'getPosicaoEstoquePorCategoria',
+    ]);
+  });
+
+  it('sem hasStockAccess, chatStream é chamado sem o parâmetro tools (undefined)', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([
+      { document: 'doc relevante', metadata: { arquivo: 'a.pdf', indice: 0 }, distance: 0.1 },
+    ]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield { type: 'token', text: 'resposta' };
+    });
+
+    await answerQuestion('pergunta de procedimento', [], {
+      onToken: jest.fn(),
+      onSources: jest.fn(),
+      onDone: jest.fn(),
+      onConsulta: jest.fn(),
+    });
+
+    const [, streamOptions] = mockedOllama.chatStream.mock.calls[0];
+    expect(streamOptions.tools).toBeUndefined();
+  });
+
+  it('executa a tool pedida pelo modelo, injeta o resultado, chama o modelo de novo, e emite onConsulta', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([]);
+    (mockedStockQuery.getSaldoProduto as jest.Mock).mockResolvedValue({
+      codigoProduto: 'PROD-001',
+      nomeProduto: 'Produto 1',
+      quantidade: 42,
+      deposito: null,
+    });
+
+    let callCount = 0;
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: 'tool_calls',
+          calls: [{ id: 'call_1', function: { name: 'getSaldoProduto', arguments: { codigoProduto: 'PROD-001' } } }],
+        };
+      } else {
+        yield { type: 'token', text: 'O produto PROD-001 tem 42 unidades em estoque.' };
+      }
+    });
+
+    const onConsulta = jest.fn();
+    const onToken = jest.fn();
+    await answerQuestion(
+      'qual o saldo do PROD-001?',
+      [],
+      { onToken, onSources: jest.fn(), onDone: jest.fn(), onConsulta },
+      { hasStockAccess: true }
+    );
+
+    expect(mockedStockQuery.getSaldoProduto).toHaveBeenCalledWith('PROD-001', undefined);
+    expect(onConsulta).toHaveBeenCalledWith({
+      funcao: 'getSaldoProduto',
+      parametros: { codigoProduto: 'PROD-001' },
+      linhas: 1,
+    });
+    expect(onToken).toHaveBeenCalledWith('O produto PROD-001 tem 42 unidades em estoque.');
+    expect(mockedOllama.chatStream).toHaveBeenCalledTimes(2);
+
+    // A segunda chamada deve incluir a mensagem role:'tool' com o resultado.
+    const [secondCallMessages] = mockedOllama.chatStream.mock.calls[1];
+    const toolMessage = secondCallMessages.find((m: any) => m.role === 'tool');
+    expect(toolMessage).toBeDefined();
+    expect(JSON.parse(toolMessage.content)).toEqual({
+      codigoProduto: 'PROD-001',
+      nomeProduto: 'Produto 1',
+      quantidade: 42,
+      deposito: null,
+    });
+  });
+
+  it('quando a tool retorna erro estruturado, injeta o erro e NÃO conta como consulta com linhas', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([]);
+    (mockedStockQuery.getSaldoProduto as jest.Mock).mockResolvedValue({ erro: 'produto_nao_encontrado' });
+
+    let callCount = 0;
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      callCount += 1;
+      if (callCount === 1) {
+        yield {
+          type: 'tool_calls',
+          calls: [{ function: { name: 'getSaldoProduto', arguments: { codigoProduto: 'INEXISTENTE' } } }],
+        };
+      } else {
+        yield { type: 'token', text: 'Não encontrei o produto INEXISTENTE.' };
+      }
+    });
+
+    const onConsulta = jest.fn();
+    await answerQuestion(
+      'qual o saldo do INEXISTENTE?',
+      [],
+      { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn(), onConsulta },
+      { hasStockAccess: true }
+    );
+
+    expect(onConsulta).toHaveBeenCalledWith({
+      funcao: 'getSaldoProduto',
+      parametros: { codigoProduto: 'INEXISTENTE' },
+      linhas: 0,
+    });
   });
 });
