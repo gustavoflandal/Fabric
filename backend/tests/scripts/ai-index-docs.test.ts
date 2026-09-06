@@ -51,18 +51,24 @@ describe('ai-index-docs.indexDocuments', () => {
     const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
     const summary = await indexDocuments('/fake/docs');
 
+    // resetCollection/upsertChunks só rodam UMA vez, no final, com os chunks
+    // acumulados de TODOS os arquivos processados com sucesso (achado 3 da
+    // revisão final: nunca resetar a coleção antes de ter tudo pronto).
     expect(mockedResetCollection).toHaveBeenCalledTimes(1);
+    expect(mockedUpsertChunks).toHaveBeenCalledTimes(1);
     const manualA = summary.find((s) => s.file === 'manual-a.pdf');
     expect(manualA?.chunks).toBe(1);
     expect(mockedEmbed).toHaveBeenCalledWith('Passo 1: faça isso.');
-    expect(mockedUpsertChunks).toHaveBeenCalledWith([
-      expect.objectContaining({
-        id: 'manual-a.pdf::0',
-        text: 'Passo 1: faça isso.',
-        embedding: [0.1, 0.2],
-        metadata: { arquivo: 'manual-a.pdf', indice: 0 },
-      }),
-    ]);
+    expect(mockedUpsertChunks).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'manual-a.pdf::0',
+          text: 'Passo 1: faça isso.',
+          embedding: [0.1, 0.2],
+          metadata: { arquivo: 'manual-a.pdf', indice: 0 },
+        }),
+      ])
+    );
   });
 
   it('remove o separador de página "-- N of M --" inserido pelo pdf-parse antes do chunking', async () => {
@@ -102,6 +108,72 @@ describe('ai-index-docs.indexDocuments', () => {
     const summary = await indexDocuments('/fake/docs');
 
     summary.forEach((s) => expect(s.chunks).toBe(0));
+    expect(mockedUpsertChunks).not.toHaveBeenCalled();
+  });
+
+  it('um arquivo que lança exceção durante extração/chunking/embedding não impede os demais de serem indexados', async () => {
+    mockedFs.readdirSync.mockReturnValue(['manual-bom.pdf', 'manual-quebrado.pdf'] as any);
+    MockedPDFParse.mockImplementationOnce(
+      () =>
+        ({
+          getText: jest.fn().mockResolvedValue({ text: 'Passo 1: faça isso.' }),
+          destroy: jest.fn().mockResolvedValue(undefined),
+        }) as any
+    ).mockImplementationOnce(
+      () =>
+        ({
+          getText: jest.fn().mockRejectedValue(new Error('PDF corrompido')),
+          destroy: jest.fn().mockResolvedValue(undefined),
+        }) as any
+    );
+
+    const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
+    const summary = await indexDocuments('/fake/docs');
+
+    const bom = summary.find((s) => s.file === 'manual-bom.pdf');
+    const quebrado = summary.find((s) => s.file === 'manual-quebrado.pdf');
+
+    expect(bom?.chunks).toBe(1);
+    expect(bom?.error).toBeUndefined();
+    expect(quebrado?.chunks).toBe(0);
+    expect(quebrado?.error).toContain('PDF corrompido');
+
+    // O arquivo bom ainda deve ter sido indexado, mesmo com a falha do outro.
+    expect(mockedResetCollection).toHaveBeenCalledTimes(1);
+    expect(mockedUpsertChunks).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'manual-bom.pdf::0' }),
+    ]);
+  });
+
+  it('NÃO chama resetCollection quando docsDir não tem nenhum PDF', async () => {
+    mockedFs.readdirSync.mockReturnValue(['nota.txt', 'imagem.png'] as any);
+
+    const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
+    const summary = await indexDocuments('/fake/docs');
+
+    expect(summary).toEqual([]);
+    expect(mockedResetCollection).not.toHaveBeenCalled();
+    expect(mockedUpsertChunks).not.toHaveBeenCalled();
+  });
+
+  it('NÃO chama resetCollection quando todos os PDFs falham ao processar', async () => {
+    mockedFs.readdirSync.mockReturnValue(['a.pdf', 'b.pdf'] as any);
+    MockedPDFParse.mockImplementation(
+      () =>
+        ({
+          getText: jest.fn().mockRejectedValue(new Error('falha geral')),
+          destroy: jest.fn().mockResolvedValue(undefined),
+        }) as any
+    );
+
+    const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
+    const summary = await indexDocuments('/fake/docs');
+
+    summary.forEach((s) => {
+      expect(s.chunks).toBe(0);
+      expect(s.error).toContain('falha geral');
+    });
+    expect(mockedResetCollection).not.toHaveBeenCalled();
     expect(mockedUpsertChunks).not.toHaveBeenCalled();
   });
 });
