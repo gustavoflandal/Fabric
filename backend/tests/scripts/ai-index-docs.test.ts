@@ -65,6 +65,30 @@ describe('ai-index-docs.indexDocuments', () => {
     ]);
   });
 
+  it('remove o separador de página "-- N of M --" inserido pelo pdf-parse antes do chunking', async () => {
+    MockedPDFParse.mockImplementation(
+      () =>
+        ({
+          getText: jest
+            .fn()
+            .mockResolvedValue({ text: 'Passo 1: faça isso.\n\n-- 1 of 2 --\n\nPasso 2: faça aquilo.' }),
+          destroy: jest.fn().mockResolvedValue(undefined),
+        }) as any
+    );
+
+    const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
+    await indexDocuments('/fake/docs');
+
+    mockedEmbed.mock.calls.forEach(([text]) => {
+      expect(text).not.toContain('-- 1 of 2 --');
+    });
+    mockedUpsertChunks.mock.calls.forEach(([chunks]) => {
+      chunks.forEach((chunk) => {
+        expect(chunk.text).not.toContain('-- 1 of 2 --');
+      });
+    });
+  });
+
   it('não indexa PDF sem camada de texto (escaneado) e registra 0 chunks', async () => {
     MockedPDFParse.mockImplementation(
       () =>
