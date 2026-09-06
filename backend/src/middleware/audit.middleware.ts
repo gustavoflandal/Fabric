@@ -107,6 +107,13 @@ export const auditMiddleware = async (
       // Logar operações de escrita, erros, ou leituras bem-sucedidas quando
       // o modo 'all' pediu explicitamente para incluí-las.
       if (isWriteOperation || isError || (isReadOperation && includeReads)) {
+        // Rotas que nunca chamam `res.json` (ex.: streaming SSE do
+        // assistente de IA, que usa `res.write`) não têm como preencher
+        // `responseBody` pela interceptação acima. Nesses casos, o próprio
+        // controller pode registrar o corpo a auditar em
+        // `res.locals.auditResponseBody` antes de encerrar a resposta.
+        const effectiveResponseBody = responseBody ?? res.locals?.auditResponseBody;
+
         await auditLogService.create({
           userId: req.userId,
           action,
@@ -118,7 +125,7 @@ export const auditMiddleware = async (
           endpoint: req.originalUrl,
           statusCode: res.statusCode,
           requestBody: sanitizeBody(originalBody),
-          responseBody: sanitizeBody(responseBody),
+          responseBody: sanitizeBody(effectiveResponseBody),
           durationMs,
         });
       }

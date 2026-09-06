@@ -141,6 +141,12 @@ async function main() {
     { resource: 'tarefas_armazem', action: 'executar', description: 'Executar tarefas de armazém (iniciar, conferir leitura, concluir)' },
     { resource: 'tarefas_armazem', action: 'atribuir', description: 'Atribuir tarefas de armazém a operadores' },
 
+    // Assistente de IA — Fase 1 (RAG sobre manuais em PDF). Ver
+    // docs/superpowers/specs/2026-09-06-assistente-ia-rag-manuais-design.md.
+    // Ação única (`usar`): não há como segmentar mais nesta fase — não há
+    // consulta a dado transacional nem ação alguma, só leitura de manual.
+    { resource: 'assistente_ia', action: 'usar', description: 'Usar o assistente virtual de IA' },
+
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
     { resource: 'suppliers', action: 'read', description: 'Visualizar fornecedores' },
@@ -497,6 +503,7 @@ async function main() {
     sessoes_contagem: ['visualizar', 'criar', 'iniciar', 'completar', 'cancelar'],
     contagem: ['executar', 'recontar', 'aprovar_divergencia'],
     relatorios_contagem: ['visualizar'],
+    assistente_ia: ['usar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms'],
     audit_logs: ['read'],
     roles: ['read'],
@@ -532,6 +539,7 @@ async function main() {
     sessoes_contagem: ['visualizar', 'iniciar'],
     contagem: ['executar', 'recontar'],
     relatorios_contagem: ['visualizar'],
+    assistente_ia: ['usar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms'],
   };
 

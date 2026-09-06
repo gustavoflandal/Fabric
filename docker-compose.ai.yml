@@ -1,0 +1,33 @@
+# docker-compose.ai.yml
+#
+# Infraestrutura do Assistente de IA — Fase 1 (RAG sobre manuais). Arquivo
+# SEPARADO do docker-compose.yml principal, propositalmente: sobe só com
+#   docker compose -f docker-compose.yml -f docker-compose.ai.yml up -d
+# (nunca sozinho — depende da rede `fabric-network` declarada no arquivo
+# principal). Nenhum dos dois serviços é exposto além da rede interna do
+# compose: só o `backend` fala com eles (a API do Ollama não tem
+# autenticação própria — ver
+# docs/superpowers/specs/2026-09-06-assistente-ia-rag-manuais-design.md,
+# seção 3).
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fabric-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_storage:/root/.ollama
+    networks:
+      - fabric-network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: fabric-chromadb
+    restart: unless-stopped
+    volumes:
+      - chroma_storage:/chroma/chroma
+    networks:
+      - fabric-network
+
+volumes:
+  ollama_storage:
+  chroma_storage:

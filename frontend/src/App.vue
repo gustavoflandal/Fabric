@@ -3,6 +3,7 @@
     <RouterView />
     <ToastContainer />
     <ConfirmDialogContainer />
+    <ChatAssistant />
   </div>
 </template>
 
@@ -12,6 +13,7 @@ import { onMounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth.store'
 import ToastContainer from '@/components/common/ToastContainer.vue'
 import ConfirmDialogContainer from '@/components/common/ConfirmDialogContainer.vue'
+import ChatAssistant from '@/components/assistant/ChatAssistant.vue'
 
 const authStore = useAuthStore()
 const isInitializing = ref(true)
