@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import warehouseTaskService from '../services/warehouse-task.service';
+import { getTaskKpis } from '../services/wms-kpi.service';
 import warehouseTaskExecutionService from '../services/warehouse-task-execution.service';
 import purchaseReceiptService from '../services/purchase-receipt.service';
 
@@ -30,6 +31,17 @@ export class WarehouseTaskController {
     try {
       const scope = (req.query.scope as 'all' | 'mine' | undefined) ?? 'all';
       const data = await warehouseTaskService.listActiveReceiptOperations(scope, req.userId!);
+      return res.status(200).json({ status: 'success', data });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  /** Dashboard de KPIs do WMS — as 4 abas de Recebimento (Volume/Status, Tempo de Ciclo, Produtividade, Gargalos). */
+  async getKpis(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const days = Number(req.query.days) || 30;
+      const data = await getTaskKpis(days);
       return res.status(200).json({ status: 'success', data });
     } catch (error) {
       return next(error);

@@ -306,3 +306,63 @@ export const getPositionMovements = async (
     }))
   };
 };
+
+export interface WarehouseOccupancy {
+  warehouseCode: string;
+  occupied: number;
+  free: number;
+  blocked: number;
+  total: number;
+}
+
+export interface OccupancyResponse {
+  byWarehouse: WarehouseOccupancy[];
+}
+
+/**
+ * Dashboard de KPIs do WMS — aba Ocupação. Sem período (ocupação é sempre
+ * "agora"), agrupado só por armazém nesta v1 (não por rua/estrutura — ver
+ * docs/superpowers/specs/2026-09-05-dashboard-kpis-wms-design.md).
+ *
+ * Classificação: BLOQUEADA tem prioridade sobre ocupada — uma posição
+ * bloqueada com saldo residual conta como bloqueada, não ocupada (é a mesma
+ * posição impedida de operar, o saldo nela é um problema à parte, não
+ * "capacidade em uso").
+ */
+export const getOccupancy = async (): Promise<OccupancyResponse> => {
+  // SEM `take` aqui: uma posição pode ter mais de uma linha de saldo (uma por
+  // lote, ver StockPositionBalance) — trazer só a primeira classificaria
+  // errado uma posição com saldo real só num lote diferente do que calhou de
+  // vir primeiro. O volume por posição é pequeno o bastante (poucas linhas por
+  // endereço) para trazer todas sem paginação nesta v1.
+  const positions = await prisma.storagePosition.findMany({
+    select: {
+      warehouseCode: true,
+      blocked: true,
+      stockPositionBalances: { select: { quantity: true } },
+    },
+  });
+
+  const byWarehouseMap = new Map<string, WarehouseOccupancy>();
+  for (const position of positions) {
+    const entry = byWarehouseMap.get(position.warehouseCode) ?? {
+      warehouseCode: position.warehouseCode,
+      occupied: 0,
+      free: 0,
+      blocked: 0,
+      total: 0,
+    };
+    entry.total += 1;
+    const hasBalance = position.stockPositionBalances.some((b) => Number(b.quantity) > 0);
+    if (position.blocked) {
+      entry.blocked += 1;
+    } else if (hasBalance) {
+      entry.occupied += 1;
+    } else {
+      entry.free += 1;
+    }
+    byWarehouseMap.set(position.warehouseCode, entry);
+  }
+
+  return { byWarehouse: [...byWarehouseMap.values()].sort((a, b) => a.warehouseCode.localeCompare(b.warehouseCode)) };
+};

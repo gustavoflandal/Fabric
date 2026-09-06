@@ -223,6 +223,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/wms/OperationsPanelView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/wms/kpis',
+    name: 'wms-kpis',
+    component: () => import('../views/wms/WmsKpiDashboardView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

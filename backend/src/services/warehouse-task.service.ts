@@ -100,7 +100,7 @@ export const PRODUCTION_ORDER_TASK_REFERENCE_TYPE = 'PRODUCTION_ORDER';
 export const REPLENISHMENT_TASK_REFERENCE_TYPE = 'REPLENISHMENT';
 
 /** Status a partir dos quais uma tarefa ainda pode ser concluída. */
-const OPEN_STATUSES: WarehouseTaskStatus[] = [
+export const OPEN_STATUSES: WarehouseTaskStatus[] = [
   WarehouseTaskStatus.PENDING,
   WarehouseTaskStatus.IN_PROGRESS,
 ];

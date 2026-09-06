@@ -99,3 +99,13 @@ export const myWarehouseTasksQuerySchema = Joi.object({
 export const panelQuerySchema = Joi.object({
   scope: Joi.string().valid('all', 'mine'),
 }).unknown(true);
+
+/**
+ * `GET /warehouse-tasks/kpis`. `days` só aceita os 3 valores do seletor de
+ * período da tela (7/30/90); qualquer outro valor é 400, não um fallback
+ * silencioso — evita a tela mostrar "período de 15 dias" por engano de URL.
+ * Ausente = o controller aplica o default de 30.
+ */
+export const kpisQuerySchema = Joi.object({
+  days: Joi.number().valid(7, 30, 90),
+}).unknown(true);
