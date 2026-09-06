@@ -165,4 +165,37 @@ export const config = {
     /** Dias de antecedência do alerta `LOT_EXPIRING_SOON`. Ver a nota acima. */
     lotExpiryAlertDays,
   },
+  assistant: {
+    /**
+     * Assistente de IA — Fase 1 (RAG sobre manuais em PDF). Ver
+     * docs/superpowers/specs/2026-09-06-assistente-ia-rag-manuais-design.md.
+     * Defaults cobrem execução fora de container (`localhost`); em Docker,
+     * `docker-compose.yml` sobrescreve OLLAMA_URL/CHROMA_HOST/CHROMA_PORT
+     * para os nomes dos serviços em `docker-compose.ai.yml`.
+     */
+    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
+    chatModel: process.env.ASSISTANT_CHAT_MODEL || 'qwen2.5:7b',
+    embedModel: process.env.ASSISTANT_EMBED_MODEL || 'bge-m3',
+    /**
+     * Contexto explícito (nunca o padrão do Ollama) — evita o truncamento
+     * silencioso do início do prompt (system prompt + contexto recuperado)
+     * quando a conversa cresce. 4096 cobre system prompt + 3 chunks de 500
+     * caracteres + até 6 mensagens de histórico + a pergunta, com folga.
+     */
+    numCtx: Number(process.env.ASSISTANT_NUM_CTX) || 4096,
+    /**
+     * Distância de cosseno máxima (métrica do ChromaDB, ver
+     * chroma-client.service.ts) para um chunk ser considerado relevante.
+     * 0=idêntico, 2=oposto. Valor inicial a calibrar empiricamente rodando o
+     * golden set (Task 9) contra os PDFs de exemplo — ver nota da spec,
+     * seção 4.
+     */
+    maxCosineDistance: Number.isFinite(Number(process.env.ASSISTANT_MAX_COSINE_DISTANCE))
+      ? Number(process.env.ASSISTANT_MAX_COSINE_DISTANCE)
+      : 0.6,
+    chroma: {
+      host: process.env.CHROMA_HOST || 'localhost',
+      port: Number(process.env.CHROMA_PORT) || 8000,
+    },
+  },
 };
