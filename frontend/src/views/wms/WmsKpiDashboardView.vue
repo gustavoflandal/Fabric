@@ -34,7 +34,7 @@
         </div>
       </div>
 
-      <div v-show="activeTab === 'volume'">
+      <div v-show="activeTab === 'volume'" data-testid="tab-panel-volume">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <p class="text-sm text-gray-600">Recebimentos ativos</p>
@@ -50,7 +50,7 @@
         </Card>
       </div>
 
-      <div v-show="activeTab === 'ciclo'">
+      <div v-show="activeTab === 'ciclo'" data-testid="tab-panel-ciclo">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
           <p class="text-sm text-gray-600">Tempo médio do recebimento completo</p>
           <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.cycleTime.fullReceiptAvgHours ?? 0 }}h</p>
@@ -60,7 +60,7 @@
         </Card>
       </div>
 
-      <div v-show="activeTab === 'produtividade'">
+      <div v-show="activeTab === 'produtividade'" data-testid="tab-panel-produtividade">
         <Card title="Produtividade por operador">
           <table class="min-w-full divide-y divide-gray-200">
             <thead>
@@ -81,7 +81,7 @@
         </Card>
       </div>
 
-      <div v-show="activeTab === 'gargalos'">
+      <div v-show="activeTab === 'gargalos'" data-testid="tab-panel-gargalos">
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
           <div
             v-for="entry in taskKpis?.bottlenecks.byType ?? []"
@@ -116,7 +116,7 @@
         </Card>
       </div>
 
-      <div v-show="activeTab === 'ocupacao'">
+      <div v-show="activeTab === 'ocupacao'" data-testid="tab-panel-ocupacao">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
           <p class="text-sm text-gray-600">% de ocupação geral</p>
           <p class="text-3xl font-bold text-gray-900">{{ overallOccupancyPercent }}%</p>
