@@ -1,4 +1,4 @@
-import { answerQuestion } from '../../src/services/assistant.service';
+import { answerQuestion, NAO_ENCONTREI, FORA_ESCOPO } from '../../src/services/assistant.service';
 import * as ollamaClient from '../../src/services/ollama-client.service';
 import * as chromaClient from '../../src/services/chroma-client.service';
 import { config } from '../../src/config/env';
@@ -129,5 +129,52 @@ describe('assistant.service.answerQuestion', () => {
     expect(mockedOllama.chatStream).toHaveBeenCalled();
     expect(onSources).toHaveBeenCalledWith([{ arquivo: 'limite.pdf', trecho: 'no limite' }]);
     expect(onToken).not.toHaveBeenCalledWith('Não encontrei essa informação nos manuais do sistema.');
+  });
+
+  it('NÃO chama onSources quando o chunk passa o limiar mas o MODELO decide recusar (não encontrei)', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([
+      { document: 'conteúdo relevante', metadata: { arquivo: 'manual.pdf', indice: 0 }, distance: 0.1 },
+    ]);
+    // Chunk passou o corte determinístico, mas o modelo (mockado) decide que
+    // não sabe responder e gera a frase fixa via streaming, token a token.
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield 'Não encontrei essa informação ';
+      yield 'nos manuais do sistema.';
+    });
+
+    const onSources = jest.fn();
+    const onDone = jest.fn();
+
+    await answerQuestion('pergunta ambígua', [], { onToken: jest.fn(), onSources, onDone });
+
+    expect(mockedOllama.chatStream).toHaveBeenCalled();
+    expect(onSources).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it('NÃO chama onSources quando o chunk passa o limiar mas o MODELO decide recusar (fora de escopo)', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([
+      { document: 'conteúdo relevante', metadata: { arquivo: 'manual.pdf', indice: 0 }, distance: 0.1 },
+    ]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield 'Desculpe, sou um assistente focado ';
+      yield 'exclusivamente nas operações deste sistema.';
+    });
+
+    const onSources = jest.fn();
+    const onDone = jest.fn();
+
+    await answerQuestion('qual a previsão do tempo?', [], { onToken: jest.fn(), onSources, onDone });
+
+    expect(mockedOllama.chatStream).toHaveBeenCalled();
+    expect(onSources).not.toHaveBeenCalled();
+    expect(onDone).toHaveBeenCalled();
+  });
+
+  it('exporta NAO_ENCONTREI e FORA_ESCOPO com os textos fixos usados no guardrail', () => {
+    expect(NAO_ENCONTREI).toBe('Não encontrei essa informação nos manuais do sistema.');
+    expect(FORA_ESCOPO).toBe('Desculpe, sou um assistente focado exclusivamente nas operações deste sistema.');
   });
 });
