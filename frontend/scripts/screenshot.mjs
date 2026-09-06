@@ -50,6 +50,7 @@ const ROUTES = {
   'wms-operations': '/wms/operations',
   'wms-workflows': '/wms/workflows',
   'wms-workflow-new': '/wms/workflows/new',
+  'wms-kpis': '/wms/kpis',
   notifications: '/notifications',
   'counting-dashboard': '/counting/dashboard',
   'counting-plans': '/counting/plans',
