@@ -111,6 +111,87 @@ describe('ChatAssistant', () => {
     expect(document.body.textContent).toContain('Falha de conexão')
   })
 
+  it('atualiza o DOM progressivamente conforme os tokens chegam durante o streaming', async () => {
+    hasPermissionMock.mockReturnValue(true)
+
+    // Regressao direta do bug de reatividade corrigido na task da store:
+    // assistantMessage precisa ser reactive() para que mutacoes token a token
+    // no closure (fora do proxy reativo do array) disparem re-render. Sem
+    // reactive(), a mutacao e invisivel para o Vue e SO reapareceria "de
+    // carona" se outro estado reativo (ex.: isStreaming) forcasse um render
+    // por outro motivo — por isso cada onToken() aqui e isolado por um gate
+    // proprio, e onDone() (que mexe em isStreaming, reativo de verdade) so e
+    // liberado DEPOIS de verificarmos o estado de cada token isoladamente.
+    // Sem esse isolamento, o teste passaria mesmo com o bug reintroduzido
+    // (verificado manualmente: revertendo reactive() -> objeto plano na
+    // store, uma versao anterior deste teste sem os gates passava do mesmo
+    // jeito, por causa exatamente desse "carona").
+    let releaseFirstToken: () => void = () => {}
+    let releaseSecondToken: () => void = () => {}
+    let releaseDone: () => void = () => {}
+    let notifyFirstTokenSent: () => void = () => {}
+    let notifySecondTokenSent: () => void = () => {}
+
+    const firstTokenGate = new Promise<void>((resolve) => {
+      releaseFirstToken = resolve
+    })
+    const secondTokenGate = new Promise<void>((resolve) => {
+      releaseSecondToken = resolve
+    })
+    const doneGate = new Promise<void>((resolve) => {
+      releaseDone = resolve
+    })
+    const firstTokenSent = new Promise<void>((resolve) => {
+      notifyFirstTokenSent = resolve
+    })
+    const secondTokenSent = new Promise<void>((resolve) => {
+      notifySecondTokenSent = resolve
+    })
+
+    vi.mocked(streamChat).mockImplementation(async (_msg, _history, handlers) => {
+      await firstTokenGate
+      handlers.onToken('Olá')
+      notifyFirstTokenSent()
+      await secondTokenGate
+      handlers.onToken(' mundo')
+      notifySecondTokenSent()
+      await doneGate
+      handlers.onDone()
+    })
+
+    mount(ChatAssistant, { attachTo: document.body })
+    click(openButton()!)
+    await nextTick()
+
+    await setInputValue(inputEl()!, 'oi')
+    await submitForm(formEl()!)
+    await nextTick()
+
+    // Antes do primeiro token: mensagem do assistente ja existe, mas vazia.
+    expect(document.body.textContent).not.toContain('Olá')
+
+    releaseFirstToken()
+    await firstTokenSent
+    await nextTick()
+
+    // Estado intermediario isolado: so o primeiro token chegou, onDone ainda
+    // nao foi chamado (nao ha nenhum outro gatilho reativo por perto).
+    expect(document.body.textContent).toContain('Olá')
+    expect(document.body.textContent).not.toContain('Olá mundo')
+
+    releaseSecondToken()
+    await secondTokenSent
+    await nextTick()
+
+    // Segundo estado intermediario isolado: o segundo token foi concatenado
+    // ao primeiro (nao substituiu), e onDone ainda nao rodou.
+    expect(document.body.textContent).toContain('Olá mundo')
+
+    releaseDone()
+    await nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
   it('desabilita o campo e o botão de enviar durante o streaming', async () => {
     hasPermissionMock.mockReturnValue(true)
     let resolveStream: () => void = () => {}
