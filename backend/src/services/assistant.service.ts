@@ -58,7 +58,8 @@ function buildContextBlock(chunks: RetrievedChunk[]): string {
 export async function answerQuestion(
   message: string,
   history: AssistantHistoryMessage[],
-  events: AssistantEvents
+  events: AssistantEvents,
+  signal?: AbortSignal
 ): Promise<void> {
   const queryEmbedding = await embed(message);
   const topChunks = await queryTopChunks(queryEmbedding, TOP_K);
@@ -78,7 +79,7 @@ export async function answerQuestion(
   ];
 
   let respostaCompleta = '';
-  for await (const token of chatStream(messages)) {
+  for await (const token of chatStream(messages, signal)) {
     respostaCompleta += token;
     events.onToken(token);
   }

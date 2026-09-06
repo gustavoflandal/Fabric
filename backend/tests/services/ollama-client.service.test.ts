@@ -159,5 +159,23 @@ describe('ollama-client.service', () => {
 
       expect(collected).toEqual(['X']);
     });
+
+    it('repassa o AbortSignal recebido para o fetch', async () => {
+      const lines = [JSON.stringify({ message: { role: 'assistant', content: '' }, done: true })];
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBody(lines),
+      });
+      global.fetch = mockFetch as any;
+
+      const abortController = new AbortController();
+      const messages: ChatMessage[] = [{ role: 'user', content: 'oi' }];
+      for await (const _ of chatStream(messages, abortController.signal)) {
+        // no-op
+      }
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.signal).toBe(abortController.signal);
+    });
   });
 });

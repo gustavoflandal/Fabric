@@ -84,6 +84,12 @@ describe('Integração: POST /api/v1/assistant/chat', () => {
     expect(res.text).toContain('"text":"Olá"');
     expect(res.text).toContain('event: fontes');
     expect(res.text).toContain('event: fim');
+
+    // achado 4 da revisão final: o controller cria um AbortController e
+    // repassa o signal até answerQuestion, para poder cancelar o streaming
+    // do Ollama se o cliente desconectar.
+    const signalArg = mockedAnswerQuestion.mock.calls[0][3];
+    expect(signalArg).toBeInstanceOf(AbortSignal);
   });
 
   it('emite evento erro (sem quebrar a conexão) quando answerQuestion lança exceção', async () => {

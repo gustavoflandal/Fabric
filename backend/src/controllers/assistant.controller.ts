@@ -11,6 +11,13 @@ import { logger } from '../config/logger';
 export const chat = async (req: Request, res: Response, _next: NextFunction) => {
   const { message, history } = req.body as { message: string; history?: AssistantHistoryMessage[] };
 
+  // Cancela o streaming do Ollama se o cliente desconectar (fecha o widget,
+  // navega para outra tela, cai a conexão) — sem isso, com o modelo rodando
+  // CPU-only, o backend continuaria consumindo a resposta até o fim sem
+  // ninguém para recebê-la.
+  const abortController = new AbortController();
+  req.on('close', () => abortController.abort());
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -24,14 +31,19 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
   };
 
   try {
-    await answerQuestion(message, history ?? [], {
-      onToken: (text) => send('token', { text }),
-      onSources: (sources) => send('fontes', { sources }),
-      onDone: () => {
-        send('fim', {});
-        res.end();
+    await answerQuestion(
+      message,
+      history ?? [],
+      {
+        onToken: (text) => send('token', { text }),
+        onSources: (sources) => send('fontes', { sources }),
+        onDone: () => {
+          send('fim', {});
+          res.end();
+        },
       },
-    });
+      abortController.signal
+    );
   } catch (error) {
     logger.error('Erro no assistente de IA', { error: error instanceof Error ? error.message : error });
     send('erro', { message: 'Falha ao gerar resposta. Tente novamente.' });

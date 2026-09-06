@@ -173,6 +173,40 @@ describe('assistant.service.answerQuestion', () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  it('repassa o AbortSignal opcional até chatStream', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([
+      { document: 'doc', metadata: { arquivo: 'a.pdf', indice: 0 }, distance: 0.1 },
+    ]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield 'ok';
+    });
+
+    const abortController = new AbortController();
+    await answerQuestion(
+      'pergunta',
+      [],
+      { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() },
+      abortController.signal
+    );
+
+    expect(mockedOllama.chatStream).toHaveBeenCalledWith(expect.any(Array), abortController.signal);
+  });
+
+  it('continua funcionando normalmente quando nenhum signal é passado (parâmetro opcional)', async () => {
+    mockedOllama.embed.mockResolvedValue([0.1]);
+    mockedChroma.queryTopChunks.mockResolvedValue([
+      { document: 'doc', metadata: { arquivo: 'a.pdf', indice: 0 }, distance: 0.1 },
+    ]);
+    mockedOllama.chatStream.mockImplementation(async function* () {
+      yield 'ok';
+    });
+
+    await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() });
+
+    expect(mockedOllama.chatStream).toHaveBeenCalledWith(expect.any(Array), undefined);
+  });
+
   it('exporta NAO_ENCONTREI e FORA_ESCOPO com os textos fixos usados no guardrail', () => {
     expect(NAO_ENCONTREI).toBe('Não encontrei essa informação nos manuais do sistema.');
     expect(FORA_ESCOPO).toBe('Desculpe, sou um assistente focado exclusivamente nas operações deste sistema.');

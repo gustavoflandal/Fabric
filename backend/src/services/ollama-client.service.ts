@@ -30,7 +30,13 @@ export async function embed(text: string): Promise<number[]> {
   return data.embedding;
 }
 
-export async function* chatStream(messages: ChatMessage[]): AsyncGenerator<string> {
+/**
+ * `signal` (opcional) permite cancelar o streaming quando o cliente HTTP
+ * desconecta — sem ele, com o modelo rodando CPU-only, o backend continuaria
+ * consumindo a resposta do Ollama até o fim mesmo sem ninguém para recebê-la,
+ * segurando o worker por dezenas de segundos por cliente abandonado.
+ */
+export async function* chatStream(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
   const res = await fetch(`${config.assistant.ollamaUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -40,6 +46,7 @@ export async function* chatStream(messages: ChatMessage[]): AsyncGenerator<strin
       stream: true,
       options: { num_ctx: config.assistant.numCtx },
     }),
+    signal,
   });
 
   if (!res.ok || !res.body) {
