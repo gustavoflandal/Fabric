@@ -15,7 +15,11 @@ export async function embed(text: string): Promise<number[]> {
   const res = await fetch(`${config.assistant.ollamaUrl}/api/embeddings`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: config.assistant.embedModel, prompt: text }),
+    body: JSON.stringify({
+      model: config.assistant.embedModel,
+      prompt: text,
+      options: { num_ctx: config.assistant.numCtx },
+    }),
   });
 
   if (!res.ok) {
