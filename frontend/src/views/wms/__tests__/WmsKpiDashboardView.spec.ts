@@ -38,7 +38,7 @@ const mockTaskKpis = {
     byTypeAndStatus: [
       { type: 'DESCARGA', status: 'PENDING', count: 3 },
       { type: 'DESCARGA', status: 'COMPLETED', count: 7 },
-      { type: 'ARMAZENAGEM', status: 'IN_PROGRESS', count: 2 },
+      { type: 'ALOCACAO', status: 'IN_PROGRESS', count: 2 },
     ],
     receiptsActive: 2,
     receiptsFinished: 5,
@@ -169,7 +169,7 @@ describe('WmsKpiDashboardView', () => {
 
     // Gráfico Volume/Status: valida o agrupamento/pivot de byTypeAndStatus.
     expect(volumeChart.config.type).toBe('bar')
-    expect(volumeChart.config.data.labels).toEqual(['DESCARGA', 'ARMAZENAGEM'])
+    expect(volumeChart.config.data.labels).toEqual(['DESCARGA', 'ALOCACAO'])
     const volumeDatasets = Object.fromEntries(
       volumeChart.config.data.datasets.map((d: any) => [d.label, d.data])
     )

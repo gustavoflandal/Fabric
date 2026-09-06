@@ -1,7 +1,7 @@
 import { WarehouseTaskStatus, WarehouseTaskType } from '@prisma/client';
 import { prisma } from '../config/database';
 import { getSetting } from './system-setting.service';
-import { RECEIPT_TASK_REFERENCE_TYPE } from './warehouse-task.service';
+import { OPEN_STATUSES, RECEIPT_TASK_REFERENCE_TYPE } from './warehouse-task.service';
 
 /**
  * Dashboard de KPIs do WMS — as 4 abas sobre a cadeia de Recebimento
@@ -11,11 +11,6 @@ import { RECEIPT_TASK_REFERENCE_TYPE } from './warehouse-task.service';
  */
 
 const MS_PER_HOUR = 60 * 60 * 1000;
-
-const OPEN_STATUSES: WarehouseTaskStatus[] = [
-  WarehouseTaskStatus.PENDING,
-  WarehouseTaskStatus.IN_PROGRESS,
-];
 
 function average(values: number[]): number {
   if (values.length === 0) return 0;
@@ -102,7 +97,7 @@ async function getVolumeStatus(since: Date): Promise<VolumeStatus> {
     select: { reference: true },
     distinct: ['reference'],
   });
-  const activeSet = new Set(activeRefs.map((r) => r.reference));
+  const activeSet = new Set(activeRefs.map((r) => r.reference).filter((r): r is string => !!r));
   const receiptsActive = activeSet.size;
   const receiptsFinished = allRefs.filter((r) => r.reference && !activeSet.has(r.reference)).length;
 
@@ -110,10 +105,32 @@ async function getVolumeStatus(since: Date): Promise<VolumeStatus> {
 }
 
 async function getCycleTime(since: Date): Promise<CycleTime> {
-  const tasks = await prisma.warehouseTask.findMany({
-    where: { referenceType: RECEIPT_TASK_REFERENCE_TYPE, reference: { not: null } },
-    select: { type: true, status: true, reference: true, createdAt: true, completedAt: true },
+  // Passo 1: recebimentos com QUALQUER atividade recente (tarefa concluída
+  // dentro do período) — leve, só `reference` distinto. Isso decide QUAIS
+  // cadeias importam para esta consulta, sem carregar a tabela inteira.
+  const recentReceipts = await prisma.warehouseTask.findMany({
+    where: {
+      referenceType: RECEIPT_TASK_REFERENCE_TYPE,
+      status: WarehouseTaskStatus.COMPLETED,
+      completedAt: { gte: since },
+    },
+    select: { reference: true },
+    distinct: ['reference'],
   });
+  const candidateReferences = recentReceipts
+    .map((r) => r.reference)
+    .filter((r): r is string => !!r);
+
+  // Passo 2: a cadeia COMPLETA (qualquer status, qualquer data) só dessas
+  // referências — necessário porque fullReceiptAvgHours precisa do
+  // createdAt mais antigo da cadeia inteira, que pode ser anterior a `since`.
+  const tasks =
+    candidateReferences.length === 0
+      ? []
+      : await prisma.warehouseTask.findMany({
+          where: { referenceType: RECEIPT_TASK_REFERENCE_TYPE, reference: { in: candidateReferences } },
+          select: { type: true, status: true, reference: true, createdAt: true, completedAt: true },
+        });
 
   const hoursByType = new Map<WarehouseTaskType, number[]>();
   for (const task of tasks) {

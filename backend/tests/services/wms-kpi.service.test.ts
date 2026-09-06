@@ -71,7 +71,7 @@ describe('wms-kpi.service — getTaskKpis', () => {
   describe('volumeStatus', () => {
     it('agrupa por type e status dentro do período, e conta recebimentos ativos vs finalizados', async () => {
       const { user, token } = await loginReceiptUser();
-      const { res } = await createReceipt(token, user.id, 100);
+      await createReceipt(token, user.id, 100);
 
       const kpis = await getTaskKpis(30);
 
@@ -168,6 +168,45 @@ describe('wms-kpi.service — getTaskKpis', () => {
 
       const kpis = await getTaskKpis(30);
       expect(kpis.cycleTime.fullReceiptAvgHours).toBe(0);
+    });
+
+    it('fullReceiptAvgHours alcança o início real da cadeia mesmo quando ele fica fora da janela do período (query em duas etapas de getCycleTime)', async () => {
+      // getCycleTime busca em 2 passos: (1) referências com tarefa COMPLETED
+      // dentro do período, leve; (2) a cadeia INTEIRA (sem filtro de data)
+      // dessas referências. Este teste prova que o passo 2 ainda alcança uma
+      // tarefa criada 45 dias atrás — bem antes da janela de days=30 — desde
+      // que a ÚLTIMA conclusão da cadeia caia dentro do período.
+      const { user, token } = await loginReceiptUser();
+      const { res } = await createReceipt(token, user.id, 100);
+
+      const tasks = await testPrisma.warehouseTask.findMany({
+        where: { reference: res.body.data.id, referenceType: 'PURCHASE_RECEIPT' },
+        orderBy: { sequence: 'asc' },
+      });
+      expect(tasks.length).toBeGreaterThan(1);
+
+      const chainStart = new Date(Date.now() - 45 * 24 * HOUR); // 45 dias atrás: fora da janela de 30 dias
+      const earlyCompletedAt = new Date(Date.now() - 40 * 24 * HOUR); // 40 dias atrás: também fora da janela
+      const lastCompletedAt = new Date(Date.now() - 5 * 24 * HOUR); // 5 dias atrás: dentro da janela de 30 dias
+
+      for (const [index, task] of tasks.entries()) {
+        const isLast = index === tasks.length - 1;
+        await testPrisma.warehouseTask.update({
+          where: { id: task.id },
+          data: {
+            createdAt: chainStart,
+            status: 'COMPLETED',
+            completedAt: isLast ? lastCompletedAt : earlyCompletedAt,
+          },
+        });
+      }
+
+      const kpis = await getTaskKpis(30);
+      // (lastCompletedAt - chainStart) = 40 dias = 960h. Se o passo 1 tivesse
+      // restringido por data a cadeia inteira (em vez de só decidir QUAIS
+      // referências entram), o createdAt de 45 dias atrás seria perdido e o
+      // resultado ficaria errado.
+      expect(kpis.cycleTime.fullReceiptAvgHours).toBe(40 * 24);
     });
   });
 

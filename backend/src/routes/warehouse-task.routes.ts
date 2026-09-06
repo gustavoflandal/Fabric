@@ -95,8 +95,10 @@ router.get(
 );
 
 // Dashboard de KPIs do WMS — as 4 abas de Recebimento. RBAC:
-// `tarefas_armazem:visualizar`, mesmo recurso de `GET /my` — é leitura
-// agregada, não dado sensível a mais que o painel operacional já expõe.
+// `tarefas_armazem:visualizar`, mesmo recurso de `GET /my` — é uma visão
+// analítica/agregada sobre dados de TAREFA de armazém (contagens, médias,
+// gargalos), coerente com o recurso orientado a tarefa em vez do recurso
+// orientado a recebimento (`recebimentos_compra`) usado por `/panel`.
 router.get(
   '/kpis',
   requirePermission('tarefas_armazem', 'visualizar'),

@@ -35,33 +35,58 @@
       </div>
 
       <div v-show="activeTab === 'volume'" data-testid="tab-panel-volume">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <p class="text-sm text-gray-600">Recebimentos ativos</p>
-            <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.volumeStatus.receiptsActive ?? 0 }}</p>
-          </div>
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <p class="text-sm text-gray-600">Recebimentos finalizados</p>
-            <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.volumeStatus.receiptsFinished ?? 0 }}</p>
-          </div>
+        <div
+          v-if="taskKpisError"
+          data-testid="tab-error-volume"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+        >
+          <p class="text-red-600">{{ taskKpisError }}</p>
         </div>
-        <Card title="Volume por tipo e status">
-          <div class="h-72"><canvas ref="volumeChartRef"></canvas></div>
-        </Card>
+        <template v-else>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <p class="text-sm text-gray-600">Recebimentos ativos</p>
+              <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.volumeStatus.receiptsActive ?? 0 }}</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              <p class="text-sm text-gray-600">Recebimentos finalizados</p>
+              <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.volumeStatus.receiptsFinished ?? 0 }}</p>
+            </div>
+          </div>
+          <Card title="Volume por tipo e status">
+            <div class="h-72"><canvas ref="volumeChartRef"></canvas></div>
+          </Card>
+        </template>
       </div>
 
       <div v-show="activeTab === 'ciclo'" data-testid="tab-panel-ciclo">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-          <p class="text-sm text-gray-600">Tempo médio do recebimento completo</p>
-          <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.cycleTime.fullReceiptAvgHours ?? 0 }}h</p>
+        <div
+          v-if="taskKpisError"
+          data-testid="tab-error-ciclo"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+        >
+          <p class="text-red-600">{{ taskKpisError }}</p>
         </div>
-        <Card title="Tempo médio por etapa (horas)">
-          <div class="h-72"><canvas ref="cycleChartRef"></canvas></div>
-        </Card>
+        <template v-else>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+            <p class="text-sm text-gray-600">Tempo médio do recebimento completo</p>
+            <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.cycleTime.fullReceiptAvgHours ?? 0 }}h</p>
+          </div>
+          <Card title="Tempo médio por etapa (horas)">
+            <div class="h-72"><canvas ref="cycleChartRef"></canvas></div>
+          </Card>
+        </template>
       </div>
 
       <div v-show="activeTab === 'produtividade'" data-testid="tab-panel-produtividade">
-        <Card title="Produtividade por operador">
+        <div
+          v-if="taskKpisError"
+          data-testid="tab-error-produtividade"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+        >
+          <p class="text-red-600">{{ taskKpisError }}</p>
+        </div>
+        <Card v-else title="Produtividade por operador">
           <table class="min-w-full divide-y divide-gray-200">
             <thead>
               <tr>
@@ -82,48 +107,66 @@
       </div>
 
       <div v-show="activeTab === 'gargalos'" data-testid="tab-panel-gargalos">
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <div
-            v-for="entry in taskKpis?.bottlenecks.byType ?? []"
-            :key="entry.type"
-            class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
-          >
-            <p class="text-sm text-gray-600">{{ entry.type }}</p>
-            <p class="text-3xl font-bold text-red-600">{{ entry.count }}</p>
-          </div>
+        <div
+          v-if="taskKpisError"
+          data-testid="tab-error-gargalos"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+        >
+          <p class="text-red-600">{{ taskKpisError }}</p>
         </div>
-        <Card title="Recebimentos afetados">
-          <table class="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recebimento</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Horas parada</th>
-                <th class="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in taskKpis?.bottlenecks.affected ?? []" :key="row.receiptId + row.taskType">
-                <td class="px-4 py-2">{{ row.receiptNumber }}</td>
-                <td class="px-4 py-2">{{ row.taskType }}</td>
-                <td class="px-4 py-2">{{ row.hoursStuck }}h</td>
-                <td class="px-4 py-2">
-                  <RouterLink to="/wms/operations" class="text-primary-600 hover:underline">Ver no painel</RouterLink>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </Card>
+        <template v-else>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div
+              v-for="entry in taskKpis?.bottlenecks.byType ?? []"
+              :key="entry.type"
+              class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+            >
+              <p class="text-sm text-gray-600">{{ entry.type }}</p>
+              <p class="text-3xl font-bold text-red-600">{{ entry.count }}</p>
+            </div>
+          </div>
+          <Card title="Recebimentos afetados">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recebimento</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Horas parada</th>
+                  <th class="px-4 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in taskKpis?.bottlenecks.affected ?? []" :key="row.receiptId + row.taskType">
+                  <td class="px-4 py-2">{{ row.receiptNumber }}</td>
+                  <td class="px-4 py-2">{{ row.taskType }}</td>
+                  <td class="px-4 py-2">{{ row.hoursStuck }}h</td>
+                  <td class="px-4 py-2">
+                    <RouterLink to="/wms/operations" class="text-primary-600 hover:underline">Ver no painel</RouterLink>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </Card>
+        </template>
       </div>
 
       <div v-show="activeTab === 'ocupacao'" data-testid="tab-panel-ocupacao">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-          <p class="text-sm text-gray-600">% de ocupação geral</p>
-          <p class="text-3xl font-bold text-gray-900">{{ overallOccupancyPercent }}%</p>
+        <div
+          v-if="occupancyError"
+          data-testid="tab-error-ocupacao"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+        >
+          <p class="text-red-600">{{ occupancyError }}</p>
         </div>
-        <Card title="Ocupação por armazém">
-          <div class="h-72"><canvas ref="occupancyChartRef"></canvas></div>
-        </Card>
+        <template v-else>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+            <p class="text-sm text-gray-600">% de ocupação geral</p>
+            <p class="text-3xl font-bold text-gray-900">{{ overallOccupancyPercent }}%</p>
+          </div>
+          <Card title="Ocupação por armazém">
+            <div class="h-72"><canvas ref="occupancyChartRef"></canvas></div>
+          </Card>
+        </template>
       </div>
     </div>
   </AppLayout>
@@ -155,6 +198,8 @@ const error = ref('')
 
 const taskKpis = ref<WmsTaskKpis | null>(null)
 const occupancy = ref<OccupancyResponse | null>(null)
+const taskKpisError = ref('')
+const occupancyError = ref('')
 
 const overallOccupancyPercent = computed(() => {
   const rows = occupancy.value?.byWarehouse ?? []
@@ -171,26 +216,53 @@ let volumeChart: Chart | null = null
 let cycleChart: Chart | null = null
 let occupancyChart: Chart | null = null
 
+function permissionErrorMessage(err: any): string {
+  return err?.response?.data?.message || 'Sem permissão para ver estes dados'
+}
+
+// Usado tanto por loadAll() quanto pelo watch(days, ...): trata erro
+// isoladamente (não derruba a outra aba) e descarta a resposta se `days`
+// já mudou de novo enquanto a requisição estava em voo (evita que uma
+// resposta desatualizada sobrescreva os dados do período atual).
 async function loadTaskKpis(): Promise<void> {
-  taskKpis.value = await wmsKpiService.getTaskKpis(days.value)
+  const requestedDays = days.value
+  try {
+    const data = await wmsKpiService.getTaskKpis(requestedDays)
+    if (days.value !== requestedDays) return
+    taskKpis.value = data
+    taskKpisError.value = ''
+  } catch (err: any) {
+    if (days.value !== requestedDays) return
+    taskKpis.value = null
+    taskKpisError.value = permissionErrorMessage(err)
+  }
+}
+
+async function loadOccupancy(): Promise<void> {
+  try {
+    occupancy.value = await wmsKpiService.getOccupancy()
+    occupancyError.value = ''
+  } catch (err: any) {
+    occupancy.value = null
+    occupancyError.value = permissionErrorMessage(err)
+  }
 }
 
 async function loadAll(): Promise<void> {
   loading.value = true
   error.value = ''
-  try {
-    const [taskData, occupancyData] = await Promise.all([
-      wmsKpiService.getTaskKpis(days.value),
-      wmsKpiService.getOccupancy(),
-    ])
-    taskKpis.value = taskData
-    occupancy.value = occupancyData
-    setTimeout(createCharts, 100)
-  } catch (err: any) {
-    error.value = err.response?.data?.message || 'Erro ao carregar dashboard'
-  } finally {
-    loading.value = false
+
+  // Promise.allSettled (via loadTaskKpis/loadOccupancy, que já capturam seus
+  // próprios erros): uma permissão faltando derruba só a metade dela, não o
+  // dashboard inteiro — só mostramos o erro de página cheia se AMBAS falharem.
+  await Promise.allSettled([loadTaskKpis(), loadOccupancy()])
+
+  if (taskKpisError.value && occupancyError.value) {
+    error.value = 'Erro ao carregar dashboard'
   }
+
+  loading.value = false
+  setTimeout(createCharts, 100)
 }
 
 watch(days, async () => {
