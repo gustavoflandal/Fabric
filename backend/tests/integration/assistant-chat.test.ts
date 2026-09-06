@@ -1,7 +1,8 @@
 import request from 'supertest';
 import { app } from '../../src/app';
 import { createUserWithPermissions } from '../helpers/fixtures';
-import { cleanDatabase, disconnectTestDb } from '../helpers/db';
+import { cleanDatabase, disconnectTestDb, testPrisma } from '../helpers/db';
+import { clearSettingCache } from '../../src/services/system-setting.service';
 import * as assistantService from '../../src/services/assistant.service';
 
 jest.mock('../../src/services/assistant.service');
@@ -17,6 +18,7 @@ const loginWith = async (permissions: { resource: string; action: string }[]) =>
 
 describe('Integração: POST /api/v1/assistant/chat', () => {
   afterEach(async () => {
+    clearSettingCache();
     await cleanDatabase();
     jest.clearAllMocks();
   });
@@ -90,6 +92,50 @@ describe('Integração: POST /api/v1/assistant/chat', () => {
     // do Ollama se o cliente desconectar.
     const signalArg = mockedAnswerQuestion.mock.calls[0][3];
     expect(signalArg).toBeInstanceOf(AbortSignal);
+  });
+
+  it('achado 5 da revisão final: grava a resposta do assistente no AuditLog via res.locals.auditResponseBody', async () => {
+    // .env.test define AUDIT_LOG_MODE=none (evita ruído nos demais testes de
+    // integração) — precisa de um audit.mode explícito no banco para este
+    // teste, igual ao padrão usado em tests/integration/audit-middleware.test.ts.
+    await testPrisma.systemSetting.create({
+      data: { key: 'audit.mode', value: 'write_only', type: 'STRING', category: 'auditoria', label: 'Modo de auditoria' },
+    });
+    clearSettingCache();
+
+    const token = await loginWith([{ resource: 'assistente_ia', action: 'usar' }]);
+
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events) => {
+      events.onToken('Olá');
+      events.onToken(', mundo');
+      events.onSources([{ arquivo: 'x.pdf', trecho: 'trecho' }]);
+      events.onDone();
+    });
+
+    await request(app)
+      .post('/api/v1/assistant/chat')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ message: 'qual o procedimento?' });
+
+    // O log é gravado em res.on('finish', async () => {...}), depois da
+    // resposta HTTP já ter sido enviada — poll curto em vez de checar uma
+    // vez só.
+    const deadline = Date.now() + 1000;
+    let logs = await testPrisma.auditLog.findMany({
+      where: { endpoint: '/api/v1/assistant/chat', method: 'POST' },
+    });
+    while (logs.length === 0 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      logs = await testPrisma.auditLog.findMany({
+        where: { endpoint: '/api/v1/assistant/chat', method: 'POST' },
+      });
+    }
+
+    expect(logs.length).toBeGreaterThanOrEqual(1);
+    const responseBody = logs[0].responseBody as unknown as { resposta: string; fontes: unknown[] } | null;
+    expect(responseBody).not.toBeNull();
+    expect(responseBody?.resposta).toBe('Olá, mundo');
+    expect(responseBody?.fontes).toEqual([{ arquivo: 'x.pdf', trecho: 'trecho' }]);
   });
 
   it('emite evento erro (sem quebrar a conexão) quando answerQuestion lança exceção', async () => {

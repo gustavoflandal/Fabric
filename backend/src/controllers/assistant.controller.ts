@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { answerQuestion, type AssistantHistoryMessage } from '../services/assistant.service';
+import { answerQuestion, type AssistantHistoryMessage, type AssistantSource } from '../services/assistant.service';
 import { logger } from '../config/logger';
 
 /**
@@ -30,14 +30,30 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Acumula a resposta completa e as fontes recebidas para a spec da
+  // feature ("cada pergunta e resposta gera uma entrada no AuditLog") —
+  // esta rota é SSE (usa `res.write`, nunca `res.json`), então o
+  // `audit.middleware.ts` global não tem como capturar a resposta sozinho.
+  // `res.locals.auditResponseBody` é o ponto de extensão que ele lê como
+  // alternativa quando não há corpo de `res.json`.
+  let respostaCompletaParaAuditoria = '';
+  let fontesRecebidas: AssistantSource[] = [];
+
   try {
     await answerQuestion(
       message,
       history ?? [],
       {
-        onToken: (text) => send('token', { text }),
-        onSources: (sources) => send('fontes', { sources }),
+        onToken: (text) => {
+          respostaCompletaParaAuditoria += text;
+          send('token', { text });
+        },
+        onSources: (sources) => {
+          fontesRecebidas = sources;
+          send('fontes', { sources });
+        },
         onDone: () => {
+          res.locals.auditResponseBody = { resposta: respostaCompletaParaAuditoria, fontes: fontesRecebidas };
           send('fim', {});
           res.end();
         },
@@ -46,6 +62,7 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
     );
   } catch (error) {
     logger.error('Erro no assistente de IA', { error: error instanceof Error ? error.message : error });
+    res.locals.auditResponseBody = { resposta: respostaCompletaParaAuditoria, fontes: fontesRecebidas };
     send('erro', { message: 'Falha ao gerar resposta. Tente novamente.' });
     res.end();
   }
