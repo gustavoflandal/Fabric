@@ -81,4 +81,23 @@ describe('assistant.service.streamChat', () => {
 
     expect(onError).toHaveBeenCalledWith('Falha ao gerar resposta. Tente novamente.')
   })
+
+  it('chama onError quando a conexão cai durante a leitura do stream, em vez de rejeitar sem tratamento', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: {
+        getReader: () => ({
+          read: vi.fn().mockRejectedValue(new Error('conexão caiu')),
+        }),
+      },
+    }) as any
+
+    const onError = vi.fn()
+
+    await expect(
+      streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onDone: vi.fn(), onError })
+    ).resolves.toBeUndefined()
+
+    expect(onError).toHaveBeenCalledWith('Falha ao processar a resposta do assistente.')
+  })
 })

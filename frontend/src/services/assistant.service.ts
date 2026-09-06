@@ -47,29 +47,33 @@ export async function streamChat(
     return
   }
 
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
+  try {
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
 
-    let separatorIndex
-    while ((separatorIndex = buffer.indexOf('\n\n')) >= 0) {
-      const block = buffer.slice(0, separatorIndex)
-      buffer = buffer.slice(separatorIndex + 2)
+      let separatorIndex
+      while ((separatorIndex = buffer.indexOf('\n\n')) >= 0) {
+        const block = buffer.slice(0, separatorIndex)
+        buffer = buffer.slice(separatorIndex + 2)
 
-      const parsed = parseSseBlock(block)
-      if (!parsed) continue
+        const parsed = parseSseBlock(block)
+        if (!parsed) continue
 
-      const payload = JSON.parse(parsed.data)
+        const payload = JSON.parse(parsed.data)
 
-      if (parsed.event === 'token') handlers.onToken(payload.text)
-      else if (parsed.event === 'fontes') handlers.onSources(payload.sources)
-      else if (parsed.event === 'fim') handlers.onDone()
-      else if (parsed.event === 'erro') handlers.onError(payload.message)
+        if (parsed.event === 'token') handlers.onToken(payload.text)
+        else if (parsed.event === 'fontes') handlers.onSources(payload.sources)
+        else if (parsed.event === 'fim') handlers.onDone()
+        else if (parsed.event === 'erro') handlers.onError(payload.message)
+      }
     }
+  } catch {
+    handlers.onError('Falha ao processar a resposta do assistente.')
   }
 }
