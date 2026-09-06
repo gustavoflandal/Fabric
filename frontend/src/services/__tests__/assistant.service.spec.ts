@@ -100,4 +100,16 @@ describe('assistant.service.streamChat', () => {
 
     expect(onError).toHaveBeenCalledWith('Falha ao processar a resposta do assistente.')
   })
+
+  it('chama onError quando o próprio fetch rejeita (rede indisponível), em vez de rejeitar sem tratamento', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('falha de rede')) as any
+
+    const onError = vi.fn()
+
+    await expect(
+      streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onDone: vi.fn(), onError })
+    ).resolves.toBeUndefined()
+
+    expect(onError).toHaveBeenCalledWith('Falha ao processar a resposta do assistente.')
+  })
 })

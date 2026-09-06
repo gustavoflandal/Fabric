@@ -33,21 +33,21 @@ export async function streamChat(
 ): Promise<void> {
   const authStore = useAuthStore()
 
-  const response = await fetch(`${baseURL}/assistant/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${authStore.accessToken}`,
-    },
-    body: JSON.stringify({ message, history }),
-  })
-
-  if (!response.ok || !response.body) {
-    handlers.onError('Não foi possível conectar ao assistente.')
-    return
-  }
-
   try {
+    const response = await fetch(`${baseURL}/assistant/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authStore.accessToken}`,
+      },
+      body: JSON.stringify({ message, history }),
+    })
+
+    if (!response.ok || !response.body) {
+      handlers.onError('Não foi possível conectar ao assistente.')
+      return
+    }
+
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
