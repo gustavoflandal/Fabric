@@ -211,5 +211,17 @@ export const config = {
       host: process.env.CHROMA_HOST || 'localhost',
       port: Number(process.env.CHROMA_PORT) || 8000,
     },
+    /**
+     * Fase 2 — connection string do usuário MySQL read-only
+     * (`fabric_assistente`, ver backend/scripts/sql/create-readonly-user.sql).
+     * Sem valor ausente tolerado: as 3 funções de consulta de estoque não têm
+     * fallback seguro para a connection normal (`DATABASE_URL`) — isso
+     * reintroduziria o mesmo usuário com permissão de escrita que a Fase 2
+     * existe justamente para evitar.
+     */
+    readOnlyDatabaseUrl: requireEnv(
+      'ASSISTANT_DATABASE_URL',
+      'Defina a URL de conexão do usuário MySQL read-only do assistente (fabric_assistente)'
+    ),
   },
 };
