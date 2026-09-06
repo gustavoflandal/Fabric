@@ -28,6 +28,7 @@
     "prisma:seed-all": "powershell -ExecutionPolicy Bypass -File ./seed-all.ps1",
     "backup": "tsx scripts/backup-database.ts",
     "backup:create": "tsx scripts/backup-database.ts",
+    "ai:index-docs": "tsx scripts/ai-index-docs.ts",
     "restore": "node restore-database.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -62,6 +63,7 @@
     "mysql2": "^3.15.2",
     "node-cron": "^4.2.1",
     "nodemailer": "^9.1.1",
+    "pdf-parse": "^2.4.5",
     "winston": "^3.14.2"
   },
   "devDependencies": {
