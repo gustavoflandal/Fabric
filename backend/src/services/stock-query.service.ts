@@ -55,14 +55,19 @@ export async function getSaldoProduto(
     };
   }
 
+  // Verificar se o depósito existe de verdade
+  const depositoExiste = await readOnlyPrisma.storagePosition.findFirst({
+    where: { warehouseCode: codigoDeposito },
+  });
+
+  if (!depositoExiste) {
+    return { erro: 'deposito_nao_encontrado' };
+  }
+
   const positionBalances = await readOnlyPrisma.stockPositionBalance.findMany({
     where: { productId: product.id, storagePosition: { warehouseCode: codigoDeposito } },
     select: { quantity: true },
   });
-
-  if (positionBalances.length === 0) {
-    return { erro: 'deposito_nao_encontrado' };
-  }
 
   const quantidade = positionBalances.reduce((sum, p) => sum + Number(p.quantity), 0);
 

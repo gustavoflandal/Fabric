@@ -12,6 +12,7 @@ jest.mock('../../src/config/readonly-database', () => ({
     stockPositionBalance: { findMany: jest.fn() },
     stockMovement: { findMany: jest.fn() },
     productCategory: { findUnique: jest.fn() },
+    storagePosition: { findFirst: jest.fn() },
   },
 }));
 
@@ -43,15 +44,32 @@ describe('stock-query.service', () => {
 
     it('com codigoDeposito inexistente retorna erro estruturado', async () => {
       mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
-      mockedPrisma.stockPositionBalance.findMany.mockResolvedValue([]);
+      mockedPrisma.storagePosition.findFirst.mockResolvedValue(null);
 
       const result = await getSaldoProduto('PROD-001', 'DEP-INEXISTENTE');
 
       expect(result).toEqual({ erro: 'deposito_nao_encontrado' });
+      expect(mockedPrisma.storagePosition.findFirst).toHaveBeenCalledWith({
+        where: { warehouseCode: 'DEP-INEXISTENTE' },
+      });
+    });
+
+    it('com codigoDeposito existente mas produto com saldo zero retorna quantidade 0', async () => {
+      mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
+      mockedPrisma.storagePosition.findFirst.mockResolvedValue({ id: 'sp1', warehouseCode: 'DEP-01' });
+      mockedPrisma.stockPositionBalance.findMany.mockResolvedValue([]);
+
+      const result = await getSaldoProduto('PROD-001', 'DEP-01');
+
+      expect(result).toEqual({ codigoProduto: 'PROD-001', nomeProduto: 'Produto 1', quantidade: 0, deposito: 'DEP-01' });
+      expect(mockedPrisma.storagePosition.findFirst).toHaveBeenCalledWith({
+        where: { warehouseCode: 'DEP-01' },
+      });
     });
 
     it('com codigoDeposito soma as posições daquele armazém', async () => {
       mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
+      mockedPrisma.storagePosition.findFirst.mockResolvedValue({ id: 'sp1', warehouseCode: 'DEP-01' });
       mockedPrisma.stockPositionBalance.findMany.mockResolvedValue([
         { quantity: 10 },
         { quantity: 15 },
