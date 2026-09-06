@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { streamChat } from '@/services/assistant.service'
 import type { AssistantMessage, AssistantHistoryMessage } from '@/types/assistant.types'
 
@@ -23,7 +23,9 @@ export const useAssistantStore = defineStore('assistant', () => {
     const history = historyForRequest()
 
     messages.value.push({ id: generateId(), role: 'user', content: text })
-    const assistantMessage: AssistantMessage = { id: generateId(), role: 'assistant', content: '' }
+    // Usar reactive() garante que mutações no closure (token a token) disparem reatividade.
+    // Sem reactive(), o Vue não faria proxy dessa referência e o componente não re-renderizaria durante streaming.
+    const assistantMessage = reactive<AssistantMessage>({ id: generateId(), role: 'assistant', content: '' })
     messages.value.push(assistantMessage)
 
     isStreaming.value = true
