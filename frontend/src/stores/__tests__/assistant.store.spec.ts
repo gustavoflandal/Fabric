@@ -59,6 +59,38 @@ describe('useAssistantStore', () => {
     expect(lastCallHistory?.length).toBeLessThanOrEqual(6)
   })
 
+  it('não inclui mensagem com erro no histórico da requisição seguinte', async () => {
+    vi.mocked(streamChat).mockImplementationOnce(async (_msg, _history, handlers) => {
+      handlers.onError('Falha de conexão')
+    })
+    vi.mocked(streamChat).mockImplementationOnce(async (_msg, _history, handlers) => handlers.onDone())
+
+    const store = useAssistantStore()
+    await store.sendMessage('pergunta que falha')
+    await store.sendMessage('pergunta seguinte')
+
+    const secondCallHistory = vi.mocked(streamChat).mock.calls[1][1]
+    expect(secondCallHistory.some((m) => m.content === '')).toBe(false)
+    expect(secondCallHistory.every((m) => m.content.trim().length > 0)).toBe(true)
+  })
+
+  it('trunca em 2000 caracteres o content de mensagens longas no histórico', async () => {
+    const longContent = 'a'.repeat(2500)
+    vi.mocked(streamChat).mockImplementationOnce(async (_msg, _history, handlers) => {
+      handlers.onToken(longContent)
+      handlers.onDone()
+    })
+    vi.mocked(streamChat).mockImplementationOnce(async (_msg, _history, handlers) => handlers.onDone())
+
+    const store = useAssistantStore()
+    await store.sendMessage('pergunta longa')
+    await store.sendMessage('pergunta seguinte')
+
+    const secondCallHistory = vi.mocked(streamChat).mock.calls[1][1]
+    const assistantEntry = secondCallHistory.find((m) => m.role === 'assistant')
+    expect(assistantEntry?.content.length).toBe(2000)
+  })
+
   it('clear() limpa as mensagens e o erro', async () => {
     vi.mocked(streamChat).mockImplementation(async (_msg, _history, handlers) => handlers.onDone())
     const store = useAssistantStore()

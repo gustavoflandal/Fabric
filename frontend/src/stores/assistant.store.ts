@@ -16,7 +16,10 @@ export const useAssistantStore = defineStore('assistant', () => {
   const error = ref<string | null>(null)
 
   const historyForRequest = (): AssistantHistoryMessage[] =>
-    messages.value.slice(-6).map((m) => ({ role: m.role, content: m.content }))
+    messages.value
+      .filter((m) => !m.error && m.content.trim().length > 0)
+      .slice(-6)
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 2000) }))
 
   const sendMessage = async (text: string): Promise<void> => {
     error.value = null
