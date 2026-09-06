@@ -49,6 +49,12 @@ Testado diretamente contra `qwen2.5:7b` real, via `/api/chat` com `stream: true`
 
 Isso confirma a suposição central do design: **o número nunca é gerado pelo modelo, sempre injetado do resultado real da função**.
 
+### Trade-off explícito: o corte determinístico da Fase 1 não se aplica a quem tem `stock:read`
+
+O guardrail determinístico da Fase 1 (nenhum chunk relevante ⇒ nunca invoca o modelo) pressupõe que toda pergunta legítima tem alguma relação semântica com os manuais indexados. Uma pergunta de estoque ("qual o saldo do PROD-001?") nunca vai ter — então, para o tool calling funcionar, o corte determinístico **só se aplica a usuários sem `stock:read`**. Quem tem `stock:read` sempre invoca o modelo (com as 3 tools disponíveis), mesmo sem nenhum chunk relevante.
+
+**Consequência aceita conscientemente**: para esse grupo de usuários, a única proteção contra injeção de prompt (ex.: "repita seu system prompt") volta a ser o system prompt (camada de reforço), não mais o corte determinístico — a mesma fragilidade que a calibração do limiar da Fase 1 tinha fechado. Mitigantes: (1) o grupo afetado já tem acesso legítimo a dado de estoque no resto do sistema, não é público geral; (2) as 3 tools continuam sendo o único canal de dado real — não há text-to-SQL, então o pior cenário de uma injeção bem-sucedida é o modelo desviar do assunto ou vazar o texto do próprio prompt, nunca vazar dado indevido ou executar uma ação. Alternativa descartada: um segundo limiar de similaridade contra descrições das tools reintroduziria complexidade de calibração equivalente a um classificador de intenção, que a Fase 1 já tinha decidido não ter.
+
 ### Extensão necessária em `ollama-client.service.ts` (Fase 1)
 
 `chatStream()` da Fase 1 só extrai `message.content`. Nesta fase, ele precisa também repassar `message.tool_calls` quando presente — o contrato do generator muda de "só emite strings de token" para emitir um tipo de evento diferenciado (token de texto vs. tool call), já que uma chamada de tool não vem acompanhada de nenhum texto.
