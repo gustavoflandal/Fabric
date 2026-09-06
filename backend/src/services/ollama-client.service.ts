@@ -2,13 +2,51 @@ import { config } from '../config/env';
 
 /**
  * Wrapper fino sobre a API HTTP nativa do Ollama (`/api/embeddings`,
- * `/api/chat`). Sem SDK — `fetch` nativo (Node 22), mesmo critério de
- * "sem framework de orquestração" registrado na spec (seção "Approach A").
+ * `/api/chat`). Sem SDK — `fetch` nativo (Node 22).
+ *
+ * Fase 2: `chatStream` ganha suporte a tool calling, unificado com o `signal`
+ * de cancelamento (correção de regressão pós-Fase 1) num único parâmetro de
+ * opções. Comportamento real do Ollama (confirmado empiricamente, não é
+ * suposição): quando o modelo decide chamar uma tool, a resposta chega em UMA
+ * linha NDJSON com `message.tool_calls` e `done: false` — nenhum token de
+ * texto acompanha essa rodada. `tool_calls[].function.arguments` já vem como
+ * objeto parseado.
  */
 
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  tool_calls?: ToolCall[];
+}
+
+export interface ToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface ToolCall {
+  id?: string;
+  function: {
+    name: string;
+    arguments: Record<string, unknown>;
+  };
+}
+
+export type ChatStreamEvent = { type: 'token'; text: string } | { type: 'tool_calls'; calls: ToolCall[] };
+
+export interface ChatStreamOptions {
+  tools?: ToolDefinition[];
+  /**
+   * Cancela o streaming quando o cliente HTTP desconecta — ver
+   * `assistant.controller.ts`. Sem isso, com o modelo rodando CPU-only, o
+   * backend continuaria consumindo a resposta do Ollama até o fim mesmo sem
+   * ninguém para recebê-la.
+   */
+  signal?: AbortSignal;
 }
 
 export async function embed(text: string): Promise<number[]> {
@@ -30,13 +68,9 @@ export async function embed(text: string): Promise<number[]> {
   return data.embedding;
 }
 
-/**
- * `signal` (opcional) permite cancelar o streaming quando o cliente HTTP
- * desconecta — sem ele, com o modelo rodando CPU-only, o backend continuaria
- * consumindo a resposta do Ollama até o fim mesmo sem ninguém para recebê-la,
- * segurando o worker por dezenas de segundos por cliente abandonado.
- */
-export async function* chatStream(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
+export async function* chatStream(messages: ChatMessage[], options: ChatStreamOptions = {}): AsyncGenerator<ChatStreamEvent> {
+  const { tools, signal } = options;
+
   const res = await fetch(`${config.assistant.ollamaUrl}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -45,6 +79,7 @@ export async function* chatStream(messages: ChatMessage[], signal?: AbortSignal)
       messages,
       stream: true,
       options: { num_ctx: config.assistant.numCtx },
+      ...(tools ? { tools } : {}),
     }),
     signal,
   });
@@ -68,10 +103,17 @@ export async function* chatStream(messages: ChatMessage[], signal?: AbortSignal)
       buffer = buffer.slice(newlineIndex + 1);
       if (!line) continue;
 
-      const parsed = JSON.parse(line) as { message?: { content: string }; done: boolean };
-      if (parsed.message?.content) {
-        yield parsed.message.content;
+      const parsed = JSON.parse(line) as {
+        message?: { content: string; tool_calls?: ToolCall[] };
+        done: boolean;
+      };
+
+      if (parsed.message?.tool_calls && parsed.message.tool_calls.length > 0) {
+        yield { type: 'tool_calls', calls: parsed.message.tool_calls };
+      } else if (parsed.message?.content) {
+        yield { type: 'token', text: parsed.message.content };
       }
+
       if (parsed.done) {
         return;
       }

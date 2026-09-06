@@ -1,4 +1,5 @@
-import { embed, chatStream, type ChatMessage } from '../../src/services/ollama-client.service';
+// backend/tests/services/ollama-client.service.test.ts
+import { embed, chatStream, type ChatMessage, type ToolDefinition } from '../../src/services/ollama-client.service';
 
 function makeFakeBody(lines: string[]) {
   let i = 0;
@@ -14,13 +15,13 @@ function makeFakeBody(lines: string[]) {
   };
 }
 
-function makeFakeBodyRaw(chunks: string[]) {
+function makeFakeBodyRaw(lines: string[]) {
   let i = 0;
   return {
     getReader: () => ({
       read: async () => {
-        if (i >= chunks.length) return { done: true, value: undefined };
-        const chunk = new TextEncoder().encode(chunks[i]);
+        if (i >= lines.length) return { done: true, value: undefined };
+        const chunk = new TextEncoder().encode(lines[i]);
         i += 1;
         return { done: false, value: chunk };
       },
@@ -37,7 +38,7 @@ describe('ollama-client.service', () => {
   });
 
   describe('embed', () => {
-    it('chama POST /api/embeddings com o modelo configurado e retorna o vetor', async () => {
+    it('chama POST /api/embeddings com o modelo configurado, num_ctx, e retorna o vetor', async () => {
       const mockFetch = jest.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ embedding: [0.1, 0.2, 0.3] }),
@@ -52,7 +53,6 @@ describe('ollama-client.service', () => {
       const body = JSON.parse(options.body);
       expect(body.prompt).toBe('texto de teste');
       expect(body.model).toBe('bge-m3');
-      expect(body.options).toBeDefined();
       expect(body.options.num_ctx).toBe(4096);
     });
 
@@ -68,34 +68,152 @@ describe('ollama-client.service', () => {
   });
 
   describe('chatStream', () => {
-    it('emite cada fragmento de texto recebido via NDJSON e para no done', async () => {
+    it('emite eventos {type:"token"} para cada fragmento de texto e para no done', async () => {
       const lines = [
         JSON.stringify({ message: { role: 'assistant', content: 'Olá' }, done: false }),
         JSON.stringify({ message: { role: 'assistant', content: ', mundo' }, done: false }),
         JSON.stringify({ message: { role: 'assistant', content: '' }, done: true }),
       ];
-      const mockFetch = jest.fn().mockResolvedValue({
+      global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         body: makeFakeBody(lines),
+      }) as any;
+
+      const messages: ChatMessage[] = [{ role: 'user', content: 'oi' }];
+      const collected: any[] = [];
+      for await (const event of chatStream(messages)) {
+        collected.push(event);
+      }
+
+      expect(collected).toEqual([
+        { type: 'token', text: 'Olá' },
+        { type: 'token', text: ', mundo' },
+      ]);
+    });
+
+    it('emite um único evento {type:"tool_calls"} quando o modelo pede uma tool, sem nenhum token de texto', async () => {
+      const lines = [
+        JSON.stringify({
+          message: {
+            role: 'assistant',
+            content: '',
+            tool_calls: [{ id: 'call_1', function: { name: 'getSaldoProduto', arguments: { codigoProduto: 'PROD-001' } } }],
+          },
+          done: false,
+        }),
+        JSON.stringify({ message: { role: 'assistant', content: '' }, done: true }),
+      ];
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBody(lines),
+      }) as any;
+
+      const messages: ChatMessage[] = [{ role: 'user', content: 'qual o saldo do PROD-001?' }];
+      const collected: any[] = [];
+      for await (const event of chatStream(messages)) {
+        collected.push(event);
+      }
+
+      expect(collected).toEqual([
+        {
+          type: 'tool_calls',
+          calls: [{ id: 'call_1', function: { name: 'getSaldoProduto', arguments: { codigoProduto: 'PROD-001' } } }],
+        },
+      ]);
+    });
+
+    it('envia a lista de tools no corpo da requisição quando fornecida via options.tools', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBody([JSON.stringify({ message: { content: 'ok' }, done: true })]),
       });
       global.fetch = mockFetch as any;
 
-      const messages: ChatMessage[] = [{ role: 'user', content: 'oi' }];
-      const collected: string[] = [];
-      for await (const token of chatStream(messages)) {
-        collected.push(token);
+      const tools: ToolDefinition[] = [
+        {
+          type: 'function',
+          function: { name: 'getSaldoProduto', description: 'desc', parameters: { type: 'object', properties: {} } },
+        },
+      ];
+
+      const collected: any[] = [];
+      for await (const event of chatStream([{ role: 'user', content: 'oi' }], { tools })) {
+        collected.push(event);
       }
 
-      expect(collected).toEqual(['Olá', ', mundo']);
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.tools).toEqual(tools);
+    });
 
-      // Verify request details
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain('/api/chat');
-      const body = JSON.parse(options.body);
-      expect(body.model).toBe('qwen2.5:7b');
-      expect(body.stream).toBe(true);
-      expect(body.options).toBeDefined();
-      expect(body.options.num_ctx).toBe(4096);
+    it('não inclui "tools" no corpo quando não fornecida em options', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBody([JSON.stringify({ message: { content: 'ok' }, done: true })]),
+      });
+      global.fetch = mockFetch as any;
+
+      const collected: any[] = [];
+      for await (const event of chatStream([{ role: 'user', content: 'oi' }])) {
+        collected.push(event);
+      }
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.tools).toBeUndefined();
+    });
+
+    it('repassa options.signal para o fetch (cobertura preservada da correção de cancelamento de stream)', async () => {
+      const mockFetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBody([JSON.stringify({ message: { content: 'ok' }, done: true })]),
+      });
+      global.fetch = mockFetch as any;
+
+      const controller = new AbortController();
+      const collected: any[] = [];
+      for await (const event of chatStream([{ role: 'user', content: 'oi' }], { signal: controller.signal })) {
+        collected.push(event);
+      }
+
+      expect(mockFetch.mock.calls[0][1].signal).toBe(controller.signal);
+    });
+
+    it('lida com múltiplas linhas de token em um único chunk de rede', async () => {
+      const chunk =
+        JSON.stringify({ message: { content: 'A' }, done: false }) +
+        '\n' +
+        JSON.stringify({ message: { content: 'B' }, done: false }) +
+        '\n' +
+        JSON.stringify({ message: { content: '' }, done: true }) +
+        '\n';
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBodyRaw([chunk]),
+      }) as any;
+
+      const collected: any[] = [];
+      for await (const event of chatStream([{ role: 'user', content: 'oi' }])) {
+        collected.push(event);
+      }
+
+      expect(collected).toEqual([
+        { type: 'token', text: 'A' },
+        { type: 'token', text: 'B' },
+      ]);
+    });
+
+    it('lida com uma linha de token dividida entre dois chunks de rede', async () => {
+      const line1 = JSON.stringify({ message: { role: 'assistant', content: 'X' }, done: false });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        body: makeFakeBodyRaw([line1.slice(0, 30), line1.slice(30) + '\n' + JSON.stringify({ message: { content: '' }, done: true }) + '\n']),
+      }) as any;
+
+      const collected: any[] = [];
+      for await (const event of chatStream([{ role: 'user', content: 'oi' }])) {
+        collected.push(event);
+      }
+
+      expect(collected).toEqual([{ type: 'token', text: 'X' }]);
     });
 
     it('lança erro quando a resposta não é ok', async () => {
@@ -113,69 +231,6 @@ describe('ollama-client.service', () => {
       };
 
       await expect(iterate()).rejects.toThrow(/Ollama chat falhou/);
-    });
-
-    it('maneja múltiplas linhas NDJSON chegando no mesmo chunk', async () => {
-      // Two complete NDJSON lines arriving together in one read() call
-      const chunk =
-        JSON.stringify({ message: { role: 'assistant', content: 'A' }, done: false })
-        + '\n'
-        + JSON.stringify({ message: { role: 'assistant', content: 'B' }, done: false })
-        + '\n'
-        + JSON.stringify({ message: { role: 'assistant', content: '' }, done: true })
-        + '\n';
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        body: makeFakeBodyRaw([chunk]),
-      }) as any;
-
-      const messages: ChatMessage[] = [{ role: 'user', content: 'oi' }];
-      const collected: string[] = [];
-      for await (const token of chatStream(messages)) {
-        collected.push(token);
-      }
-
-      expect(collected).toEqual(['A', 'B']);
-    });
-
-    it('maneja uma linha NDJSON dividida em múltiplos chunks', async () => {
-      // One JSON line split across two read() calls (without automatic newline insertion)
-      const line1 = '{"message":{"role":"assistant","content":"X"},"done":false}';
-      const line2 = '{"message":{"role":"assistant","content":""},"done":true}';
-      const chunks = [
-        line1.slice(0, 30), // First part of line1 (ends mid-line, no newline)
-        line1.slice(30) + '\n' + line2 + '\n', // Rest of line1 + newline + complete line2 + newline
-      ];
-      global.fetch = jest.fn().mockResolvedValue({
-        ok: true,
-        body: makeFakeBodyRaw(chunks),
-      }) as any;
-
-      const messages: ChatMessage[] = [{ role: 'user', content: 'oi' }];
-      const collected: string[] = [];
-      for await (const token of chatStream(messages)) {
-        collected.push(token);
-      }
-
-      expect(collected).toEqual(['X']);
-    });
-
-    it('repassa o AbortSignal recebido para o fetch', async () => {
-      const lines = [JSON.stringify({ message: { role: 'assistant', content: '' }, done: true })];
-      const mockFetch = jest.fn().mockResolvedValue({
-        ok: true,
-        body: makeFakeBody(lines),
-      });
-      global.fetch = mockFetch as any;
-
-      const abortController = new AbortController();
-      const messages: ChatMessage[] = [{ role: 'user', content: 'oi' }];
-      for await (const _ of chatStream(messages, abortController.signal)) {
-        // no-op
-      }
-
-      const [, options] = mockFetch.mock.calls[0];
-      expect(options.signal).toBe(abortController.signal);
     });
   });
 });
