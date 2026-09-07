@@ -1,6 +1,26 @@
 import { Request, Response, NextFunction } from 'express';
-import { answerQuestion, type AssistantHistoryMessage, type AssistantSource } from '../services/assistant.service';
+import type { AuthRequest } from '../middleware/auth.middleware';
+import {
+  answerQuestion,
+  type AssistantHistoryMessage,
+  type AssistantSource,
+  type ConsultaInfo,
+} from '../services/assistant.service';
+import { getUserWithPermissions, userHasPermission } from '../middleware/permission.middleware';
 import { logger } from '../config/logger';
+
+/**
+ * Verifica se o usuário tem `stock:read` — decide apenas se as tools de
+ * consulta de estoque (Fase 2) são oferecidas ao modelo, nunca bloqueia a
+ * requisição (a permissão obrigatória do endpoint é `assistente_ia:usar`,
+ * já checada por `requirePermission` na rota). Reaproveita as funções
+ * extraídas de `permission.middleware.ts` para não duplicar a query.
+ */
+async function hasStockReadPermission(userId: string): Promise<boolean> {
+  const user = await getUserWithPermissions(userId);
+  if (!user) return false;
+  return userHasPermission(user, 'stock', 'read');
+}
 
 /**
  * Handler SSE. Após `res.writeHead` (200 já enviado), erros NUNCA vão para
@@ -10,6 +30,7 @@ import { logger } from '../config/logger';
  */
 export const chat = async (req: Request, res: Response, _next: NextFunction) => {
   const { message, history } = req.body as { message: string; history?: AssistantHistoryMessage[] };
+  const { userId } = req as AuthRequest;
 
   // Cancela o streaming do Ollama se o cliente desconectar (fecha o widget,
   // navega para outra tela, cai a conexão) — sem isso, com o modelo rodando
@@ -54,6 +75,13 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
   // alternativa quando não há corpo de `res.json`.
   let respostaCompletaParaAuditoria = '';
   let fontesRecebidas: AssistantSource[] = [];
+  let consultasRecebidas: ConsultaInfo[] = [];
+
+  // Decide apenas se as tools de consulta de estoque (Fase 2) ficam
+  // disponíveis para o modelo — nunca bloqueia a requisição, já que a
+  // permissão obrigatória do endpoint (`assistente_ia:usar`) já foi checada
+  // pelo `requirePermission` na rota.
+  const hasStockAccess = await hasStockReadPermission(userId!);
 
   try {
     await answerQuestion(
@@ -68,17 +96,29 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
           fontesRecebidas = sources;
           send('fontes', { sources });
         },
+        onConsulta: (info) => {
+          consultasRecebidas = [...consultasRecebidas, info];
+          send('consulta', info);
+        },
         onDone: () => {
-          res.locals.auditResponseBody = { resposta: respostaCompletaParaAuditoria, fontes: fontesRecebidas };
+          res.locals.auditResponseBody = {
+            resposta: respostaCompletaParaAuditoria,
+            fontes: fontesRecebidas,
+            consultas: consultasRecebidas,
+          };
           send('fim', {});
           res.end();
         },
       },
-      abortController.signal
+      { signal: abortController.signal, hasStockAccess }
     );
   } catch (error) {
     logger.error('Erro no assistente de IA', { error: error instanceof Error ? error.message : error });
-    res.locals.auditResponseBody = { resposta: respostaCompletaParaAuditoria, fontes: fontesRecebidas };
+    res.locals.auditResponseBody = {
+      resposta: respostaCompletaParaAuditoria,
+      fontes: fontesRecebidas,
+      consultas: consultasRecebidas,
+    };
     send('erro', { message: 'Falha ao gerar resposta. Tente novamente.' });
     res.end();
   }

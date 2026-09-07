@@ -88,10 +88,11 @@ describe('Integração: POST /api/v1/assistant/chat', () => {
     expect(res.text).toContain('event: fim');
 
     // achado 4 da revisão final: o controller cria um AbortController e
-    // repassa o signal até answerQuestion, para poder cancelar o streaming
-    // do Ollama se o cliente desconectar.
-    const signalArg = mockedAnswerQuestion.mock.calls[0][3];
-    expect(signalArg).toBeInstanceOf(AbortSignal);
+    // repassa o signal (dentro do objeto de opções da Fase 2) até
+    // answerQuestion, para poder cancelar o streaming do Ollama se o
+    // cliente desconectar.
+    const optionsArg = mockedAnswerQuestion.mock.calls[0][3];
+    expect(optionsArg.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('achado 5 da revisão final: grava a resposta do assistente no AuditLog via res.locals.auditResponseBody', async () => {
@@ -149,5 +150,29 @@ describe('Integração: POST /api/v1/assistant/chat', () => {
 
     expect(res.status).toBe(200);
     expect(res.text).toContain('event: erro');
+  });
+
+  it('usuário com stock:read recebe o evento consulta quando answerQuestion o emite', async () => {
+    const token = await loginWith([
+      { resource: 'assistente_ia', action: 'usar' },
+      { resource: 'stock', action: 'read' },
+    ]);
+
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events) => {
+      events.onToken('resposta');
+      events.onConsulta({ funcao: 'getSaldoProduto', parametros: { codigoProduto: 'X' }, linhas: 1 });
+      events.onDone();
+    });
+
+    const res = await request(app)
+      .post('/api/v1/assistant/chat')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ message: 'qual o saldo?' });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('event: consulta');
+
+    const optionsArg = mockedAnswerQuestion.mock.calls[0][3];
+    expect(optionsArg).toEqual(expect.objectContaining({ hasStockAccess: true }));
   });
 });

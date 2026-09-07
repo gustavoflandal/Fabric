@@ -1,8 +1,13 @@
 import type { Request, Response } from 'express';
 import { chat } from '../../src/controllers/assistant.controller';
 import * as assistantService from '../../src/services/assistant.service';
+import { getUserWithPermissions } from '../../src/middleware/permission.middleware';
 
 jest.mock('../../src/services/assistant.service');
+jest.mock('../../src/middleware/permission.middleware', () => ({
+  ...jest.requireActual('../../src/middleware/permission.middleware'),
+  getUserWithPermissions: jest.fn(),
+}));
 
 const mockedAnswerQuestion = assistantService.answerQuestion as jest.Mock;
 
@@ -41,9 +46,10 @@ function createMockRes(): Response & { __triggerClose: () => void } {
   return res as Response & { __triggerClose: () => void };
 }
 
-function createMockReq(body: unknown): Request {
+function createMockReq(opts: { userId?: string; body: unknown }): Request {
   return {
-    body,
+    userId: opts.userId ?? 'u1',
+    body: opts.body,
     on: jest.fn(),
   } as unknown as Request;
 }
@@ -61,7 +67,7 @@ describe('assistant.controller.chat — auditoria da resposta (res.locals.auditR
       events.onDone();
     });
 
-    const req = createMockReq({ message: 'qual o procedimento?' });
+    const req = createMockReq({ body: { message: 'qual o procedimento?' } });
     const res = createMockRes();
 
     await chat(req, res, jest.fn());
@@ -69,6 +75,7 @@ describe('assistant.controller.chat — auditoria da resposta (res.locals.auditR
     expect(res.locals.auditResponseBody).toEqual({
       resposta: 'Olá, mundo',
       fontes: [{ arquivo: 'x.pdf', trecho: 'trecho relevante' }],
+      consultas: [],
     });
   });
 
@@ -78,7 +85,7 @@ describe('assistant.controller.chat — auditoria da resposta (res.locals.auditR
       throw new Error('Ollama fora do ar');
     });
 
-    const req = createMockReq({ message: 'qual o procedimento?' });
+    const req = createMockReq({ body: { message: 'qual o procedimento?' } });
     const res = createMockRes();
 
     await chat(req, res, jest.fn());
@@ -86,6 +93,7 @@ describe('assistant.controller.chat — auditoria da resposta (res.locals.auditR
     expect(res.locals.auditResponseBody).toEqual({
       resposta: 'Resposta parcial antes da falha',
       fontes: [],
+      consultas: [],
     });
   });
 
@@ -95,7 +103,7 @@ describe('assistant.controller.chat — auditoria da resposta (res.locals.auditR
       events.onDone();
     });
 
-    const req = createMockReq({ message: 'pergunta sem resposta nos manuais' });
+    const req = createMockReq({ body: { message: 'pergunta sem resposta nos manuais' } });
     const res = createMockRes();
 
     await chat(req, res, jest.fn());
@@ -103,6 +111,7 @@ describe('assistant.controller.chat — auditoria da resposta (res.locals.auditR
     expect(res.locals.auditResponseBody).toEqual({
       resposta: 'Não encontrei essa informação nos manuais do sistema.',
       fontes: [],
+      consultas: [],
     });
   });
 });
@@ -132,13 +141,13 @@ describe('assistant.controller.chat — cancelamento do stream via res.on(close)
     const res = createMockRes();
     let signalRecebido: AbortSignal | undefined;
 
-    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events, signal) => {
-      signalRecebido = signal;
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events, options) => {
+      signalRecebido = options.signal;
       events.onToken('Olá');
       events.onDone(); // chama res.end() -> res.writableEnded vira true
     });
 
-    const req = createMockReq({ message: 'qual o procedimento?' });
+    const req = createMockReq({ body: { message: 'qual o procedimento?' } });
     await chat(req, res, jest.fn());
 
     expect(res.end).toHaveBeenCalled();
@@ -154,18 +163,78 @@ describe('assistant.controller.chat — cancelamento do stream via res.on(close)
     const res = createMockRes();
     let signalRecebido: AbortSignal | undefined;
 
-    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events, signal) => {
-      signalRecebido = signal;
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events, options) => {
+      signalRecebido = options.signal;
       events.onToken('Resposta parcial');
       // Cliente desconecta no meio do streaming, antes de onDone/res.end().
       res.__triggerClose();
       // não chama onDone — a promise nunca é resolvida por um "fim" normal
     });
 
-    const req = createMockReq({ message: 'qual o procedimento?' });
+    const req = createMockReq({ body: { message: 'qual o procedimento?' } });
     await chat(req, res, jest.fn());
 
     expect(res.end).not.toHaveBeenCalled();
     expect(signalRecebido?.aborted).toBe(true);
+  });
+});
+
+describe('assistant.controller.chat — Fase 2 (stock:read)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('emite evento "consulta" quando answerQuestion chama onConsulta', async () => {
+    (getUserWithPermissions as jest.Mock).mockResolvedValue({
+      roles: [{ role: { permissions: [{ permission: { resource: 'stock', action: 'read' } }] } }],
+    });
+
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events) => {
+      events.onToken('O produto tem 42 unidades.');
+      events.onConsulta({ funcao: 'getSaldoProduto', parametros: { codigoProduto: 'PROD-001' }, linhas: 1 });
+      events.onDone();
+    });
+
+    const req = createMockReq({ userId: 'u1', body: { message: 'saldo?' } });
+    const res = createMockRes();
+
+    await chat(req, res, jest.fn());
+
+    expect(res.write).toHaveBeenCalledWith(expect.stringContaining('event: consulta'));
+    expect(res.write).toHaveBeenCalledWith(
+      expect.stringContaining(JSON.stringify({ funcao: 'getSaldoProduto', parametros: { codigoProduto: 'PROD-001' }, linhas: 1 }))
+    );
+  });
+
+  it('passa hasStockAccess=true para answerQuestion quando o usuário tem stock:read', async () => {
+    (getUserWithPermissions as jest.Mock).mockResolvedValue({
+      roles: [{ role: { permissions: [{ permission: { resource: 'stock', action: 'read' } }] } }],
+    });
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events) => events.onDone());
+
+    const req = createMockReq({ userId: 'u1', body: { message: 'oi' } });
+    const res = createMockRes();
+
+    await chat(req, res, jest.fn());
+
+    const options = mockedAnswerQuestion.mock.calls[0][3];
+    // objectContaining, não toEqual: o objeto real também carrega `signal`
+    // (o AbortSignal do controller) — este teste só verifica hasStockAccess.
+    expect(options).toEqual(expect.objectContaining({ hasStockAccess: true }));
+  });
+
+  it('passa hasStockAccess=false quando o usuário NÃO tem stock:read', async () => {
+    (getUserWithPermissions as jest.Mock).mockResolvedValue({
+      roles: [{ role: { permissions: [{ permission: { resource: 'outra_coisa', action: 'ler' } }] } }],
+    });
+    mockedAnswerQuestion.mockImplementation(async (_msg, _history, events) => events.onDone());
+
+    const req = createMockReq({ userId: 'u1', body: { message: 'oi' } });
+    const res = createMockRes();
+
+    await chat(req, res, jest.fn());
+
+    const options = mockedAnswerQuestion.mock.calls[0][3];
+    expect(options).toEqual(expect.objectContaining({ hasStockAccess: false }));
   });
 });
