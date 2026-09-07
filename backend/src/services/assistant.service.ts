@@ -146,6 +146,18 @@ const MARCADORES_DE_VAZAMENTO = [
 // cliente (ver `answerQuestion`).
 const JANELA_CHECAGEM_VAZAMENTO = 250;
 
+// Depois que o buffer inicial é liberado, a checagem continua rodando sobre
+// cada token novo (achado da re-revisão: o buffer de 250 caracteres só
+// protegia o INÍCIO da resposta — um vazamento colado bem depois, ou um
+// marcador partido exatamente na fronteira dos 250 caracteres, passava
+// direto). Para isso sem re-escanear a resposta inteira a cada token, mantém
+// só um "overlap" rolante com os últimos N-1 caracteres já liberados, onde N
+// é o tamanho do maior marcador — grande o suficiente para que nenhum
+// marcador possa ficar partido entre o overlap e o token novo sem aparecer
+// inteiro na concatenação.
+const TAMANHO_MAIOR_MARCADOR = Math.max(...MARCADORES_DE_VAZAMENTO.map((m) => m.length));
+const TAMANHO_OVERLAP_VAZAMENTO = TAMANHO_MAIOR_MARCADOR - 1;
+
 const SYSTEM_PROMPT = `Você é o Assistente Virtual Oficial do Sistema Fabric. Sua única função é responder dúvidas operacionais dos usuários com base nos manuais internos fornecidos abaixo e, quando disponíveis, em funções de consulta de estoque.
 
 REGRAS OBRIGATÓRIAS E INEGOCIÁVEIS:
@@ -244,17 +256,40 @@ export async function answerQuestion(
   // uma única vez, e nenhum token novo é repassado dali em diante — não dá
   // para "desenviar" um token SSE já mandado ao cliente, por isso a checagem
   // roda sobre um buffer ANTES de chamar `events.onToken`, nunca depois.
+  //
+  // Achado da re-revisão: isso só protegia o INÍCIO da resposta (primeiros
+  // ~250 caracteres). Um vazamento que só aparece depois disso (ex: uma
+  // recusa longa e legítima com o vazamento colado no final) passava direto
+  // — a mesma forma da falha real que motivou essa defesa. Por isso, depois
+  // do buffer inicial liberado, a checagem continua rodando token a token:
+  // `overlapVazamento` guarda os últimos `TAMANHO_OVERLAP_VAZAMENTO`
+  // caracteres já liberados, o token novo é concatenado a esse overlap ANTES
+  // de decidir repassá-lo, e a checagem de marcadores roda nesse texto
+  // concatenado — pega tanto um vazamento tardio quanto um marcador partido
+  // exatamente na fronteira entre dois tokens/chunks. Se um marcador for
+  // encontrado nessa checagem contínua, o cliente já recebeu parte da
+  // resposta antes desse ponto (aceitável — o objetivo é impedir que o
+  // RESTANTE do vazamento chegue, não desfazer o que já foi enviado); aqui
+  // não emite FORA_ESCOPO de novo (o cliente já viu uma resposta que parecia
+  // legítima até ali) — só para de repassar tokens novos e a resposta
+  // termina normalmente.
   const bufferAntiVazamento: string[] = [];
   let tamanhoBufferAntiVazamento = 0;
   let checagemVazamentoFeita = false;
   let vazamentoDetectado = false;
+  let overlapVazamento = '';
 
   const contemMarcadorDeVazamento = (texto: string): boolean =>
     MARCADORES_DE_VAZAMENTO.some((m) => texto.includes(m));
 
+  const atualizarOverlap = (textoLiberado: string) => {
+    overlapVazamento = (overlapVazamento + textoLiberado).slice(-TAMANHO_OVERLAP_VAZAMENTO);
+  };
+
   const liberarBuffer = () => {
     for (const token of bufferAntiVazamento) {
       events.onToken(token);
+      atualizarOverlap(token);
     }
     bufferAntiVazamento.length = 0;
     tamanhoBufferAntiVazamento = 0;
@@ -267,6 +302,20 @@ export async function answerQuestion(
     tamanhoBufferAntiVazamento = 0;
     checagemVazamentoFeita = true;
     events.onToken(FORA_ESCOPO);
+  };
+
+  // Checagem contínua pós-buffer: roda sobre `overlapVazamento + token`, sem
+  // nunca precisar re-escanear a resposta inteira. Retorna true (e repassa o
+  // token) se seguro, ou para de repassar (sem emitir nada) se achar um
+  // marcador tardio.
+  const repassarComChecagemContinua = (token: string) => {
+    const textoParaChecar = overlapVazamento + token;
+    if (contemMarcadorDeVazamento(textoParaChecar)) {
+      vazamentoDetectado = true;
+      return;
+    }
+    events.onToken(token);
+    atualizarOverlap(token);
   };
 
   while (true) {
@@ -285,7 +334,7 @@ export async function answerQuestion(
       }
 
       if (checagemVazamentoFeita) {
-        events.onToken(event.text);
+        repassarComChecagemContinua(event.text);
         continue;
       }
 
