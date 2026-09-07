@@ -10,7 +10,8 @@ import { cleanDatabase, disconnectTestDb } from '../helpers/db';
  *
  * Pré-requisito: `backend/scripts/sql/create-readonly-user.sql` já deve ter
  * sido rodado contra o banco de teste (`fabric_test`) antes desta suíte
- * rodar — ver Task 13 (verificação fim a fim) para o passo operacional.
+ * rodar — isso agora é automático via `npm run test:integration`
+ * (script `test:db:readonly-user`, ver backend/package.json).
  */
 describe('Integração: usuário MySQL read-only do assistente', () => {
   afterEach(async () => {
