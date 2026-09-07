@@ -1,302 +1,131 @@
 # 🗺 Fabric - Roadmap de Implementação
 
+> **Atualizado em 2026-09-07** para refletir o estado real do projeto. A versão anterior deste documento era o plano original de início de projeto — os checkboxes nunca foram marcados durante a implementação, então o documento não acompanhava a realidade. Este status foi verificado contra o código (schema Prisma, rotas do backend, views do frontend), não contra memória ou suposição.
+
 ## 📋 Visão Geral
 
-Plano de implementação em 4 fases seguindo a mesma metodologia do VagaLume.
+Plano original de implementação em 4 fases. As Fases 1-3 estão completas e, em vários pontos, foram entregues com escopo bem maior do que o originalmente previsto (WMS completo em vez de controle de estoque simples). A Fase 4 (Manutenção, Qualidade, Indicadores/Relatórios) é a única fase que ainda não foi iniciada.
 
 ---
 
-## 🎯 Fase 1: Infraestrutura e Base (4-6 semanas)
+## 🎯 Fase 1: Infraestrutura e Base — ✅ COMPLETA
 
-### **Semana 1-2: Setup do Projeto**
+### Backend
+- [x] Estrutura de pastas, TypeScript + Express, Prisma ORM, MySQL, variáveis de ambiente, middleware de erro, Winston, ESLint/Prettier
+- [x] Schema Prisma: `User`, `Role`, `Permission`, `RolePermission`, `UserRole` — RBAC granular por recurso+ação, mais completo que o "Schema: User, Role, Permission" originalmente previsto
+- [x] `AuthService`/`AuthController`, rotas `/auth/*`, middleware JWT, bcrypt, refresh token (`RefreshToken`, com rotação a cada uso)
 
-#### **Backend**
-- [ ] Criar estrutura de pastas
-- [ ] Configurar TypeScript + Express
-- [ ] Configurar Prisma ORM
-- [ ] Setup MySQL database
-- [ ] Configurar variáveis de ambiente
-- [ ] Implementar middleware de erro
-- [ ] Configurar Winston (logging)
-- [ ] Setup ESLint + Prettier
+### Frontend
+- [x] Vue 3 + Vite + TypeScript + TailwindCSS + Vue Router + Pinia
+- [x] Layout base (`AppLayout.vue`, compartilhado por ~26+ views)
+- [x] `authStore`, `authService`, views de Login/Registro, route guards, interceptor Axios
+- [x] Tema claro/escuro — implementado em 2026-09-07 (Fase 1 do dark mode: infraestrutura + Dashboard + KPIs do WMS + `DataTable.vue`; retrofit das demais telas fica para lotes futuros)
 
-#### **Frontend**
-- [ ] Criar projeto Vue 3 + Vite
-- [ ] Configurar TypeScript
-- [ ] Setup TailwindCSS
-- [ ] Configurar Vue Router
-- [ ] Setup Pinia (state management)
-- [ ] Criar layout base
-- [ ] Implementar tema claro/escuro
+### Cadastros básicos
+- [x] `WorkCenter`, `Supplier`, `Customer`, `UnitOfMeasure` — CRUD completo, back+front
+- [ ] `Shift` (turnos) e `Calendar` (calendário de produção) — únicos itens desta fase que **não foram implementados**; não bloqueiam capacidade de uso hoje, mas são pré-requisito natural para cálculos de capacidade mais precisos (turnos/feriados) caso isso vire prioridade
 
-#### **DevOps**
-- [ ] Configurar Docker + Docker Compose
-- [ ] Setup Git + GitHub
-- [ ] Configurar scripts npm
-- [ ] Documentação inicial
-
-### **Semana 3-4: Autenticação e Usuários**
-
-#### **Backend**
-- [ ] Schema Prisma: User, Role, Permission
-- [ ] Service: AuthService
-- [ ] Controller: AuthController
-- [ ] Routes: /auth/*
-- [ ] Middleware: JWT authentication
-- [ ] Implementar bcrypt para senhas
-- [ ] Refresh token logic
-
-#### **Frontend**
-- [ ] Store: authStore (Pinia)
-- [ ] Service: authService
-- [ ] Views: Login, Register
-- [ ] Components: LoginForm, RegisterForm
-- [ ] Route guards
-- [ ] Interceptor Axios (token)
-
-#### **Testes**
-- [ ] Testes unitários auth
-- [ ] Testes de integração API
-
-### **Semana 5-6: Cadastros Básicos**
-
-#### **Backend**
-- [ ] Schema: WorkCenter, Supplier, Customer, UnitOfMeasure, Shift, Calendar
-- [ ] Services para cada entidade
-- [ ] Controllers CRUD
-- [ ] Routes: /work-centers, /suppliers, /customers, /units
-- [ ] Validação Joi
-
-#### **Frontend**
-- [ ] Stores: masterDataStore
-- [ ] Services: API clients
-- [ ] Views: Listagens e formulários
-- [ ] Components: DataTable, FormInput, Modal
-- [ ] Navegação e menus
-
-#### **Entregáveis Fase 1**
-✅ Sistema de autenticação funcional  
-✅ Cadastros básicos completos  
-✅ Interface responsiva  
-✅ Documentação técnica  
+### DevOps
+- [x] Docker + Docker Compose, Git/GitHub, scripts npm, documentação técnica
 
 ---
 
-## 🔧 Fase 2: Engenharia e Planejamento (6-8 semanas)
+## 🔧 Fase 2: Engenharia e Planejamento — ✅ COMPLETA
 
-### **Semana 7-9: Produtos e BOMs**
+### Produtos e BOMs
+- [x] `Product`, `ProductCategory`, `BOM`, `BOMItem` — CRUD + explosão multinível, back+front (`BOMTree`, `BOMEditor`)
 
-#### **Backend**
-- [ ] Schema: Product, ProductCategory, BOM, BOMItem
-- [ ] ProductService: CRUD + lógica de negócio
-- [ ] BOMService: Explosão multinível
-- [ ] Controllers e routes
-- [ ] Validações complexas
+### Roteiros de Fabricação
+- [x] `Routing`, `RoutingOperation` — cálculo de lead time e capacidade necessária
 
-#### **Frontend**
-- [ ] Store: productStore, bomStore
-- [ ] Views: Produtos, BOMs
-- [ ] Component: BOMTree (hierarquia)
-- [ ] Component: BOMEditor
-- [ ] Busca e filtros avançados
-
-### **Semana 10-12: Roteiros de Fabricação**
-
-#### **Backend**
-- [ ] Schema: Routing, RoutingOperation
-- [ ] RoutingService
-- [ ] Cálculo de lead time
-- [ ] Cálculo de capacidade necessária
-
-#### **Frontend**
-- [ ] Store: routingStore
-- [ ] Views: Roteiros
-- [ ] Component: RoutingEditor
-- [ ] Visualização de sequência
-
-### **Semana 13-14: MRP Básico**
-
-#### **Backend**
-- [ ] Schema: MRPRun, MRPRequirement, Suggestions
-- [ ] MRPService: Lógica de cálculo
-- [ ] Explosão de BOM
-- [ ] Cálculo de necessidades
-- [ ] Geração de sugestões
-- [ ] Background job (opcional)
-
-#### **Frontend**
-- [ ] Store: mrpStore
-- [ ] Views: Executar MRP, Resultados
-- [ ] Component: MRPResults
-- [ ] Visualização de sugestões
-- [ ] Conversão de sugestões
-
-#### **Entregáveis Fase 2**
-✅ Cadastro completo de produtos  
-✅ BOMs multiníveis funcionais  
-✅ Roteiros de fabricação  
-✅ MRP básico operacional  
+### MRP
+- [x] `MRPService` — explosão de BOM, cálculo de necessidades, geração de sugestões, views de execução/resultados
+- **Diferença do plano original**: implementado como cálculo sob demanda (stateless), sem persistir cada execução em tabelas `MRPRun`/`MRPRequirement` — simplificação deliberada, não uma lacuna funcional (o resultado do MRP é sempre recalculado a partir do estado atual, não há necessidade de histórico de execuções até hoje)
 
 ---
 
-## 🏭 Fase 3: Execução e Controle (8-10 semanas)
+## 🏭 Fase 3: Execução e Controle — ✅ COMPLETA E EXPANDIDA
 
-### **Semana 15-17: Gestão de Estoque**
+O escopo real entregue aqui foi muito além do previsto: em vez de um controle de estoque simples, o projeto evoluiu para um **WMS (Warehouse Management System) completo**, que não existia como conceito no roadmap original.
 
-#### **Backend**
-- [ ] Schema: Warehouse, Location, Stock, StockMovement, Lot
-- [ ] StockService: Movimentações
-- [ ] Controle de lotes
-- [ ] Reservas de estoque
-- [ ] Cálculo de disponibilidade (ATP)
+### Gestão de Estoque (original) → WMS completo (entregue)
+- [x] `Lot`, `StockBalance`, `StockMovement` — rastreabilidade por lote, movimentações
+- [x] **Além do previsto**: `Warehouse`, `WarehouseStructure`, `StoragePosition`, `StorageRule`, `StockPositionBalance` — estrutura hierárquica de armazém com posições e regras de armazenagem
+- [x] **Além do previsto**: `WorkflowTemplate`/`WorkflowNode`/`WorkflowEdge` — workflows dinâmicos de operação do armazém, editor visual (drag-and-drop)
+- [x] **Além do previsto**: `WarehouseTask` — tarefas de armazém (descarga, conferência, alocação, quarentena etc.), painel operacional de acompanhamento
+- [x] **Além do previsto**: `ReceiptPutaway` — recebimento com leitura de NFe, impressão de movimentação
+- [x] Dashboard de KPIs do WMS (volume/status, tempo de ciclo, produtividade, gargalos, ocupação) — não estava no plano original, construído organicamente
 
-#### **Frontend**
-- [ ] Store: stockStore
-- [ ] Views: Estoque, Movimentações
-- [ ] Component: StockCard
-- [ ] Consultas e relatórios
-- [ ] Alertas de estoque baixo
+### Inventário (original) → Contagem cíclica completa (entregue)
+- [x] `CountingPlan`, `CountingSession`, `CountingItem`, `CountingPlanProduct`, `CountingAssignment` — plano de contagem, sessões, atribuições, ajustes de estoque
 
-### **Semana 18-20: Inventário**
+### PCP e Produção
+- [x] `ProductionOrder`, `ProductionOrderOperation`, `ProductionPointing` — geração/liberação de OPs, apontamento, consumo de materiais, dashboard de produção (`PCPDashboardView`)
 
-#### **Backend**
-- [ ] Schema: Inventory, InventoryCount
-- [ ] InventoryService
-- [ ] Contagem cíclica
-- [ ] Ajustes de estoque
-
-#### **Frontend**
-- [ ] Views: Inventário
-- [ ] Component: InventoryCounter
-- [ ] App mobile-friendly para contagem
-
-### **Semana 21-24: PCP e Produção**
-
-#### **Backend**
-- [ ] Schema: ProductionOrder, ProductionOrderOperation, ProductionPointing
-- [ ] ProductionService
-- [ ] Geração de OPs
-- [ ] Liberação de OPs
-- [ ] Apontamento de produção
-- [ ] Consumo de materiais
-- [ ] Controle de perdas
-
-#### **Frontend**
-- [ ] Store: productionStore
-- [ ] Views: Ordens de Produção
-- [ ] Component: ProductionBoard (Kanban)
-- [ ] Component: PointingForm
-- [ ] Dashboard de produção
-- [ ] Apontamento mobile
-
-### **Semana 25-26: Compras**
-
-#### **Backend**
-- [ ] Schema: PurchaseOrder, MaterialReceipt
-- [ ] PurchaseService
-- [ ] Workflow de aprovação
-- [ ] Recebimento de materiais
-
-#### **Frontend**
-- [ ] Store: purchaseStore
-- [ ] Views: Pedidos de Compra
-- [ ] Component: PurchaseOrderForm
-- [ ] Recebimento de materiais
-
-#### **Entregáveis Fase 3**
-✅ Controle completo de estoque  
-✅ Rastreabilidade por lote  
-✅ Ordens de produção funcionais  
-✅ Apontamento de produção  
-✅ Gestão de compras integrada  
+### Compras
+- [x] `PurchaseQuotation`, `PurchaseOrder`, `PurchaseReceipt` (+ items) — orçamentos, pedidos, recebimento de materiais integrado ao WMS
 
 ---
 
-## 📈 Fase 4: Apoio e Qualidade (6-8 semanas)
+## 📈 Fase 4: Apoio e Qualidade — ❌ NÃO INICIADA
 
-### **Semana 27-29: Manutenção**
+Esta é a única fase do plano original que ainda não tem nenhum código associado. Verificado diretamente no schema Prisma: não existe nenhum model `Equipment`, `MaintenancePlan`, `MaintenanceOrder`, `InspectionPlan`, `QualityInspection`, `NonConformity`, `KPI` ou `KPIValue`.
 
-#### **Backend**
-- [ ] Schema: Equipment, MaintenancePlan, MaintenanceOrder
-- [ ] MaintenanceService
-- [ ] Planos preventivos
-- [ ] Ordens de serviço
-- [ ] Cálculo de indicadores (MTBF, MTTR)
+### Manutenção — não iniciado
+- [ ] `Equipment`, `MaintenancePlan`, `MaintenanceOrder`
+- [ ] Planos preventivos, ordens de serviço
+- [ ] Indicadores MTBF/MTTR
+- [ ] Views: Equipamentos, Manutenção, calendário de manutenção, dashboard
 
-#### **Frontend**
-- [ ] Store: maintenanceStore
-- [ ] Views: Equipamentos, Manutenção
-- [ ] Component: MaintenanceCalendar
-- [ ] Dashboard de manutenção
+### Qualidade — não iniciado (existe apenas um proxy parcial)
+- [ ] `InspectionPlan`, `QualityInspection`, `NonConformity`
+- [ ] Planos de inspeção, registro de inspeções, não-conformidades, ações corretivas, certificados
+- **O que já existe, mas não é o mesmo módulo**: `GET /reports/quality` calcula uma taxa de refugo (%) a partir dos apontamentos de produção (`ProductionPointing`) — é uma métrica derivada, não um fluxo de inspeção/não-conformidade. Útil como ponto de partida, mas não substitui o módulo.
 
-### **Semana 30-32: Qualidade**
-
-#### **Backend**
-- [ ] Schema: InspectionPlan, QualityInspection, NonConformity
-- [ ] QualityService
-- [ ] Planos de inspeção
-- [ ] Registro de inspeções
-- [ ] Não-conformidades
-- [ ] Ações corretivas
-
-#### **Frontend**
-- [ ] Store: qualityStore
-- [ ] Views: Inspeções, Não-conformidades
-- [ ] Component: InspectionForm
-- [ ] Certificados de qualidade
-
-### **Semana 33-34: Indicadores e Relatórios**
-
-#### **Backend**
-- [ ] Schema: KPI, KPIValue, Report
-- [ ] KPIService: Cálculo automático
-- [ ] ReportService: Geração de relatórios
-- [ ] Exportação PDF/Excel
-
-#### **Frontend**
-- [ ] Store: kpiStore, reportStore
-- [ ] Views: Dashboard Executivo
-- [ ] Component: KPICard
-- [ ] Component: ChartWidget (Chart.js)
-- [ ] Relatórios interativos
-
-#### **Entregáveis Fase 4**
-✅ Manutenção preventiva/corretiva  
-✅ Controle de qualidade  
-✅ Indicadores de performance  
-✅ Dashboards executivos  
-✅ Sistema completo e funcional  
+### Indicadores e Relatórios — parcialmente coberto por dashboards ad-hoc, sem o motor genérico previsto
+- [ ] `KPI`, `KPIValue`, `Report` (modelo genérico de indicadores configuráveis)
+- [ ] Exportação PDF/Excel — não existe hoje (os relatórios atuais são só JSON consumido pelo frontend)
+- **O que já existe, cobrindo parte do objetivo**: `ReportsService` (produção, eficiência, qualidade-proxy, centros de trabalho, consolidado), `PCPDashboardView`, dashboard de KPIs do WMS — todos construídos como necessidade pontual de cada módulo, não como um motor de indicadores reutilizável e configurável
 
 ---
 
-## 📊 Cronograma Resumido
+## ✨ Entregas fora do roadmap original
 
-| Fase | Duração | Entregas Principais |
-|------|---------|---------------------|
-| **Fase 1** | 4-6 semanas | Autenticação, Cadastros Básicos |
-| **Fase 2** | 6-8 semanas | Produtos, BOMs, Roteiros, MRP |
-| **Fase 3** | 8-10 semanas | Estoque, Produção, Compras |
-| **Fase 4** | 6-8 semanas | Manutenção, Qualidade, Indicadores |
-| **Total** | **24-32 semanas** | **Sistema Completo** |
+Funcionalidades completas que não estavam previstas em nenhuma das 4 fases originais:
+
+- **Sistema de Notificações** — `Notification`, `NotificationRule`, `NotificationPreference`, central de notificações, sino com dropdown, agendamentos automáticos (ordens atrasadas, níveis de estoque, capacidade ociosa)
+- **Logs de Auditoria** — `AuditLog`, modo configurável (write-only vs. all+reads), retenção configurável
+- **Licenciamento de Módulos** — `LicensedModule`, permite habilitar/desabilitar módulos (ex.: WMS) por instalação
+- **Configurações do Sistema** — `SystemSetting`, cache com fallback para `.env`, painel de configuração
+- **Assistente de IA** — RAG sobre manuais do sistema (Ollama + ChromaDB) na Fase 1, e consultas de estoque em tempo real via tool calling (saldo, movimentações, posição por categoria) na Fase 2, com guardrails contra vazamento de prompt e RBAC dedicado (`stock:read`)
+- **Dark Mode** — Fase 1 (infraestrutura + Dashboard + KPIs do WMS + `DataTable.vue`), retrofit das demais ~50 telas fica para lotes futuros
 
 ---
 
-## 🎯 Próximos Passos Imediatos
+## 📊 Cronograma Resumido (atualizado)
 
-1. **Criar estrutura de pastas do projeto**
-2. **Configurar ambiente de desenvolvimento**
-3. **Implementar schema Prisma completo**
-4. **Iniciar Fase 1: Autenticação**
-5. **Configurar CI/CD básico**
-6. **Documentar APIs com Swagger**
+| Fase | Status | Observação |
+|------|--------|------------|
+| **Fase 1** | ✅ Completa | Falta apenas `Shift`/`Calendar` (não bloqueante) |
+| **Fase 2** | ✅ Completa | MRP sem persistência de execuções (simplificação aceita) |
+| **Fase 3** | ✅ Completa e expandida | Virou um WMS completo, muito além do previsto |
+| **Fase 4** | ❌ Não iniciada | Manutenção e Qualidade em 0%; Indicadores parcialmente coberto por dashboards ad-hoc |
+| *(fora do plano)* | ✅ Entregue | Notificações, Auditoria, Licenciamento, Configurações, Assistente de IA, Dark Mode (parcial) |
+
+---
+
+## 🎯 Próximos Passos (para "finalização e entrega" segundo o plano original)
+
+1. **Decidir se a Fase 4 ainda é prioridade como originalmente escopada** — Manutenção e Qualidade são módulos grandes e isolados do resto do sistema; vale um brainstorm dedicado antes de planejar.
+2. Se sim: começar pelo menor dos três (tipicamente Manutenção, por ter menos dependência cruzada com módulos existentes) via `superpowers:brainstorming` → spec → plano → `subagent-driven-development`, mesmo padrão usado em todo o projeto até aqui.
+3. Itens pequenos e independentes que podem ser resolvidos a qualquer momento, sem esperar a Fase 4: `Shift`/`Calendar` (Fase 1), retrofit das ~50 telas restantes do dark mode.
+4. Se a resposta for "não, o escopo real do projeto já é outro" — vale reescrever a Visão Geral (`01_VISAO_GERAL.md`) e este roadmap para descrever o sistema como ele é hoje (PCP + WMS + IA), em vez de manter Manutenção/Qualidade como uma fase pendente indefinidamente.
 
 ---
 
 ## 📝 Observações
 
-- Seguir os mesmos padrões do VagaLume
-- Commits convencionais
-- Code review obrigatório
-- Testes unitários > 80% cobertura
-- Documentação contínua
-- Deploy incremental por fase
+- Seguir os mesmos padrões já estabelecidos: TDD, revisão por task + revisão final de branch inteira em modelo mais capaz, commits convencionais
+- Testes automatizados como rede de segurança (backend: suites Jest; frontend: Vitest) — não há meta formal de cobertura definida, mas toda feature nova até aqui manteve os testes existentes verdes
+- CI do GitHub está falhando desde 2026-09-02 por divergência entre o `tsconfig` mais estrito do CI e o usado localmente (~70 erros pré-existentes, não bloqueia merges hoje) — vale resolver antes de qualquer "entrega" formal
+- Deploy incremental por fase (mantido do plano original)
