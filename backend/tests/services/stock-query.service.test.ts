@@ -12,7 +12,7 @@ jest.mock('../../src/config/readonly-database', () => ({
     stockPositionBalance: { findMany: jest.fn() },
     stockMovement: { findMany: jest.fn() },
     productCategory: { findUnique: jest.fn() },
-    storagePosition: { findFirst: jest.fn() },
+    warehouse: { findUnique: jest.fn() },
   },
 }));
 
@@ -44,32 +44,45 @@ describe('stock-query.service', () => {
 
     it('com codigoDeposito inexistente retorna erro estruturado', async () => {
       mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
-      mockedPrisma.storagePosition.findFirst.mockResolvedValue(null);
+      mockedPrisma.warehouse.findUnique.mockResolvedValue(null);
 
       const result = await getSaldoProduto('PROD-001', 'DEP-INEXISTENTE');
 
       expect(result).toEqual({ erro: 'deposito_nao_encontrado' });
-      expect(mockedPrisma.storagePosition.findFirst).toHaveBeenCalledWith({
-        where: { warehouseCode: 'DEP-INEXISTENTE' },
+      expect(mockedPrisma.warehouse.findUnique).toHaveBeenCalledWith({
+        where: { code: 'DEP-INEXISTENTE' },
       });
     });
 
     it('com codigoDeposito existente mas produto com saldo zero retorna quantidade 0', async () => {
       mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
-      mockedPrisma.storagePosition.findFirst.mockResolvedValue({ id: 'sp1', warehouseCode: 'DEP-01' });
+      mockedPrisma.warehouse.findUnique.mockResolvedValue({ id: 'w1', code: 'DEP-01' });
       mockedPrisma.stockPositionBalance.findMany.mockResolvedValue([]);
 
       const result = await getSaldoProduto('PROD-001', 'DEP-01');
 
       expect(result).toEqual({ codigoProduto: 'PROD-001', nomeProduto: 'Produto 1', quantidade: 0, deposito: 'DEP-01' });
-      expect(mockedPrisma.storagePosition.findFirst).toHaveBeenCalledWith({
-        where: { warehouseCode: 'DEP-01' },
+      expect(mockedPrisma.warehouse.findUnique).toHaveBeenCalledWith({
+        where: { code: 'DEP-01' },
       });
+    });
+
+    it('com depósito existente mas SEM nenhuma posição de armazenagem cadastrada ainda retorna saldo zero (não erro)', async () => {
+      // Instalação nova: o armazém existe na tabela `warehouses`, mas
+      // `storage_positions` ainda está vazia para ele — não pode ser
+      // confundido com "depósito não encontrado" (Achado 7 da revisão final).
+      mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
+      mockedPrisma.warehouse.findUnique.mockResolvedValue({ id: 'w-novo', code: 'DEP-NOVO' });
+      mockedPrisma.stockPositionBalance.findMany.mockResolvedValue([]);
+
+      const result = await getSaldoProduto('PROD-001', 'DEP-NOVO');
+
+      expect(result).toEqual({ codigoProduto: 'PROD-001', nomeProduto: 'Produto 1', quantidade: 0, deposito: 'DEP-NOVO' });
     });
 
     it('com codigoDeposito soma as posições daquele armazém', async () => {
       mockedPrisma.product.findUnique.mockResolvedValue({ id: 'p1', code: 'PROD-001', name: 'Produto 1' });
-      mockedPrisma.storagePosition.findFirst.mockResolvedValue({ id: 'sp1', warehouseCode: 'DEP-01' });
+      mockedPrisma.warehouse.findUnique.mockResolvedValue({ id: 'w1', code: 'DEP-01' });
       mockedPrisma.stockPositionBalance.findMany.mockResolvedValue([
         { quantity: 10 },
         { quantity: 15 },

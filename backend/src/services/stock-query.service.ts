@@ -55,9 +55,12 @@ export async function getSaldoProduto(
     };
   }
 
-  // Verificar se o depósito existe de verdade
-  const depositoExiste = await readOnlyPrisma.storagePosition.findFirst({
-    where: { warehouseCode: codigoDeposito },
+  // Verificar se o depósito existe de verdade — checagem contra a tabela
+  // `warehouses`, não `storage_positions`: um armazém recém-cadastrado sem
+  // nenhuma posição de armazenagem ainda é um armazém válido (mesma confusão
+  // que o fix da Task 2 já resolveu um nível abaixo, para produto vs saldo).
+  const depositoExiste = await readOnlyPrisma.warehouse.findUnique({
+    where: { code: codigoDeposito },
   });
 
   if (!depositoExiste) {
