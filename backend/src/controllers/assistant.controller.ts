@@ -77,13 +77,18 @@ export const chat = async (req: Request, res: Response, _next: NextFunction) => 
   let fontesRecebidas: AssistantSource[] = [];
   let consultasRecebidas: ConsultaInfo[] = [];
 
-  // Decide apenas se as tools de consulta de estoque (Fase 2) ficam
-  // disponíveis para o modelo — nunca bloqueia a requisição, já que a
-  // permissão obrigatória do endpoint (`assistente_ia:usar`) já foi checada
-  // pelo `requirePermission` na rota.
-  const hasStockAccess = await hasStockReadPermission(userId!);
-
   try {
+    // Decide apenas se as tools de consulta de estoque (Fase 2) ficam
+    // disponíveis para o modelo — nunca bloqueia a requisição, já que a
+    // permissão obrigatória do endpoint (`assistente_ia:usar`) já foi checada
+    // pelo `requirePermission` na rota. Fica DENTRO do try: essa checagem faz
+    // uma query real no Prisma, e headers SSE já foram enviados (writeHead
+    // acima) — se essa query falhar aqui fora do try, a rejeição escaparia
+    // sem tratamento (Express 4 não encaminha rejeições de handler async
+    // para o errorHandler sozinho), virando uma unhandled rejection capaz de
+    // derrubar o processo inteiro em vez de só esta requisição.
+    const hasStockAccess = await hasStockReadPermission(userId!);
+
     await answerQuestion(
       message,
       history ?? [],

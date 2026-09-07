@@ -237,4 +237,24 @@ describe('assistant.controller.chat — Fase 2 (stock:read)', () => {
     const options = mockedAnswerQuestion.mock.calls[0][3];
     expect(options).toEqual(expect.objectContaining({ hasStockAccess: false }));
   });
+
+  it('emite evento "erro" (sem derrubar o processo) quando a checagem de stock:read falha', async () => {
+    // getUserWithPermissions faz uma query real no Prisma; se ela falhar
+    // (timeout de conexão, erro transitório do banco, etc.), a checagem
+    // precisa cair no mesmo catch que já trata falhas de answerQuestion —
+    // caso contrário a rejeição escaparia sem tratamento (Express 4 sem
+    // express-async-errors não encaminha rejeições de handler async para o
+    // errorHandler), o que no Node deriva numa unhandled rejection capaz de
+    // derrubar o processo inteiro, não só esta requisição.
+    (getUserWithPermissions as jest.Mock).mockRejectedValue(new Error('falha de conexão'));
+
+    const req = createMockReq({ userId: 'u1', body: { message: 'saldo?' } });
+    const res = createMockRes();
+
+    await chat(req, res, jest.fn());
+
+    expect(res.write).toHaveBeenCalledWith(expect.stringContaining('event: erro'));
+    expect(res.end).toHaveBeenCalled();
+    expect(mockedAnswerQuestion).not.toHaveBeenCalled();
+  });
 });
