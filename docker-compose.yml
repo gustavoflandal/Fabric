@@ -30,6 +30,7 @@ services:
       OLLAMA_URL: "http://ollama:11434"
       CHROMA_HOST: "chromadb"
       CHROMA_PORT: "8000"
+      ASSISTANT_DATABASE_URL: "mysql://fabric_assistente:lsei4tgbLRJxOvxjqZEyrRGI@mysql:3306/fabric"
     command: sh -c "npx prisma generate && npm run dev"
     ports:
       - "3005:3005"
