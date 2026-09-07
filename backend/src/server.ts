@@ -8,6 +8,7 @@ import logCleanupJob from './jobs/log-cleanup.job';
 import stockPositionReconciliationJob from './jobs/stock-position-reconciliation.job';
 import replenishmentJob from './jobs/replenishment.job';
 import lotExpiryJob from './jobs/lot-expiry.job';
+import maintenanceJob from './jobs/maintenance.job';
 import { loadLicensedModules } from './services/licensed-module.service';
 import { getSetting } from './services/system-setting.service';
 import { generalLimiter, authLimiter, writeLimiter } from './middleware/rate-limit.middleware';
@@ -76,6 +77,10 @@ const startServer = async () => {
     // Mesmo padrão dos dois jobs acima — sai cedo sem WMS licenciado.
     lotExpiryJob.start();
 
+    // Fase 4: geracao de ordens preventivas + deteccao de atraso.
+    // Mesmo padrao dos jobs WMS acima — sai cedo sem MANUTENCAO licenciada.
+    maintenanceJob.start();
+
     // Start server
     app.listen(config.port, () => {
       logger.info(`🚀 Server running on port ${config.port}`);
@@ -96,6 +101,7 @@ process.on('SIGTERM', async () => {
   stockPositionReconciliationJob.stop();
   replenishmentJob.stop();
   lotExpiryJob.stop();
+  maintenanceJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });
@@ -107,6 +113,7 @@ process.on('SIGINT', async () => {
   stockPositionReconciliationJob.stop();
   replenishmentJob.stop();
   lotExpiryJob.stop();
+  maintenanceJob.stop();
   await prisma.$disconnect();
   process.exit(0);
 });

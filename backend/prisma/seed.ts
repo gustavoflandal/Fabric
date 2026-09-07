@@ -305,6 +305,15 @@ async function main() {
         'Quantos dias antes do vencimento um lote com saldo dispara o alerta LOT_EXPIRING_SOON. Antes migrado via LOT_EXPIRY_ALERT_DAYS.',
     },
     {
+      key: 'manutencao.ordem_atraso_horas',
+      value: '48',
+      type: 'NUMBER' as const,
+      category: 'manutencao',
+      label: 'Limiar de ordem de manutenção atrasada (horas)',
+      description:
+        'A partir de quantas horas aberta (PENDING/IN_PROGRESS) uma ordem de manutenção é sinalizada como atrasada.',
+    },
+    {
       key: 'audit.retention_days',
       value: '90',
       type: 'NUMBER' as const,
