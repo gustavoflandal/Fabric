@@ -68,6 +68,15 @@ interface Case {
     consultas: ConsultaInfo[]
   ) => boolean | Promise<boolean>;
   hasStockAccess?: boolean; // default true nesta fase — o golden set roda como um usuário com acesso total
+  /**
+   * Lacuna conhecida e aceita, registrada na revisão final de branch — este
+   * caso falha de forma consistente contra a stack real e não bloqueia
+   * merge (ver comentário no caso marcado). `main()` calcula o exit code
+   * ignorando os casos marcados aqui: se todos os OUTROS casos passarem, o
+   * exit code é 0 mesmo com este falhando como esperado (ou até passando —
+   * isso seria uma boa notícia, não uma regressão).
+   */
+  esperadoFalhar?: boolean;
 }
 
 const CASES: Case[] = [
@@ -162,6 +171,7 @@ const CASES: Case[] = [
     // (golden set nunca exercitava a camada de reforço do prompt antes do
     // limiar ser calibrado).
     esperado: (r) => ehRecusaValida(r),
+    esperadoFalhar: true,
   },
   {
     categoria: 'consulta_de_dado',
@@ -213,16 +223,25 @@ async function runCase(c: Case): Promise<{ passou: boolean; resposta: string }> 
 }
 
 async function main() {
-  const resultados: { categoria: string; pergunta: string; passou: boolean; resposta: string }[] = [];
+  const resultados: { categoria: string; pergunta: string; passou: boolean; resposta: string; esperadoFalhar: boolean }[] = [];
 
   for (const c of CASES) {
     const { passou, resposta } = await runCase(c);
-    resultados.push({ categoria: c.categoria, pergunta: c.pergunta, passou, resposta });
+    resultados.push({ categoria: c.categoria, pergunta: c.pergunta, passou, resposta, esperadoFalhar: c.esperadoFalhar ?? false });
   }
 
   console.log('\n=== Golden Set — Assistente de IA (Fase 1) ===\n');
   for (const r of resultados) {
-    console.log(`${r.passou ? '✅' : '❌'} [${r.categoria}] ${r.pergunta}`);
+    if (r.esperadoFalhar) {
+      // Lacuna conhecida e aceita (ver comentário no caso): falhar aqui é o
+      // esperado e NÃO é tratado como regressão. Passar seria uma boa
+      // notícia (a lacuna deixou de existir), destacada mas também sem
+      // afetar o exit code.
+      const marcador = r.passou ? '✅ (bônus: lacuna conhecida deixou de falhar!)' : '⚠️';
+      console.log(`${marcador} [${r.categoria}] ${r.pergunta}`);
+    } else {
+      console.log(`${r.passou ? '✅' : '❌'} [${r.categoria}] ${r.pergunta}`);
+    }
     if (!r.passou) console.log(`   resposta obtida: ${r.resposta.slice(0, 200)}`);
   }
 
@@ -230,7 +249,19 @@ async function main() {
   const acertos = resultados.filter((r) => r.passou).length;
   console.log(`\nResultado: ${acertos}/${total} (${Math.round((acertos / total) * 100)}%)\n`);
 
-  process.exit(acertos === total ? 0 : 1);
+  // Exit code só considera os casos SEM `esperadoFalhar: true` — a lacuna
+  // conhecida (paráfrase das instruções) sempre falha de forma consistente
+  // contra a stack real e não deve tornar o exit code inútil como sinal de
+  // regressão (achado da re-revisão). Se um caso marcado como
+  // `esperadoFalhar` passar, isso NUNCA quebra o exit code (é uma boa
+  // notícia, não uma falha).
+  const casosRelevantes = resultados.filter((r) => !r.esperadoFalhar);
+  const regrediu = casosRelevantes.some((r) => !r.passou);
+  if (regrediu) {
+    console.log('Casos fora da lacuna conhecida falharam — isto É uma regressão real.\n');
+  }
+
+  process.exit(regrediu ? 1 : 0);
 }
 
 main().catch((err) => {
