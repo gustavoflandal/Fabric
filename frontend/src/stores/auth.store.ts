@@ -53,6 +53,10 @@ export const useAuthStore = defineStore('auth', () => {
       // Set user data
       user.value = response.user
 
+      // Buscar permissões reais do servidor agora, para que o RBAC funcione
+      // já nesta sessão SPA (sem depender de um reload de página)
+      await fetchUser()
+
       if (import.meta.env.DEV) {
         console.log('AuthStore: Login bem-sucedido!')
       }
