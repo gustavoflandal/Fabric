@@ -107,6 +107,45 @@ const STOCK_FUNCTIONS: Record<string, (args: any) => Promise<unknown>> = {
   getPosicaoEstoquePorCategoria: (args) => getPosicaoEstoquePorCategoria(args.codigoCategoria),
 };
 
+// Campo obrigatório de cada função em STOCK_FUNCTIONS (ver assinaturas reais
+// em stock-query.service.ts) — usado para validar os argumentos que o
+// modelo mandou ANTES de chamar a função de verdade (achado da revisão
+// final: argumentos incompletos/malformados, ex. `codigoProduto` undefined,
+// faziam a exceção subir até o controller e descartar toda a resposta).
+const CAMPO_OBRIGATORIO: Record<string, string> = {
+  getSaldoProduto: 'codigoProduto',
+  getMovimentacoesRecentes: 'codigoProduto',
+  getPosicaoEstoquePorCategoria: 'codigoCategoria',
+};
+
+function argumentosValidos(nomeFuncao: string, args: unknown): boolean {
+  const campo = CAMPO_OBRIGATORIO[nomeFuncao];
+  if (!campo) return true;
+  if (!args || typeof args !== 'object') return false;
+  const valor = (args as Record<string, unknown>)[campo];
+  return typeof valor === 'string' && valor.length > 0;
+}
+
+// Mesma lista usada em `scripts/ai-golden-set.ts` para validar o golden set
+// (duplicada de propósito — os dois arquivos não compartilham imports hoje).
+// Qualquer um destes marcadores no início da resposta é sinal de vazamento
+// do system prompt colado a uma recusa correta (regra 8 do system prompt é
+// só defesa de prompt — esta é a camada determinística que fica atrás dela).
+const MARCADORES_DE_VAZAMENTO = [
+  'REGRAS OBRIGATÓRIAS',
+  'INEGOCIÁVEIS',
+  'Fonte da verdade',
+  'Negação de escopo',
+  'Tolerância zero',
+  '<contexto',
+  'Assistente Virtual Oficial',
+];
+
+// Quantos caracteres acumulados da resposta são checados contra
+// MARCADORES_DE_VAZAMENTO antes de começar a repassar tokens de verdade ao
+// cliente (ver `answerQuestion`).
+const JANELA_CHECAGEM_VAZAMENTO = 250;
+
 const SYSTEM_PROMPT = `Você é o Assistente Virtual Oficial do Sistema Fabric. Sua única função é responder dúvidas operacionais dos usuários com base nos manuais internos fornecidos abaixo e, quando disponíveis, em funções de consulta de estoque.
 
 REGRAS OBRIGATÓRIAS E INEGOCIÁVEIS:
@@ -133,7 +172,22 @@ async function executeToolCall(call: ToolCall, events: AssistantEvents): Promise
     return { role: 'tool', content: JSON.stringify({ erro: 'funcao_desconhecida' }) };
   }
 
-  const result = await fn(args);
+  if (!argumentosValidos(call.function.name, args)) {
+    return { role: 'tool', content: JSON.stringify({ erro: 'parametros_invalidos' }) };
+  }
+
+  let result: unknown;
+  try {
+    result = await fn(args);
+  } catch (error) {
+    // O modelo mandou argumentos que passaram na validação mas ainda assim
+    // causaram falha (ex.: banco fora do ar) — nunca deixa a exceção subir
+    // até o controller, senão toda a resposta (inclusive tokens já enviados
+    // ao cliente) seria descartada. O modelo recebe o erro estruturado e
+    // pode dizer ao usuário que não conseguiu consultar.
+    result = { erro: 'falha_na_consulta' };
+  }
+
   const linhas = Array.isArray(result) ? result.length : result && !('erro' in (result as object)) ? 1 : 0;
 
   events.onConsulta({ funcao: call.function.name, parametros: args, linhas });
@@ -179,15 +233,71 @@ export async function answerQuestion(
   // `tool_calls` (não deveria acontecer, mas o `break` cobre esse caso).
   let toolsJaUsadas = false;
 
+  // Camada determinística contra vazamento do system prompt (achado da
+  // revisão final: a regra 8 é só defesa de prompt, sem nada por trás dela).
+  // Os tokens da resposta NÃO vão direto para `events.onToken` — ficam num
+  // buffer interno até acumular ~250 caracteres ou o streaming terminar (o
+  // que vier primeiro). Só então a checagem de marcadores roda; se passar,
+  // o buffer é liberado (token a token, na ordem original) e os tokens
+  // seguintes passam a ir direto para `events.onToken`. Se um marcador for
+  // encontrado, o buffer é descartado, `events.onToken` recebe FORA_ESCOPO
+  // uma única vez, e nenhum token novo é repassado dali em diante — não dá
+  // para "desenviar" um token SSE já mandado ao cliente, por isso a checagem
+  // roda sobre um buffer ANTES de chamar `events.onToken`, nunca depois.
+  const bufferAntiVazamento: string[] = [];
+  let tamanhoBufferAntiVazamento = 0;
+  let checagemVazamentoFeita = false;
+  let vazamentoDetectado = false;
+
+  const contemMarcadorDeVazamento = (texto: string): boolean =>
+    MARCADORES_DE_VAZAMENTO.some((m) => texto.includes(m));
+
+  const liberarBuffer = () => {
+    for (const token of bufferAntiVazamento) {
+      events.onToken(token);
+    }
+    bufferAntiVazamento.length = 0;
+    tamanhoBufferAntiVazamento = 0;
+    checagemVazamentoFeita = true;
+  };
+
+  const bloquearPorVazamento = () => {
+    vazamentoDetectado = true;
+    bufferAntiVazamento.length = 0;
+    tamanhoBufferAntiVazamento = 0;
+    checagemVazamentoFeita = true;
+    events.onToken(FORA_ESCOPO);
+  };
+
   while (true) {
     let toolCallsRecebidas: ToolCall[] | null = null;
 
     for await (const event of chatStream(messages, { tools: toolsJaUsadas ? undefined : tools, signal: options.signal })) {
       if (event.type === 'tool_calls') {
         toolCallsRecebidas = event.calls;
-      } else {
-        respostaCompleta += event.text;
+        continue;
+      }
+
+      respostaCompleta += event.text;
+
+      if (vazamentoDetectado) {
+        continue;
+      }
+
+      if (checagemVazamentoFeita) {
         events.onToken(event.text);
+        continue;
+      }
+
+      bufferAntiVazamento.push(event.text);
+      tamanhoBufferAntiVazamento += event.text.length;
+
+      if (tamanhoBufferAntiVazamento >= JANELA_CHECAGEM_VAZAMENTO) {
+        if (contemMarcadorDeVazamento(bufferAntiVazamento.join(''))) {
+          bloquearPorVazamento();
+        } else {
+          liberarBuffer();
+        }
       }
     }
 
@@ -203,7 +313,17 @@ export async function answerQuestion(
     toolsJaUsadas = true;
   }
 
-  const respostaFinal = respostaCompleta.trim();
+  // O streaming terminou antes do buffer acumular ~250 caracteres (resposta
+  // curta) — faz a checagem com o que tiver e libera (ou bloqueia) agora.
+  if (!checagemVazamentoFeita) {
+    if (contemMarcadorDeVazamento(bufferAntiVazamento.join(''))) {
+      bloquearPorVazamento();
+    } else {
+      liberarBuffer();
+    }
+  }
+
+  const respostaFinal = vazamentoDetectado ? FORA_ESCOPO : respostaCompleta.trim();
   if (respostaFinal !== NAO_ENCONTREI && respostaFinal !== FORA_ESCOPO && relevantChunks.length > 0) {
     events.onSources(relevantChunks.map((c) => ({ arquivo: c.metadata.arquivo, trecho: c.document })));
   }
