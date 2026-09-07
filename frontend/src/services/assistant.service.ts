@@ -69,6 +69,7 @@ export async function streamChat(
 
         if (parsed.event === 'token') handlers.onToken(payload.text)
         else if (parsed.event === 'fontes') handlers.onSources(payload.sources)
+        else if (parsed.event === 'consulta') handlers.onConsulta(payload)
         else if (parsed.event === 'fim') handlers.onDone()
         else if (parsed.event === 'erro') handlers.onError(payload.message)
       }

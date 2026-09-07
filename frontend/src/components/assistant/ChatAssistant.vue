@@ -32,6 +32,11 @@
             <ul v-if="message.sources?.length" class="mt-2 space-y-1 text-xs text-gray-500">
               <li v-for="(source, idx) in message.sources" :key="idx">📄 {{ source.arquivo }}</li>
             </ul>
+            <ul v-if="message.consultas?.length" class="mt-2 space-y-1 text-xs text-gray-500">
+              <li v-for="(consulta, idx) in message.consultas" :key="idx">
+                🔎 Consultado: {{ consulta.funcao }}({{ Object.entries(consulta.parametros).map(([k, v]) => `${k}=${v}`).join(', ') }})
+              </li>
+            </ul>
           </div>
 
           <p v-if="assistantStore.isStreaming" class="text-sm italic text-gray-500">Pensando...</p>

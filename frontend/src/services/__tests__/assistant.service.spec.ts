@@ -35,12 +35,40 @@ describe('assistant.service.streamChat', () => {
     const onDone = vi.fn()
     const onError = vi.fn()
 
-    await streamChat('oi', [], { onToken, onSources, onDone, onError })
+    await streamChat('oi', [], { onToken, onSources, onConsulta: vi.fn(), onDone, onError })
 
     expect(onToken).toHaveBeenCalledWith('Olá')
     expect(onSources).toHaveBeenCalledWith([{ arquivo: 'a.pdf', trecho: 't' }])
     expect(onDone).toHaveBeenCalled()
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('invoca onConsulta quando o evento SSE "consulta" chega', async () => {
+    const sseBody =
+      'event: token\ndata: {"text":"42 unidades"}\n\n' +
+      'event: consulta\ndata: {"funcao":"getSaldoProduto","parametros":{"codigoProduto":"PA-001"},"linhas":1}\n\n' +
+      'event: fim\ndata: {}\n\n'
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: { getReader: () => makeReader([sseBody]) },
+    }) as any
+
+    const onConsulta = vi.fn()
+
+    await streamChat('oi', [], {
+      onToken: vi.fn(),
+      onSources: vi.fn(),
+      onConsulta,
+      onDone: vi.fn(),
+      onError: vi.fn(),
+    })
+
+    expect(onConsulta).toHaveBeenCalledWith({
+      funcao: 'getSaldoProduto',
+      parametros: { codigoProduto: 'PA-001' },
+      linhas: 1,
+    })
   })
 
   it('processa eventos SSE que chegam fatiados em múltiplos chunks de rede', async () => {
@@ -55,7 +83,7 @@ describe('assistant.service.streamChat', () => {
     const onToken = vi.fn()
     const onDone = vi.fn()
 
-    await streamChat('oi', [], { onToken, onSources: vi.fn(), onDone, onError: vi.fn() })
+    await streamChat('oi', [], { onToken, onSources: vi.fn(), onConsulta: vi.fn(), onDone, onError: vi.fn() })
 
     expect(onToken).toHaveBeenCalledWith('Olá')
     expect(onDone).toHaveBeenCalled()
@@ -65,7 +93,7 @@ describe('assistant.service.streamChat', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, body: null }) as any
 
     const onError = vi.fn()
-    await streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onDone: vi.fn(), onError })
+    await streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onConsulta: vi.fn(), onDone: vi.fn(), onError })
 
     expect(onError).toHaveBeenCalledWith('Não foi possível conectar ao assistente.')
   })
@@ -77,7 +105,7 @@ describe('assistant.service.streamChat', () => {
     }) as any
 
     const onError = vi.fn()
-    await streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onDone: vi.fn(), onError })
+    await streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onConsulta: vi.fn(), onDone: vi.fn(), onError })
 
     expect(onError).toHaveBeenCalledWith('Falha ao gerar resposta. Tente novamente.')
   })
@@ -95,7 +123,7 @@ describe('assistant.service.streamChat', () => {
     const onError = vi.fn()
 
     await expect(
-      streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onDone: vi.fn(), onError })
+      streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onConsulta: vi.fn(), onDone: vi.fn(), onError })
     ).resolves.toBeUndefined()
 
     expect(onError).toHaveBeenCalledWith('Falha ao processar a resposta do assistente.')
@@ -107,7 +135,7 @@ describe('assistant.service.streamChat', () => {
     const onError = vi.fn()
 
     await expect(
-      streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onDone: vi.fn(), onError })
+      streamChat('oi', [], { onToken: vi.fn(), onSources: vi.fn(), onConsulta: vi.fn(), onDone: vi.fn(), onError })
     ).resolves.toBeUndefined()
 
     expect(onError).toHaveBeenCalledWith('Falha ao processar a resposta do assistente.')

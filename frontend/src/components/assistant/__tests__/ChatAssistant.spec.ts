@@ -93,6 +93,27 @@ describe('ChatAssistant', () => {
     expect(document.body.textContent).toContain('Resposta do assistente')
   })
 
+  it('exibe a linha de consulta quando a mensagem tem consultas', async () => {
+    hasPermissionMock.mockReturnValue(true)
+    vi.mocked(streamChat).mockImplementation(async (_msg, _history, handlers) => {
+      handlers.onToken('42 unidades')
+      handlers.onConsulta({ funcao: 'getSaldoProduto', parametros: { codigoProduto: 'PA-001' }, linhas: 1 })
+      handlers.onDone()
+    })
+
+    mount(ChatAssistant, { attachTo: document.body })
+    click(openButton()!)
+    await nextTick()
+
+    await setInputValue(inputEl()!, 'qual o saldo?')
+    await submitForm(formEl()!)
+    await nextTick()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(document.body.textContent).toContain('getSaldoProduto')
+    expect(document.body.textContent).toContain('codigoProduto=PA-001')
+  })
+
   it('exibe a mensagem de erro do store quando o assistente falha', async () => {
     hasPermissionMock.mockReturnValue(true)
     vi.mocked(streamChat).mockImplementation(async (_msg, _history, handlers) => {

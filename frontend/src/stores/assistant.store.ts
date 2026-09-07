@@ -41,6 +41,9 @@ export const useAssistantStore = defineStore('assistant', () => {
         onSources: (sources) => {
           assistantMessage.sources = sources
         },
+        onConsulta: (info) => {
+          assistantMessage.consultas = [...(assistantMessage.consultas ?? []), info]
+        },
         onDone: () => {
           isStreaming.value = false
         },

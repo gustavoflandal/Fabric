@@ -34,6 +34,21 @@ describe('useAssistantStore', () => {
     expect(store.isStreaming).toBe(false)
   })
 
+  it('acumula os eventos onConsulta na mensagem do assistente', async () => {
+    vi.mocked(streamChat).mockImplementation(async (_msg, _history, handlers) => {
+      handlers.onToken('resposta')
+      handlers.onConsulta({ funcao: 'getSaldoProduto', parametros: { codigoProduto: 'PA-001' }, linhas: 1 })
+      handlers.onDone()
+    })
+
+    const store = useAssistantStore()
+    await store.sendMessage('qual o saldo?')
+
+    expect(store.messages[1].consultas).toEqual([
+      { funcao: 'getSaldoProduto', parametros: { codigoProduto: 'PA-001' }, linhas: 1 },
+    ])
+  })
+
   it('marca erro na mensagem do assistente quando o stream falha', async () => {
     vi.mocked(streamChat).mockImplementation(async (_msg, _history, handlers) => {
       handlers.onError('Falha de conexão')
