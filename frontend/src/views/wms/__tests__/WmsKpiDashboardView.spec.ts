@@ -12,6 +12,10 @@ vi.mock('@/stores/auth.store', () => ({
   useAuthStore: () => ({ userName: 'Teste', logout: vi.fn() }),
 }))
 
+vi.mock('@/stores/theme.store', () => ({
+  useThemeStore: () => ({ mode: 'system', isDark: false, setMode: vi.fn() }),
+}))
+
 // Chart.js não consegue obter um contexto 2D real em jsdom (seu construtor faz um
 // no-op seguro nesse caso). Para testar de verdade a lógica de transformação de
 // dados em createCharts() (agrupamento/pivot de byTypeAndStatus, mapeamento de

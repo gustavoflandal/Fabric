@@ -27,6 +27,10 @@ vi.mock('@/stores/auth.store', () => ({
   }),
 }))
 
+vi.mock('@/stores/theme.store', () => ({
+  useThemeStore: () => ({ mode: 'system', isDark: false, setMode: vi.fn() }),
+}))
+
 vi.mock('@/services/warehouse-task.service', () => ({
   default: { getPanel: vi.fn(), start: vi.fn(), complete: vi.fn(), putaway: vi.fn() },
 }))

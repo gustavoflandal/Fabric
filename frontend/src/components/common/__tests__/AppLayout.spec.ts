@@ -21,6 +21,10 @@ vi.mock('@/stores/auth.store', () => ({
   useAuthStore: () => ({ userName: 'Gustavo', logout }),
 }))
 
+vi.mock('@/stores/theme.store', () => ({
+  useThemeStore: () => ({ mode: 'system', isDark: false, setMode: vi.fn() }),
+}))
+
 // AppLayout existe para eliminar as 26 copias do header + handleLogout (I1).
 // O teste fixa o header exato de SuppliersView.vue:3-24 e o comportamento de logout.
 function mountLayout(props: Record<string, unknown> = {}, slots: Record<string, string> = {}) {
