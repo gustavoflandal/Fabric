@@ -32,6 +32,7 @@ import warehouseTaskRoutes from './warehouse-task.routes';
 import storageRuleRoutes from './storage-rule.routes';
 import workflowTemplateRoutes from './workflow-template.routes';
 import systemRoutes from './system.routes';
+import assistantRoutes from './assistant.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -129,6 +130,11 @@ router.use('/counting', countingRoutes);
 
 // Rotas de sistema (F0.8: quais módulos esta instalação tem licenciados)
 router.use('/system', systemRoutes);
+
+// Assistente de IA — Fase 1 (RAG sobre manuais). Não é módulo licenciável
+// (WMS/COMPRAS): igual /system e /counting, disponível sempre que a
+// permissão assistente_ia:usar for concedida.
+router.use('/assistant', assistantRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {

@@ -27,14 +27,26 @@ services:
       JWT_REFRESH_SECRET: "bab03802fdfbd9da8cebe1b3370b26db1281e915699eb7515bdfefacc02b310a"
       PORT: 3005
       NODE_ENV: development
+      OLLAMA_URL: "http://ollama:11434"
+      CHROMA_HOST: "chromadb"
+      CHROMA_PORT: "8000"
+      ASSISTANT_DATABASE_URL: "mysql://fabric_assistente:lsei4tgbLRJxOvxjqZEyrRGI@mysql:3306/fabric"
     command: sh -c "npx prisma generate && npm run dev"
     ports:
       - "3005:3005"
-    depends_on:
-      - mysql
     volumes:
       - ./backend:/app
       - /app/node_modules
+      # Assistente de IA — Fase 1: `backend/scripts/ai-index-docs.ts` resolve
+      # `docs/operacao` subindo dois níveis a partir de `backend/scripts`
+      # (correto fora de container, onde `docs/` é irmã de `backend/`). Dentro
+      # do container só `./backend` é montado em `/app`, então esse mesmo
+      # caminho relativo aponta para `/docs/operacao` na raiz do filesystem do
+      # container — sem este volume, `npm run ai:index-docs` falha com ENOENT
+      # em qualquer ambiente Docker, não só nesta verificação.
+      - ./docs/operacao:/docs/operacao
+    depends_on:
+      - mysql
     networks:
       - fabric-network
 

@@ -54,3 +54,6 @@ temp/
 # Superpowers scratch (SDD progress ledger, brainstorming companion mockups)
 .superpowers/
 
+
+# Superpowers subagent-driven-development scratch ledger (session-local, not project state)
+.superpowers/
