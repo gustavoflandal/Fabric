@@ -11,7 +11,7 @@
 
     <!-- Welcome Section -->
     <div class="mb-8">
-      <p class="text-xl text-gray-600">
+      <p class="text-xl text-gray-600 dark:text-gray-400">
         Bem-vindo ao sistema de Planejamento e Controle da Produção
       </p>
     </div>
@@ -27,7 +27,7 @@
       <div class="lg:col-span-2">
         <Card title="Módulos do Sistema">
           <!-- Tabs -->
-          <div class="mb-6 border-b border-gray-200">
+          <div class="mb-6 border-b border-gray-200 dark:border-gray-700">
             <nav class="-mb-px flex space-x-8">
               <button
                 v-if="authStore.canViewGeneral"
@@ -35,8 +35,8 @@
                 :class="[
                   'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
                   activeTab === 'geral'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
                 ]"
               >
                 Geral
@@ -47,8 +47,8 @@
                 :class="[
                   'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
                   activeTab === 'pcp'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
                 ]"
               >
                 PCP
@@ -59,8 +59,8 @@
                 :class="[
                   'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
                   activeTab === 'wms'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
                 ]"
               >
                 WMS
@@ -71,8 +71,8 @@
                 :class="[
                   'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
                   activeTab === 'yms'
-                    ? 'border-primary-500 text-primary-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
                 ]"
               >
                 YMS
@@ -84,65 +84,65 @@
           <div v-if="activeTab === 'geral' && authStore.canViewGeneral" class="grid grid-cols-3 gap-3">
             <RouterLink
               to="/users"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">👥</div>
-                <p class="text-sm font-medium text-gray-700">Usuários</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Usuários</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/roles"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🔐</div>
-                <p class="text-sm font-medium text-gray-700">Perfis</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Perfis</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/audit-logs"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>
-                <p class="text-sm font-medium text-gray-700">Logs de Auditoria</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Logs de Auditoria</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/settings/system"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">⚙️</div>
-                <p class="text-sm font-medium text-gray-700">Configurações</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Configurações</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/units-of-measure"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📏</div>
-                <p class="text-sm font-medium text-gray-700">Unidades de Medida</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Unidades de Medida</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/suppliers"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🏢</div>
-                <p class="text-sm font-medium text-gray-700">Fornecedores</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Fornecedores</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/customers"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🤝</div>
-                <p class="text-sm font-medium text-gray-700">Clientes</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Clientes</p>
               </div>
             </RouterLink>
           </div>
@@ -153,92 +153,92 @@
             <RouterLink
               v-if="authStore.canViewPCPDashboard"
               to="/pcp/dashboard"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📊</div>
-                <p class="text-sm font-medium text-gray-700">Dashboard PCP</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Dashboard PCP</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/work-centers"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">⚙️</div>
-                <p class="text-sm font-medium text-gray-700">Centros de Trabalho</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Centros de Trabalho</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/products"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🏷️</div>
-                <p class="text-sm font-medium text-gray-700">Produtos &amp; BOMs</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Produtos &amp; BOMs</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/production-orders"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🏭</div>
-                <p class="text-sm font-medium text-gray-700">Ordens de Produção</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Ordens de Produção</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/mrp"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🔄</div>
-                <p class="text-sm font-medium text-gray-700">MRP</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">MRP</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/stock"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📦</div>
-                <p class="text-sm font-medium text-gray-700">Estoque</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Estoque</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/reports"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📊</div>
-                <p class="text-sm font-medium text-gray-700">Relatórios</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Relatórios</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/production-pointings"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">⏱️</div>
-                <p class="text-sm font-medium text-gray-700">Apontamentos</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Apontamentos</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/purchases/quotations"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">💰</div>
-                <p class="text-sm font-medium text-gray-700">Orçamentos</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Orçamentos</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/purchases/orders"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🛒</div>
-                <p class="text-sm font-medium text-gray-700">Pedidos de Compra</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Pedidos de Compra</p>
               </div>
             </RouterLink>
           </div>
@@ -247,89 +247,89 @@
           <div v-else-if="activeTab === 'wms' && authStore.canViewWMS" class="grid grid-cols-3 gap-3">
             <RouterLink
               to="/counting/dashboard"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>
-                <p class="text-sm font-medium text-gray-700">Inventário</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Inventário</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/warehouses"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🏭</div>
-                <p class="text-sm font-medium text-gray-700">Armazéns</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Armazéns</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/warehouse-structures"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📦</div>
-                <p class="text-sm font-medium text-gray-700">Estruturas de Armazém</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Estruturas de Armazém</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/wms/workflows"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">🔀</div>
-                <p class="text-sm font-medium text-gray-700">Workflows</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Workflows</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/wms/operations"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>
-                <p class="text-sm font-medium text-gray-700">Operações Ativas</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Operações Ativas</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/wms/kpis"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📊</div>
-                <p class="text-sm font-medium text-gray-700">Dashboard de KPIs</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Dashboard de KPIs</p>
               </div>
             </RouterLink>
             <RouterLink
               to="/purchases/receipts"
-              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
             >
               <div class="text-center">
                 <div class="text-3xl mb-2">📦</div>
-                <p class="text-sm font-medium text-gray-700">Recebimento</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Recebimento</p>
               </div>
             </RouterLink>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">📍</div>
                 <p class="text-sm font-medium text-gray-500">Localizações</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">🔄</div>
                 <p class="text-sm font-medium text-gray-500">Transferências</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">📤</div>
                 <p class="text-sm font-medium text-gray-500">Expedição</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">🎯</div>
                 <p class="text-sm font-medium text-gray-500">Picking</p>
@@ -340,38 +340,38 @@
 
           <!-- Tab Content: YMS -->
           <div v-else-if="activeTab === 'yms' && authStore.canViewYMS" class="grid grid-cols-3 gap-3">
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">🚚</div>
                 <p class="text-sm font-medium text-gray-500">Agendamento</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">🚪</div>
                 <p class="text-sm font-medium text-gray-500">Docas</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>
                 <p class="text-sm font-medium text-gray-500">Check-in/out</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">⏱️</div>
                 <p class="text-sm font-medium text-gray-500">Tempo de Pátio</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed">
+            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">📊</div>
-                <p class="text-sm font-medium text-gray-700">Relatórios YMS</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Relatórios YMS</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
