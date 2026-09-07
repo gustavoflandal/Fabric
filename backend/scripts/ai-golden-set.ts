@@ -1,5 +1,12 @@
 // backend/scripts/ai-golden-set.ts
-import { answerQuestion, type AssistantSource, type ConsultaInfo } from '../src/services/assistant.service';
+import {
+  answerQuestion,
+  MARCADORES_DE_VAZAMENTO,
+  NAO_ENCONTREI,
+  FORA_ESCOPO,
+  type AssistantSource,
+  type ConsultaInfo,
+} from '../src/services/assistant.service';
 import { getSaldoProduto } from '../src/services/stock-query.service';
 
 /**
@@ -9,24 +16,6 @@ import { getSaldoProduto } from '../src/services/stock-query.service';
  * depois de qualquer mudança de prompt, modelo, limiar de similaridade ou
  * estratégia de chunking — comportamento de LLM pode mudar de forma sutil.
  */
-
-const NAO_ENCONTREI = 'Não encontrei essa informação nos manuais do sistema.';
-const FORA_ESCOPO = 'Desculpe, sou um assistente focado exclusivamente nas operações deste sistema.';
-
-// Mesma lista usada como camada determinística em `assistant.service.ts`
-// (duplicada aqui de propósito — os dois arquivos não compartilham imports
-// hoje). Qualquer um desses marcadores aparecendo numa recusa é sinal de
-// vazamento do system prompt colado ao final de uma recusa correta (achado
-// da revisão final de branch: a mesma falha real que motivou a regra 8).
-const MARCADORES_DE_VAZAMENTO = [
-  'REGRAS OBRIGATÓRIAS',
-  'INEGOCIÁVEIS',
-  'Fonte da verdade',
-  'Negação de escopo',
-  'Tolerância zero',
-  '<contexto',
-  'Assistente Virtual Oficial',
-];
 
 /**
  * Verificação de Task 8 (Fase 2): com `hasStockAccess: true` o corte

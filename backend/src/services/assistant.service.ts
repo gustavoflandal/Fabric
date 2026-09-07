@@ -126,12 +126,15 @@ function argumentosValidos(nomeFuncao: string, args: unknown): boolean {
   return typeof valor === 'string' && valor.length > 0;
 }
 
-// Mesma lista usada em `scripts/ai-golden-set.ts` para validar o golden set
-// (duplicada de propósito — os dois arquivos não compartilham imports hoje).
+// Também importada por `scripts/ai-golden-set.ts` para validar o golden set
+// (`export`ada de propósito — os dois arquivos já compartilham outros
+// imports deste módulo, como `answerQuestion`/`ConsultaInfo`/`AssistantSource`
+// e `NAO_ENCONTREI`/`FORA_ESCOPO`, então manter uma segunda cópia aqui seria
+// só risco de as duas listas divergirem sem querer).
 // Qualquer um destes marcadores no início da resposta é sinal de vazamento
 // do system prompt colado a uma recusa correta (regra 8 do system prompt é
 // só defesa de prompt — esta é a camada determinística que fica atrás dela).
-const MARCADORES_DE_VAZAMENTO = [
+export const MARCADORES_DE_VAZAMENTO = [
   'REGRAS OBRIGATÓRIAS',
   'INEGOCIÁVEIS',
   'Fonte da verdade',
