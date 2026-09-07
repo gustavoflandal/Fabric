@@ -21,6 +21,11 @@
 -- é o que permite este único script rodar sem alteração contra os dois
 -- bancos, como o comentário acima já promete.
 
+-- Atenção: `CREATE USER IF NOT EXISTS` NÃO atualiza a senha de um usuário que
+-- já existe (o `IDENTIFIED BY` é ignorado nesse caso). Se este script já foi
+-- rodado antes contra um ambiente e a senha precisa mudar, rode manualmente
+-- `ALTER USER 'fabric_assistente'@'%' IDENTIFIED BY '<nova_senha>';` ou
+-- `DROP USER 'fabric_assistente'@'%';` antes de rodar este script de novo.
 CREATE USER IF NOT EXISTS 'fabric_assistente'@'%' IDENTIFIED BY 'assistente_test_only_ephemeral';
 
 GRANT SELECT ON stock_balances TO 'fabric_assistente'@'%';
