@@ -27,7 +27,7 @@ describe('assistant.service.answerQuestion', () => {
     const onSources = jest.fn();
     const onDone = jest.fn();
 
-    await answerQuestion('como fazer bolo?', [], { onToken, onSources, onDone });
+    await answerQuestion('como fazer bolo?', [], { onToken, onSources, onDone, onConsulta: jest.fn() });
 
     expect(onToken).toHaveBeenCalledWith('Não encontrei essa informação nos manuais do sistema.');
     expect(onSources).not.toHaveBeenCalled();
@@ -49,7 +49,7 @@ describe('assistant.service.answerQuestion', () => {
     const onSources = jest.fn();
     const onDone = jest.fn();
 
-    await answerQuestion('qual o primeiro passo da contagem?', [], { onToken, onSources, onDone });
+    await answerQuestion('qual o primeiro passo da contagem?', [], { onToken, onSources, onDone, onConsulta: jest.fn() });
 
     expect(onToken).toHaveBeenNthCalledWith(1, 'Primeiro ');
     expect(onToken).toHaveBeenNthCalledWith(2, 'passo.');
@@ -68,7 +68,7 @@ describe('assistant.service.answerQuestion', () => {
     });
 
     const onSources = jest.fn();
-    await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources, onDone: jest.fn() });
+    await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources, onDone: jest.fn(), onConsulta: jest.fn() });
 
     expect(onSources).toHaveBeenCalledWith([{ arquivo: 'a.pdf', trecho: 'relevante' }]);
   });
@@ -83,11 +83,16 @@ describe('assistant.service.answerQuestion', () => {
     });
 
     const history = Array.from({ length: 10 }, (_, i) => ({
-      role: (i % 2 === 0 ? 'user' : 'assistant') as const,
+      role: i % 2 === 0 ? ('user' as const) : ('assistant' as const),
       content: `msg${i}`,
     }));
 
-    await answerQuestion('pergunta atual', history, { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() });
+    await answerQuestion('pergunta atual', history, {
+      onToken: jest.fn(),
+      onSources: jest.fn(),
+      onDone: jest.fn(),
+      onConsulta: jest.fn(),
+    });
 
     const sentMessages = mockedOllama.chatStream.mock.calls[0][0];
     // system + últimas 6 do histórico (msg4..msg9) + pergunta atual = 8
@@ -105,7 +110,12 @@ describe('assistant.service.answerQuestion', () => {
       yield { type: 'token', text: 'ok' };
     });
 
-    await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() });
+    await answerQuestion('pergunta', [], {
+      onToken: jest.fn(),
+      onSources: jest.fn(),
+      onDone: jest.fn(),
+      onConsulta: jest.fn(),
+    });
 
     const sentMessages = mockedOllama.chatStream.mock.calls[0][0];
     expect(sentMessages[0].role).toBe('system');
@@ -127,7 +137,7 @@ describe('assistant.service.answerQuestion', () => {
     const onSources = jest.fn();
     const onDone = jest.fn();
 
-    await answerQuestion('pergunta', [], { onToken, onSources, onDone });
+    await answerQuestion('pergunta', [], { onToken, onSources, onDone, onConsulta: jest.fn() });
 
     expect(mockedOllama.chatStream).toHaveBeenCalled();
     expect(onSources).toHaveBeenCalledWith([{ arquivo: 'limite.pdf', trecho: 'no limite' }]);
@@ -149,7 +159,7 @@ describe('assistant.service.answerQuestion', () => {
     const onSources = jest.fn();
     const onDone = jest.fn();
 
-    await answerQuestion('pergunta ambígua', [], { onToken: jest.fn(), onSources, onDone });
+    await answerQuestion('pergunta ambígua', [], { onToken: jest.fn(), onSources, onDone, onConsulta: jest.fn() });
 
     expect(mockedOllama.chatStream).toHaveBeenCalled();
     expect(onSources).not.toHaveBeenCalled();
@@ -169,7 +179,7 @@ describe('assistant.service.answerQuestion', () => {
     const onSources = jest.fn();
     const onDone = jest.fn();
 
-    await answerQuestion('qual a previsão do tempo?', [], { onToken: jest.fn(), onSources, onDone });
+    await answerQuestion('qual a previsão do tempo?', [], { onToken: jest.fn(), onSources, onDone, onConsulta: jest.fn() });
 
     expect(mockedOllama.chatStream).toHaveBeenCalled();
     expect(onSources).not.toHaveBeenCalled();
@@ -189,7 +199,7 @@ describe('assistant.service.answerQuestion', () => {
     await answerQuestion(
       'pergunta',
       [],
-      { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() },
+      { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn(), onConsulta: jest.fn() },
       { signal: abortController.signal }
     );
 
@@ -208,7 +218,12 @@ describe('assistant.service.answerQuestion', () => {
       yield { type: 'token', text: 'ok' };
     });
 
-    await answerQuestion('pergunta', [], { onToken: jest.fn(), onSources: jest.fn(), onDone: jest.fn() });
+    await answerQuestion('pergunta', [], {
+      onToken: jest.fn(),
+      onSources: jest.fn(),
+      onDone: jest.fn(),
+      onConsulta: jest.fn(),
+    });
 
     expect(mockedOllama.chatStream).toHaveBeenCalledWith(
       expect.any(Array),
@@ -262,8 +277,8 @@ describe('assistant.service.answerQuestion — tool calling (Fase 2)', () => {
 
     expect(mockedOllama.chatStream).toHaveBeenCalled();
     const [, streamOptions] = mockedOllama.chatStream.mock.calls[0];
-    expect(streamOptions.tools).toBeDefined();
-    expect(streamOptions.tools!.map((t: any) => t.function.name)).toEqual([
+    expect(streamOptions!.tools).toBeDefined();
+    expect(streamOptions!.tools!.map((t: any) => t.function.name)).toEqual([
       'getSaldoProduto',
       'getMovimentacoesRecentes',
       'getPosicaoEstoquePorCategoria',
@@ -287,7 +302,7 @@ describe('assistant.service.answerQuestion — tool calling (Fase 2)', () => {
     });
 
     const [, streamOptions] = mockedOllama.chatStream.mock.calls[0];
-    expect(streamOptions.tools).toBeUndefined();
+    expect(streamOptions!.tools).toBeUndefined();
   });
 
   it('executa a tool pedida pelo modelo, injeta o resultado, chama o modelo de novo, e emite onConsulta', async () => {
@@ -335,7 +350,7 @@ describe('assistant.service.answerQuestion — tool calling (Fase 2)', () => {
     const [secondCallMessages] = mockedOllama.chatStream.mock.calls[1];
     const toolMessage = secondCallMessages.find((m: any) => m.role === 'tool');
     expect(toolMessage).toBeDefined();
-    expect(JSON.parse(toolMessage.content)).toEqual({
+    expect(JSON.parse(toolMessage!.content)).toEqual({
       codigoProduto: 'PROD-001',
       nomeProduto: 'Produto 1',
       quantidade: 42,
