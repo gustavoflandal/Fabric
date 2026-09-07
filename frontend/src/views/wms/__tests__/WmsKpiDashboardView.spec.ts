@@ -70,6 +70,12 @@ function makeRouter() {
 describe('WmsKpiDashboardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // vi.clearAllMocks() limpa histórico de chamadas, mas não desfaz um
+    // mockReturnValue definido por um teste anterior (ex.: o teste de tema
+    // escuro abaixo). Sem isso, a substituição feita lá vazaria para todos os
+    // testes seguintes. Restauramos aqui o valor padrão (tema claro) antes de
+    // cada teste, para que qualquer override futuro fique isolado ao próprio teste.
+    vi.mocked(useThemeStore).mockReturnValue({ mode: 'system', isDark: false, setMode: vi.fn() } as any)
     chartInstances.length = 0
     // Só falseamos setTimeout/clearTimeout: createCharts() é agendado via
     // setTimeout(createCharts, 100) em loadAll()/watch(days), e precisamos
