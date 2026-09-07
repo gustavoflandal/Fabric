@@ -175,7 +175,14 @@ const CASES: Case[] = [
       if (consultas.length !== 1 || consultas[0].funcao !== 'getSaldoProduto') return false;
       const resultado = await getSaldoProduto('PA-001');
       if ('erro' in resultado) return false;
-      return r.includes(String(resultado.quantidade));
+      // O código do produto ("PA-001") aparece naturalmente na resposta do
+      // modelo citando o produto consultado, e já contém o dígito "0" — sem
+      // remover isso antes do `includes`, um saldo de 0 (achado da
+      // re-revisão: é exatamente o saldo real de PA-001 em dev) passaria
+      // mesmo com um número alucinado, porque o "0" de `String(0)` já casa
+      // com o "0" que está em "PA-001".
+      const respostaSemCodigoProduto = r.replaceAll('PA-001', '');
+      return respostaSemCodigoProduto.includes(String(resultado.quantidade));
     },
   },
   {
