@@ -2,11 +2,11 @@
   <AppLayout title="Dashboard de KPIs do WMS" subtitle="Volume, tempo de ciclo, produtividade, gargalos e ocupação">
     <div v-if="loading" class="text-center py-12">
       <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      <p class="mt-4 text-gray-600">Carregando dashboard...</p>
+      <p class="mt-4 text-gray-600 dark:text-gray-400">Carregando dashboard...</p>
     </div>
 
-    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-      <p class="text-red-600">{{ error }}</p>
+    <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900">
+      <p class="text-red-600 dark:text-red-400">{{ error }}</p>
       <Button @click="loadAll" class="mt-4">Tentar Novamente</Button>
     </div>
 
@@ -18,14 +18,14 @@
             :key="tab.key"
             type="button"
             class="px-3 py-1.5 rounded-md text-sm font-medium"
-            :class="activeTab === tab.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
+            :class="activeTab === tab.key ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'"
             @click="activeTab = tab.key"
           >
             {{ tab.label }}
           </button>
         </nav>
         <div class="flex items-center gap-2">
-          <select v-if="activeTab !== 'ocupacao'" v-model.number="days" class="rounded-md border-gray-300 text-sm">
+          <select v-if="activeTab !== 'ocupacao'" v-model.number="days" class="rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
             <option :value="7">7 dias</option>
             <option :value="30">30 dias</option>
             <option :value="90">90 dias</option>
@@ -38,19 +38,19 @@
         <div
           v-if="taskKpisError"
           data-testid="tab-error-volume"
-          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900"
         >
-          <p class="text-red-600">{{ taskKpisError }}</p>
+          <p class="text-red-600 dark:text-red-400">{{ taskKpisError }}</p>
         </div>
         <template v-else>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <p class="text-sm text-gray-600">Recebimentos ativos</p>
-              <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.volumeStatus.receiptsActive ?? 0 }}</p>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
+              <p class="text-sm text-gray-600 dark:text-gray-400">Recebimentos ativos</p>
+              <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ taskKpis?.volumeStatus.receiptsActive ?? 0 }}</p>
             </div>
-            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-              <p class="text-sm text-gray-600">Recebimentos finalizados</p>
-              <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.volumeStatus.receiptsFinished ?? 0 }}</p>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
+              <p class="text-sm text-gray-600 dark:text-gray-400">Recebimentos finalizados</p>
+              <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ taskKpis?.volumeStatus.receiptsFinished ?? 0 }}</p>
             </div>
           </div>
           <Card title="Volume por tipo e status">
@@ -63,14 +63,14 @@
         <div
           v-if="taskKpisError"
           data-testid="tab-error-ciclo"
-          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900"
         >
-          <p class="text-red-600">{{ taskKpisError }}</p>
+          <p class="text-red-600 dark:text-red-400">{{ taskKpisError }}</p>
         </div>
         <template v-else>
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-            <p class="text-sm text-gray-600">Tempo médio do recebimento completo</p>
-            <p class="text-3xl font-bold text-gray-900">{{ taskKpis?.cycleTime.fullReceiptAvgHours ?? 0 }}h</p>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700 mb-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400">Tempo médio do recebimento completo</p>
+            <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ taskKpis?.cycleTime.fullReceiptAvgHours ?? 0 }}h</p>
           </div>
           <Card title="Tempo médio por etapa (horas)">
             <div class="h-72"><canvas ref="cycleChartRef"></canvas></div>
@@ -82,17 +82,17 @@
         <div
           v-if="taskKpisError"
           data-testid="tab-error-produtividade"
-          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900"
         >
-          <p class="text-red-600">{{ taskKpisError }}</p>
+          <p class="text-red-600 dark:text-red-400">{{ taskKpisError }}</p>
         </div>
         <Card v-else title="Produtividade por operador">
-          <table class="min-w-full divide-y divide-gray-200">
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead>
               <tr>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tarefas concluídas</th>
-                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tempo médio de execução</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Operador</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Tarefas concluídas</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Tempo médio de execução</th>
               </tr>
             </thead>
             <tbody>
@@ -110,28 +110,28 @@
         <div
           v-if="taskKpisError"
           data-testid="tab-error-gargalos"
-          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900"
         >
-          <p class="text-red-600">{{ taskKpisError }}</p>
+          <p class="text-red-600 dark:text-red-400">{{ taskKpisError }}</p>
         </div>
         <template v-else>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div
               v-for="entry in taskKpis?.bottlenecks.byType ?? []"
               :key="entry.type"
-              class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"
+              class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700"
             >
-              <p class="text-sm text-gray-600">{{ entry.type }}</p>
-              <p class="text-3xl font-bold text-red-600">{{ entry.count }}</p>
+              <p class="text-sm text-gray-600 dark:text-gray-400">{{ entry.type }}</p>
+              <p class="text-3xl font-bold text-red-600 dark:text-red-400">{{ entry.count }}</p>
             </div>
           </div>
           <Card title="Recebimentos afetados">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead>
                 <tr>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Recebimento</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Etapa</th>
-                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Horas parada</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Recebimento</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Etapa</th>
+                  <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">Horas parada</th>
                   <th class="px-4 py-2"></th>
                 </tr>
               </thead>
@@ -141,7 +141,7 @@
                   <td class="px-4 py-2">{{ row.taskType }}</td>
                   <td class="px-4 py-2">{{ row.hoursStuck }}h</td>
                   <td class="px-4 py-2">
-                    <RouterLink to="/wms/operations" class="text-primary-600 hover:underline">Ver no painel</RouterLink>
+                    <RouterLink to="/wms/operations" class="text-primary-600 dark:text-primary-400 hover:underline">Ver no painel</RouterLink>
                   </td>
                 </tr>
               </tbody>
@@ -154,14 +154,14 @@
         <div
           v-if="occupancyError"
           data-testid="tab-error-ocupacao"
-          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center"
+          class="bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900"
         >
-          <p class="text-red-600">{{ occupancyError }}</p>
+          <p class="text-red-600 dark:text-red-400">{{ occupancyError }}</p>
         </div>
         <template v-else>
-          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-            <p class="text-sm text-gray-600">% de ocupação geral</p>
-            <p class="text-3xl font-bold text-gray-900">{{ overallOccupancyPercent }}%</p>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700 mb-4">
+            <p class="text-sm text-gray-600 dark:text-gray-400">% de ocupação geral</p>
+            <p class="text-3xl font-bold text-gray-900 dark:text-gray-100">{{ overallOccupancyPercent }}%</p>
           </div>
           <Card title="Ocupação por armazém">
             <div class="h-72"><canvas ref="occupancyChartRef"></canvas></div>
@@ -180,6 +180,7 @@ import Card from '@/components/common/Card.vue'
 import wmsKpiService from '@/services/wms-kpi.service'
 import type { WmsTaskKpis, OccupancyResponse } from '@/types/wms-kpi.types'
 import Chart from 'chart.js/auto'
+import { useThemeStore } from '@/stores/theme.store'
 
 type TabKey = 'volume' | 'ciclo' | 'produtividade' | 'gargalos' | 'ocupacao'
 
@@ -207,6 +208,10 @@ const overallOccupancyPercent = computed(() => {
   const occupied = rows.reduce((sum, r) => sum + r.occupied, 0)
   return total > 0 ? Math.round((occupied / total) * 1000) / 10 : 0
 })
+
+const themeStore = useThemeStore()
+const chartTextColor = computed(() => (themeStore.isDark ? '#e5e7eb' : '#374151'))
+const chartGridColor = computed(() => (themeStore.isDark ? '#374151' : '#e5e7eb'))
 
 const volumeChartRef = ref<HTMLCanvasElement | null>(null)
 const cycleChartRef = ref<HTMLCanvasElement | null>(null)
@@ -273,6 +278,13 @@ watch(days, async () => {
   setTimeout(createCharts, 100)
 })
 
+watch(
+  () => themeStore.isDark,
+  () => {
+    if (!loading.value) createCharts()
+  }
+)
+
 function destroyCharts(): void {
   volumeChart?.destroy()
   cycleChart?.destroy()
@@ -310,7 +322,11 @@ function createCharts(): void {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+        scales: {
+          x: { stacked: true, ticks: { color: chartTextColor.value }, grid: { color: chartGridColor.value } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: chartTextColor.value }, grid: { color: chartGridColor.value } },
+        },
+        plugins: { legend: { labels: { color: chartTextColor.value } } },
       },
     })
   }
@@ -326,7 +342,10 @@ function createCharts(): void {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { x: { beginAtZero: true } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: chartTextColor.value }, grid: { color: chartGridColor.value } },
+          y: { ticks: { color: chartTextColor.value }, grid: { color: chartGridColor.value } },
+        },
       },
     })
   }
@@ -346,7 +365,11 @@ function createCharts(): void {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+        scales: {
+          x: { stacked: true, ticks: { color: chartTextColor.value }, grid: { color: chartGridColor.value } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: chartTextColor.value }, grid: { color: chartGridColor.value } },
+        },
+        plugins: { legend: { labels: { color: chartTextColor.value } } },
       },
     })
   }

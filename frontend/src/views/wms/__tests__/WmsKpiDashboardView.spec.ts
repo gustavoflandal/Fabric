@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import WmsKpiDashboardView from '../WmsKpiDashboardView.vue'
 import wmsKpiService from '@/services/wms-kpi.service'
+import { useThemeStore } from '@/stores/theme.store'
 
 vi.mock('@/services/wms-kpi.service', () => ({
   default: { getTaskKpis: vi.fn(), getOccupancy: vi.fn() },
@@ -13,7 +14,7 @@ vi.mock('@/stores/auth.store', () => ({
 }))
 
 vi.mock('@/stores/theme.store', () => ({
-  useThemeStore: () => ({ mode: 'system', isDark: false, setMode: vi.fn() }),
+  useThemeStore: vi.fn(() => ({ mode: 'system', isDark: false, setMode: vi.fn() })),
 }))
 
 // Chart.js não consegue obter um contexto 2D real em jsdom (seu construtor faz um
@@ -194,6 +195,25 @@ describe('WmsKpiDashboardView', () => {
     expect(occupancyDatasets['Ocupado']).toEqual([10])
     expect(occupancyDatasets['Livre']).toEqual([5])
     expect(occupancyDatasets['Bloqueado']).toEqual([1])
+  })
+
+  it('usa cores de grade/texto claras nos 3 gráficos quando o tema está escuro', async () => {
+    vi.mocked(wmsKpiService.getTaskKpis).mockResolvedValue(mockTaskKpis as any)
+    vi.mocked(wmsKpiService.getOccupancy).mockResolvedValue(mockOccupancy as any)
+    vi.mocked(useThemeStore).mockReturnValue({ mode: 'dark', isDark: true, setMode: vi.fn() } as any)
+
+    const router = makeRouter()
+    router.push('/wms/kpis')
+    await router.isReady()
+
+    mount(WmsKpiDashboardView, { global: { plugins: [router] } })
+    await flushPromises()
+    vi.advanceTimersByTime(100)
+    await flushPromises()
+
+    const [volumeChart] = chartInstances
+    expect(volumeChart.config.options.scales.x.ticks.color).toBe('#e5e7eb')
+    expect(volumeChart.config.options.scales.x.grid.color).toBe('#374151')
   })
 
   it('recria os gráficos (destruindo os anteriores) quando o período muda', async () => {
