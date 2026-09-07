@@ -220,4 +220,75 @@ describe('WmsKpiDashboardView', () => {
     expect(firstOccupancyChart.destroy).toHaveBeenCalledTimes(1)
     expect(chartInstances).toHaveLength(6)
   })
+
+  it('mostra o erro só nas 4 abas de tarefas quando falta permissão de tarefas, mantendo a aba de ocupação intacta', async () => {
+    vi.mocked(wmsKpiService.getTaskKpis).mockRejectedValue({
+      response: { status: 403, data: { message: 'Sem permissão para ver tarefas' } },
+    })
+    vi.mocked(wmsKpiService.getOccupancy).mockResolvedValue(mockOccupancy as any)
+
+    const router = makeRouter()
+    router.push('/wms/kpis')
+    await router.isReady()
+
+    const wrapper = mount(WmsKpiDashboardView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    try {
+      expect(wrapper.find('[data-testid="tab-error-volume"]').text()).toBe('Sem permissão para ver tarefas')
+
+      const occupancyTab = wrapper.findAll('button').find((b) => b.text().includes('Ocupação'))!
+      await occupancyTab.trigger('click')
+      await flushPromises()
+
+      // A aba de ocupação não usa taskKpisError: continua mostrando os dados
+      // reais, não o erro de permissão da outra metade do dashboard.
+      expect(wrapper.find('[data-testid="tab-error-ocupacao"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="tab-panel-ocupacao"]').text()).toContain('62.5%')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('mostra o erro só na aba de ocupação quando falta permissão de ocupação, mantendo as abas de tarefas intactas', async () => {
+    vi.mocked(wmsKpiService.getTaskKpis).mockResolvedValue(mockTaskKpis as any)
+    vi.mocked(wmsKpiService.getOccupancy).mockRejectedValue({
+      response: { status: 403, data: { message: 'Sem permissão para ver ocupação' } },
+    })
+
+    const router = makeRouter()
+    router.push('/wms/kpis')
+    await router.isReady()
+
+    const wrapper = mount(WmsKpiDashboardView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    try {
+      expect(wrapper.find('[data-testid="tab-error-volume"]').exists()).toBe(false)
+      expect(wrapper.text()).toContain('Recebimentos ativos')
+
+      const occupancyTab = wrapper.findAll('button').find((b) => b.text().includes('Ocupação'))!
+      await occupancyTab.trigger('click')
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="tab-error-ocupacao"]').text()).toBe('Sem permissão para ver ocupação')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('não rotula uma falha sem resposta HTTP (rede/timeout) como erro de permissão', async () => {
+    vi.mocked(wmsKpiService.getTaskKpis).mockRejectedValue(new Error('Network Error'))
+    vi.mocked(wmsKpiService.getOccupancy).mockResolvedValue(mockOccupancy as any)
+
+    const router = makeRouter()
+    router.push('/wms/kpis')
+    await router.isReady()
+
+    const wrapper = mount(WmsKpiDashboardView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    const message = wrapper.find('[data-testid="tab-error-volume"]').text()
+    expect(message).not.toContain('permissão')
+  })
 })

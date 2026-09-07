@@ -186,6 +186,16 @@ describe('wms-kpi.service — getTaskKpis', () => {
       expect(tasks.length).toBeGreaterThan(1);
 
       const chainStart = new Date(Date.now() - 45 * 24 * HOUR); // 45 dias atrás: fora da janela de 30 dias
+      // A tarefa mais antiga da cadeia (createdAt = chainStart) tem completedAt
+      // FORA da janela de 30 dias — só a ÚLTIMA tarefa tem completedAt dentro
+      // da janela. Isso é proposital: se o passo 2 (busca da cadeia inteira)
+      // regredisse para reaplicar o filtro `completedAt >= since` do passo 1,
+      // a tarefa mais antiga seria descartada e sobraria só a última, cujo
+      // createdAt (lastTaskCreatedAt, bem mais recente) é DIFERENTE de
+      // chainStart — o teste então falharia em vez de passar silenciosamente
+      // (com todas as tarefas usando o mesmo createdAt, esse cenário buggy
+      // produzia o mesmo resultado numérico do cenário correto).
+      const lastTaskCreatedAt = new Date(Date.now() - 10 * 24 * HOUR);
       const earlyCompletedAt = new Date(Date.now() - 40 * 24 * HOUR); // 40 dias atrás: também fora da janela
       const lastCompletedAt = new Date(Date.now() - 5 * 24 * HOUR); // 5 dias atrás: dentro da janela de 30 dias
 
@@ -194,7 +204,7 @@ describe('wms-kpi.service — getTaskKpis', () => {
         await testPrisma.warehouseTask.update({
           where: { id: task.id },
           data: {
-            createdAt: chainStart,
+            createdAt: isLast ? lastTaskCreatedAt : chainStart,
             status: 'COMPLETED',
             completedAt: isLast ? lastCompletedAt : earlyCompletedAt,
           },
@@ -202,10 +212,11 @@ describe('wms-kpi.service — getTaskKpis', () => {
       }
 
       const kpis = await getTaskKpis(30);
-      // (lastCompletedAt - chainStart) = 40 dias = 960h. Se o passo 1 tivesse
-      // restringido por data a cadeia inteira (em vez de só decidir QUAIS
-      // referências entram), o createdAt de 45 dias atrás seria perdido e o
-      // resultado ficaria errado.
+      // (lastCompletedAt - chainStart) = 40 dias = 960h. Se o passo 2 tivesse
+      // restringido por data a cadeia inteira (em vez de buscá-la completa,
+      // sem filtro), a tarefa mais antiga (completedAt fora da janela) seria
+      // perdida e o cálculo usaria lastTaskCreatedAt em vez de chainStart,
+      // dando um resultado bem menor que 40*24.
       expect(kpis.cycleTime.fullReceiptAvgHours).toBe(40 * 24);
     });
   });

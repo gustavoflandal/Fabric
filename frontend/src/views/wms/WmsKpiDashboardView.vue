@@ -217,7 +217,10 @@ let cycleChart: Chart | null = null
 let occupancyChart: Chart | null = null
 
 function permissionErrorMessage(err: any): string {
-  return err?.response?.data?.message || 'Sem permissão para ver estes dados'
+  if (err?.response?.status === 403) {
+    return err?.response?.data?.message || 'Sem permissão para ver estes dados'
+  }
+  return err?.response?.data?.message || 'Erro ao carregar os dados. Tente novamente.'
 }
 
 // Usado tanto por loadAll() quanto pelo watch(days, ...): trata erro
