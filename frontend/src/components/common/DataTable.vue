@@ -6,12 +6,12 @@
         class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
         data-testid="datatable-spinner"
       ></div>
-      <p class="mt-2 text-gray-600">Carregando...</p>
+      <p class="mt-2 text-gray-600 dark:text-gray-400">Carregando...</p>
     </div>
 
     <!-- 2. Erro — faixa de PCPDashboardView.vue:12-15. Nunca colapsar em "vazio" (I11). -->
-    <div v-else-if="error" class="m-6 bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-      <p class="text-red-600">{{ error }}</p>
+    <div v-else-if="error" class="m-6 bg-red-50 border border-red-200 rounded-lg p-6 text-center dark:bg-red-950 dark:border-red-900">
+      <p class="text-red-600 dark:text-red-400">{{ error }}</p>
       <Button class="mt-4" @click="emit('retry')">Tentar Novamente</Button>
     </div>
 
@@ -20,8 +20,8 @@
       <slot name="empty-icon">
         <ClipboardDocumentListIcon class="mx-auto h-12 w-12 text-gray-400" />
       </slot>
-      <h3 class="mt-2 text-sm font-medium text-gray-900">{{ emptyTitle }}</h3>
-      <p v-if="emptyHint" class="mt-1 text-sm text-gray-500">{{ emptyHint }}</p>
+      <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">{{ emptyTitle }}</h3>
+      <p v-if="emptyHint" class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ emptyHint }}</p>
       <div v-if="$slots['empty-action']" class="mt-4">
         <slot name="empty-action" />
       </div>
@@ -29,14 +29,14 @@
 
     <!-- 4. Dados. -->
     <div v-else class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <thead class="bg-gray-50 dark:bg-gray-900">
           <tr>
             <slot name="head" />
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="(item, index) in items" :key="rowKey(item, index)" class="hover:bg-gray-50">
+        <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
+          <tr v-for="(item, index) in items" :key="rowKey(item, index)" class="hover:bg-gray-50 dark:hover:bg-gray-700">
             <slot name="row" :item="item" :index="index" />
           </tr>
         </tbody>
@@ -46,10 +46,10 @@
     <!-- Paginacao canonica — UsersListView.vue:146-172 (identica em 3 views). -->
     <div
       v-if="!loading && !error && pagination && pagination.pages > 1"
-      class="px-6 py-4 border-t border-gray-200"
+      class="px-6 py-4 border-t border-gray-200 dark:border-gray-700"
     >
       <div class="flex items-center justify-between">
-        <div class="text-sm text-gray-700">
+        <div class="text-sm text-gray-700 dark:text-gray-300">
           Mostrando {{ (pagination.page - 1) * pagination.limit + 1 }} a
           {{ Math.min(pagination.page * pagination.limit, pagination.total) }} de
           {{ pagination.total }} resultados

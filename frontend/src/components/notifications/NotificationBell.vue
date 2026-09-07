@@ -3,7 +3,7 @@
     <!-- Bell Icon com Badge -->
     <button
       @click="toggleDropdown"
-      class="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors"
+      class="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700"
       :class="{ 'animate-pulse': hasCritical }"
     >
       <BellIcon class="w-6 h-6" />
@@ -29,12 +29,12 @@
     >
       <div
         v-if="showDropdown"
-        class="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50"
+        class="absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50 dark:bg-gray-800 dark:border-gray-700"
         @click.stop
       >
         <!-- Header do Dropdown -->
-        <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-          <h3 class="text-sm font-semibold text-gray-900">Notificações</h3>
+        <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center dark:border-gray-700">
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Notificações</h3>
           <button
             v-if="unreadCount > 0"
             @click="markAllAsRead"
@@ -46,11 +46,11 @@
 
         <!-- Lista de Notificações -->
         <div class="max-h-96 overflow-y-auto">
-          <div v-if="loading" class="p-4 text-center text-gray-500">
+          <div v-if="loading" class="p-4 text-center text-gray-500 dark:text-gray-400">
             <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
           </div>
 
-          <div v-else-if="criticalNotifications.length === 0" class="p-8 text-center text-gray-500">
+          <div v-else-if="criticalNotifications.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
             <InboxIcon class="mx-auto h-12 w-12 text-gray-400" />
             <p class="mt-2 text-sm">Nenhuma notificação</p>
           </div>
@@ -59,8 +59,8 @@
             <div
               v-for="notification in criticalNotifications.slice(0, 5)"
               :key="notification.id"
-              class="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors"
-              :class="{ 'bg-blue-50': !notification.read }"
+              class="px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors dark:hover:bg-gray-700 dark:border-gray-700"
+              :class="{ 'bg-blue-50 dark:bg-blue-950': !notification.read }"
             >
               <div class="flex items-start">
                 <!-- Ícone por tipo -->
@@ -75,13 +75,13 @@
 
                 <!-- Conteúdo -->
                 <div class="ml-3 flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900">
+                  <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {{ notification.title }}
                   </p>
-                  <p class="text-sm text-gray-600 mt-1 line-clamp-2">
+                  <p class="text-sm text-gray-600 mt-1 line-clamp-2 dark:text-gray-400">
                     {{ notification.message }}
                   </p>
-                  <p class="text-xs text-gray-500 mt-1">
+                  <p class="text-xs text-gray-500 mt-1 dark:text-gray-400">
                     {{ formatTimeAgo(notification.createdAt) }}
                   </p>
                 </div>
@@ -104,7 +104,7 @@
         </div>
 
         <!-- Footer -->
-        <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
+        <div class="px-4 py-3 border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
           <RouterLink
             to="/notifications"
             class="text-sm text-blue-600 hover:text-blue-800 font-medium"

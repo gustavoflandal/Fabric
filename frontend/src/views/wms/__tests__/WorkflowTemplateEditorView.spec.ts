@@ -86,6 +86,10 @@ vi.mock('@/stores/auth.store', () => ({
   useAuthStore: () => ({ userName: 'Gustavo', logout: vi.fn() }),
 }))
 
+vi.mock('@/stores/theme.store', () => ({
+  useThemeStore: () => ({ mode: 'system', isDark: false, setMode: vi.fn() }),
+}))
+
 vi.mock('@/stores/workflow-template.store', () => ({
   useWorkflowTemplateStore: () => ({
     getTemplateById: mocks.getTemplateById,

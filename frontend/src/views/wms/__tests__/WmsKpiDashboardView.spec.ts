@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
 import WmsKpiDashboardView from '../WmsKpiDashboardView.vue'
 import wmsKpiService from '@/services/wms-kpi.service'
+import { useThemeStore } from '@/stores/theme.store'
 
 vi.mock('@/services/wms-kpi.service', () => ({
   default: { getTaskKpis: vi.fn(), getOccupancy: vi.fn() },
@@ -10,6 +11,10 @@ vi.mock('@/services/wms-kpi.service', () => ({
 
 vi.mock('@/stores/auth.store', () => ({
   useAuthStore: () => ({ userName: 'Teste', logout: vi.fn() }),
+}))
+
+vi.mock('@/stores/theme.store', () => ({
+  useThemeStore: vi.fn(() => ({ mode: 'system', isDark: false, setMode: vi.fn() })),
 }))
 
 // Chart.js não consegue obter um contexto 2D real em jsdom (seu construtor faz um
@@ -65,6 +70,12 @@ function makeRouter() {
 describe('WmsKpiDashboardView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // vi.clearAllMocks() limpa histórico de chamadas, mas não desfaz um
+    // mockReturnValue definido por um teste anterior (ex.: o teste de tema
+    // escuro abaixo). Sem isso, a substituição feita lá vazaria para todos os
+    // testes seguintes. Restauramos aqui o valor padrão (tema claro) antes de
+    // cada teste, para que qualquer override futuro fique isolado ao próprio teste.
+    vi.mocked(useThemeStore).mockReturnValue({ mode: 'system', isDark: false, setMode: vi.fn() } as any)
     chartInstances.length = 0
     // Só falseamos setTimeout/clearTimeout: createCharts() é agendado via
     // setTimeout(createCharts, 100) em loadAll()/watch(days), e precisamos
@@ -190,6 +201,25 @@ describe('WmsKpiDashboardView', () => {
     expect(occupancyDatasets['Ocupado']).toEqual([10])
     expect(occupancyDatasets['Livre']).toEqual([5])
     expect(occupancyDatasets['Bloqueado']).toEqual([1])
+  })
+
+  it('usa cores de grade/texto claras nos 3 gráficos quando o tema está escuro', async () => {
+    vi.mocked(wmsKpiService.getTaskKpis).mockResolvedValue(mockTaskKpis as any)
+    vi.mocked(wmsKpiService.getOccupancy).mockResolvedValue(mockOccupancy as any)
+    vi.mocked(useThemeStore).mockReturnValue({ mode: 'dark', isDark: true, setMode: vi.fn() } as any)
+
+    const router = makeRouter()
+    router.push('/wms/kpis')
+    await router.isReady()
+
+    mount(WmsKpiDashboardView, { global: { plugins: [router] } })
+    await flushPromises()
+    vi.advanceTimersByTime(100)
+    await flushPromises()
+
+    const [volumeChart] = chartInstances
+    expect(volumeChart.config.options.scales.x.ticks.color).toBe('#e5e7eb')
+    expect(volumeChart.config.options.scales.x.grid.color).toBe('#374151')
   })
 
   it('recria os gráficos (destruindo os anteriores) quando o período muda', async () => {

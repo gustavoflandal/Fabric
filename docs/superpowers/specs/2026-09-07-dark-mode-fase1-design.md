@@ -49,15 +49,20 @@ Montado em `AppLayout.vue`, na mesma linha de botões do header, à esquerda do 
 2. **`DashboardView.vue`** — tela de entrada mais usada.
 3. **`WmsKpiDashboardView.vue`** — serve de padrão de referência para lotes futuros em telas com tabs/cards/tabelas/gráficos Chart.js (inclusive: os gráficos Chart.js têm cor de texto/grade fixa hoje; nesta tela, ler `themeStore.isDark` e passar `color: '#e5e7eb'` (texto) / `'#374151'` (linhas de grade) nas opções do Chart.js quando `isDark` for `true`, mantendo os defaults atuais do Chart.js quando `false` — um gráfico com texto escuro sobre fundo escuro fica ilegível. Os 3 gráficos (`createCharts()`) precisam ser recriados ao alternar o tema, do mesmo jeito que já são recriados ao trocar o período — reaproveitar esse mecanismo existente com um `watch(themeStore.isDark, ...)` adicional).
 
-**Receita de conversão** (para lotes futuros seguirem o mesmo padrão):
+**Receita de conversão** (para lotes futuros seguirem o mesmo padrão — atualizada após a implementação real, que divergiu levemente desta tabela na primeira versão do spec: `text-gray-600`/`text-gray-700` acabaram recebendo pares distintos, não o mesmo `dark:text-gray-400` para os dois):
 
 | Classe clara | Par dark: |
 |---|---|
 | `bg-white` | `dark:bg-gray-800` |
 | `bg-gray-50` | `dark:bg-gray-900` |
 | `text-gray-900` | `dark:text-gray-100` |
-| `text-gray-600` / `text-gray-700` | `dark:text-gray-400` |
+| `text-gray-700` | `dark:text-gray-300` |
+| `text-gray-600` / `text-gray-500` | `dark:text-gray-400` |
 | `border-gray-200` | `dark:border-gray-700` |
+| `divide-gray-200` | `dark:divide-gray-700` |
+| `bg-red-50` / `border-red-200` | `dark:bg-red-950` / `dark:border-red-900` |
+| `text-red-600` | `dark:text-red-400` |
+| `hover:bg-gray-50` (linha de tabela) | `dark:hover:bg-gray-700` |
 
 ### 4. Fora de escopo desta fase
 

@@ -14,6 +14,10 @@ vi.mock('@/stores/auth.store', () => ({
   useAuthStore: () => ({ userName: 'Teste', logout: vi.fn() }),
 }))
 
+vi.mock('@/stores/theme.store', () => ({
+  useThemeStore: () => ({ mode: 'system', isDark: false, setMode: vi.fn() }),
+}))
+
 const mockSettings = [
   {
     key: 'wms.task_delay_threshold_hours',
