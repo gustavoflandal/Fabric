@@ -34,6 +34,7 @@ import workflowTemplateRoutes from './workflow-template.routes';
 import systemRoutes from './system.routes';
 import assistantRoutes from './assistant.routes';
 import equipmentRoutes from './equipment.routes';
+import maintenancePlanRoutes from './maintenance-plan.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -127,6 +128,7 @@ router.use('/purchase-receipts', requireModule('COMPRAS'), purchaseReceiptRoutes
 // MÓDULO MANUTENÇÃO (licenciável por instalação)
 // ============================================
 router.use('/equipment', requireModule('MANUTENCAO'), equipmentRoutes);
+router.use('/maintenance-plans', requireModule('MANUTENCAO'), maintenancePlanRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);
