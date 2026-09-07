@@ -116,13 +116,14 @@ Padrão idêntico ao já usado para `WorkCenter`/`Supplier` (service + controlle
 - `assignedTo` é opcional e não tem transição de estado própria: é definido na criação (`create`) ou alterado por uma edição simples (`update(orderId, { assignedTo })`), sem exigir uma ação dedicada — uma ordem pode ficar sem responsável definido até alguém assumir.
 - RBAC: criar/cancelar/atribuir exige `manutencao:gerenciar`; iniciar/concluir exige `manutencao:executar` (o time de manutenção executa, mas não necessariamente cadastra planos).
 
-### 4. Job agendado — geração automática de ordens preventivas
+### 4. Job agendado — geração automática de ordens preventivas + detecção de atraso
 
-Novo arquivo `backend/src/jobs/maintenance-scheduler.ts`, registrado junto aos jobs já existentes (mesmo padrão de `counting-scheduler.ts`). Roda diariamente (`0 6 * * *`, mesmo horário do job de validade de lote já existente, para não competir com os jobs de minuto-a-minuto):
+Como Manutenção é módulo licenciável (seção 7), este job segue o padrão dos jobs WMS (`lot-expiry.job.ts`, `replenishment.job.ts`), não o do `NotificationSchedulerService` do núcleo (que não conhece módulos opcionais). Novo arquivo `backend/src/jobs/maintenance.job.ts`, classe própria com `start()`/`stop()`/`run()`/`runManually()`, registrado em `server.ts` junto aos outros jobs de módulo. Roda diariamente (`0 6 * * *`, mesmo horário do job de validade de lote, para não competir com os jobs de minuto-a-minuto), e verifica `isModuleEnabled('MANUTENCAO')` no início do `run()` — se desligado, não faz nada (mesmo padrão de `lot-expiry.job.ts`).
 
-1. Busca todo `MaintenancePlan` com `active = true` e `nextDueDate <= now()`.
-2. Para cada um, verifica se já existe uma `MaintenanceOrder` com aquele `planId` em status `PENDING` ou `IN_PROGRESS` — se sim, pula (evita duplicar ordem enquanto a anterior não foi resolvida).
-3. Caso contrário, cria uma nova `MaintenanceOrder` (`type: PREVENTIVE`, `status: PENDING`, `planId` preenchido) e avança `nextDueDate` do plano em `frequencyDays` a partir do `nextDueDate` anterior (não a partir de `now()`, para não acumular atraso silenciosamente a cada execução perdida — mesmo raciocínio de calendário fixo, não relativo à execução).
+Duas responsabilidades no mesmo job (mesma cadência, mesmo gate de licença, não justificam dois arquivos separados):
+
+1. **Geração de preventivas**: busca todo `MaintenancePlan` com `active = true` e `nextDueDate <= now()`. Para cada um, verifica se já existe uma `MaintenanceOrder` com aquele `planId` em status `PENDING` ou `IN_PROGRESS` — se sim, pula (evita duplicar ordem enquanto a anterior não foi resolvida). Caso contrário, cria uma nova `MaintenanceOrder` (`type: PREVENTIVE`, `status: PENDING`, `planId` preenchido) e avança `nextDueDate` do plano em `frequencyDays` a partir do `nextDueDate` anterior (não a partir de `now()`, para não acumular atraso silenciosamente a cada execução perdida).
+2. **Detecção de atraso**: chama `notificationDetector.detectOverdueMaintenance()` (seção 6).
 
 ### 5. Indicadores MTBF/MTTR (`maintenance-kpi.service.ts`)
 
@@ -137,13 +138,23 @@ Endpoint único `GET /maintenance/kpis` (RBAC `manutencao:visualizar`), agregand
 
 ### 6. Notificações
 
-Novo método `notificationDetector.detectOverdueMaintenance()`, chamado a partir do `NotificationSchedulerService` no job de 5 em 5 minutos já existente (junto com `detectProductionDelays`/`detectBottlenecks`). Considera atrasada uma `MaintenanceOrder` `PENDING`/`IN_PROGRESS` cujo `createdAt` é anterior a `now() - limiar`, onde o limiar vem de uma nova chave `SystemSetting` (`manutencao.ordem_atraso_horas`, default 48h) — mesmo padrão de `wms.task_delay_threshold_hours`.
+Novo método `notificationDetector.detectOverdueMaintenance()`, chamado pelo job da seção 4 (não pelo `NotificationSchedulerService` do núcleo — mesmo raciocínio de `lot-expiry.job.ts`: o scheduler central não importa `isModuleEnabled` em lugar nenhum e não deve passar a conhecer módulos opcionais). Considera atrasada uma `MaintenanceOrder` `PENDING`/`IN_PROGRESS` cujo `createdAt` é anterior a `now() - limiar`, onde o limiar vem de uma nova chave `SystemSetting` (`manutencao.ordem_atraso_horas`, default 48h) — mesmo padrão de `wms.task_delay_threshold_hours`.
 
-### 7. RBAC
+### 7. Licenciamento de módulo
+
+Manutenção segue o mesmo padrão de WMS/YMS/Compras (`docs/fase-2026-09-modernizacao/04_ARQUITETURA_MODULAR_LICENCIAMENTO.md`), não o do núcleo PCP: é um módulo licenciável por instalação, não sempre-ligado.
+
+- `MODULE_CODES` (`licensed-module.service.ts`) ganha `'MANUTENCAO'`.
+- Todas as rotas novas (`/equipment`, `/maintenance-plans`, `/maintenance-orders`, `/maintenance/kpis`) são montadas em `routes/index.ts` com `requireModule('MANUTENCAO')`, mesmo ponto único de bloqueio (404, não 403) já usado para `/warehouses`, `/warehouse-tasks` etc.
+- `prisma/seed.ts` ganha uma linha em `licensedModules`: `{ code: 'MANUTENCAO', enabled: true, core: false }` (habilitado por padrão em ambiente de desenvolvimento, mesmo critério do WMS).
+- O job agendado (seção 4) verifica `isModuleEnabled('MANUTENCAO')` no início do `run()`, mesmo padrão de `lot-expiry.job.ts` — se a instalação não licenciou Manutenção, o job não faz nada (mas continua registrado/agendado, custo zero quando desligado).
+- **O frontend não precisa saber de licenciamento** — confirmado que hoje nenhuma view/store do frontend consulta `licensed-module.service`; o gate de UI é só a permissão RBAC (`modules.view_manutencao`), igual a WMS/YMS. Se o módulo estiver desligado no backend, a aba aparece para quem tem a permissão, mas as chamadas de API voltam 404 — mesmo comportamento (não ideal, mas já aceito) que os módulos existentes têm hoje.
+
+### 8. RBAC
 
 Novo recurso `manutencao` com 3 ações: `visualizar`, `executar`, `gerenciar`. Nova permissão de módulo `modules.view_manutencao` (mesmo padrão de `modules.view_wms`), concedida por padrão a ADMIN/MANAGER, seguindo o mesmo critério já usado para os módulos existentes.
 
-### 8. Frontend
+### 9. Frontend
 
 - Nova aba "Manutenção" no `DashboardView.vue` (mesmo padrão de WMS/YMS: `v-if="authStore.canViewManutencao"`, cards de navegação).
 - `EquipmentListView.vue` — CRUD via `DataTable.vue` (código, nome, centro de trabalho, fabricante/modelo, ativo).
