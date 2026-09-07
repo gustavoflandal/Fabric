@@ -1,17 +1,17 @@
 <template>
-  <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+  <div class="bg-white rounded-lg shadow-sm border border-gray-200 dark:bg-gray-800 dark:border-gray-700">
     <!-- Header -->
-    <div class="px-6 py-4 border-b border-gray-200">
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between">
         <div class="flex items-center">
           <svg class="w-6 h-6 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
-          <h2 class="text-lg font-semibold text-gray-900">Centro de Notificações</h2>
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Centro de Notificações</h2>
         </div>
         <RouterLink
           to="/notifications"
-          class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+          class="text-sm text-blue-600 hover:text-blue-800 font-medium dark:text-blue-400 dark:hover:text-blue-300"
         >
           Ver todas →
         </RouterLink>
@@ -19,23 +19,23 @@
     </div>
 
     <!-- Contadores -->
-    <div class="px-6 py-4 bg-gray-50 border-b border-gray-200">
+    <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 dark:bg-gray-900 dark:border-gray-700">
       <div class="grid grid-cols-4 gap-4">
         <div class="text-center">
           <div class="text-2xl font-bold text-red-600">{{ priorityCounts.critical }}</div>
-          <div class="text-xs text-gray-600 mt-1">Críticas</div>
+          <div class="text-xs text-gray-600 mt-1 dark:text-gray-400">Críticas</div>
         </div>
         <div class="text-center">
           <div class="text-2xl font-bold text-orange-600">{{ priorityCounts.high }}</div>
-          <div class="text-xs text-gray-600 mt-1">Altas</div>
+          <div class="text-xs text-gray-600 mt-1 dark:text-gray-400">Altas</div>
         </div>
         <div class="text-center">
           <div class="text-2xl font-bold text-blue-600">{{ unreadCount }}</div>
-          <div class="text-xs text-gray-600 mt-1">Não Lidas</div>
+          <div class="text-xs text-gray-600 mt-1 dark:text-gray-400">Não Lidas</div>
         </div>
         <div class="text-center">
           <div class="text-2xl font-bold text-gray-600">{{ totalNotifications }}</div>
-          <div class="text-xs text-gray-600 mt-1">Total</div>
+          <div class="text-xs text-gray-600 mt-1 dark:text-gray-400">Total</div>
         </div>
       </div>
     </div>
@@ -43,7 +43,7 @@
     <!-- Loading State -->
     <div v-if="loading" class="p-8 text-center">
       <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      <p class="mt-2 text-sm text-gray-600">Carregando notificações...</p>
+      <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">Carregando notificações...</p>
     </div>
 
     <!-- Empty State -->
@@ -51,15 +51,15 @@
       <svg class="mx-auto h-16 w-16 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <p class="mt-4 text-sm font-medium text-gray-900">Tudo em ordem!</p>
-      <p class="mt-1 text-sm text-gray-500">Nenhuma notificação crítica no momento</p>
+      <p class="mt-4 text-sm font-medium text-gray-900 dark:text-gray-100">Tudo em ordem!</p>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Nenhuma notificação crítica no momento</p>
     </div>
 
     <!-- Lista de Notificações Críticas -->
-    <div v-else class="divide-y divide-gray-200">
+    <div v-else class="divide-y divide-gray-200 dark:divide-gray-700">
       <!-- Críticas (Prioridade 4) -->
-      <div v-if="criticalOnly.length > 0" class="px-6 py-3 bg-red-50">
-        <div class="flex items-center text-sm font-medium text-red-900 mb-3">
+      <div v-if="criticalOnly.length > 0" class="px-6 py-3 bg-red-50 dark:bg-red-950">
+        <div class="flex items-center text-sm font-medium text-red-900 mb-3 dark:text-red-300">
           <span class="text-lg mr-2">🔴</span>
           CRÍTICO ({{ criticalOnly.length }})
         </div>
@@ -67,17 +67,17 @@
           <div
             v-for="notification in criticalOnly"
             :key="notification.id"
-            class="bg-white rounded-lg p-4 hover:shadow-md transition-shadow border-l-4 border-red-600"
+            class="bg-white rounded-lg p-4 hover:shadow-md transition-shadow border-l-4 border-red-600 dark:bg-gray-900"
           >
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-900">
+                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {{ notification.title }}
                 </p>
-                <p class="text-sm text-gray-600 mt-1">
+                <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">
                   {{ notification.message }}
                 </p>
-                <p class="text-xs text-gray-500 mt-2">
+                <p class="text-xs text-gray-500 mt-2 dark:text-gray-400">
                   {{ formatTimeAgo(notification.createdAt) }}
                 </p>
               </div>
@@ -88,7 +88,7 @@
               >
                 Marcar como lida
               </button>
-              <span v-else class="ml-4 text-xs text-green-600 font-medium">✓ Lida</span>
+              <span v-else class="ml-4 text-xs text-green-600 font-medium dark:text-green-400">✓ Lida</span>
             </div>
           </div>
         </div>
@@ -96,7 +96,7 @@
 
       <!-- Altas (Prioridade 3) -->
       <div v-if="highOnly.length > 0" class="px-6 py-3">
-        <div class="flex items-center text-sm font-medium text-orange-900 mb-3">
+        <div class="flex items-center text-sm font-medium text-orange-900 mb-3 dark:text-orange-300">
           <span class="text-lg mr-2">⚠️</span>
           ALTA ({{ highOnly.length }})
         </div>
@@ -104,17 +104,17 @@
           <div
             v-for="notification in highOnly"
             :key="notification.id"
-            class="bg-white rounded-lg p-4 hover:shadow-md transition-shadow border-l-4 border-orange-500"
+            class="bg-white rounded-lg p-4 hover:shadow-md transition-shadow border-l-4 border-orange-500 dark:bg-gray-900"
           >
             <div class="flex items-start justify-between">
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-900">
+                <p class="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {{ notification.title }}
                 </p>
-                <p class="text-sm text-gray-600 mt-1">
+                <p class="text-sm text-gray-600 mt-1 dark:text-gray-400">
                   {{ notification.message }}
                 </p>
-                <p class="text-xs text-gray-500 mt-2">
+                <p class="text-xs text-gray-500 mt-2 dark:text-gray-400">
                   {{ formatTimeAgo(notification.createdAt) }}
                 </p>
               </div>
@@ -125,7 +125,7 @@
               >
                 Marcar como lida
               </button>
-              <span v-else class="ml-4 text-xs text-green-600 font-medium">✓ Lida</span>
+              <span v-else class="ml-4 text-xs text-green-600 font-medium dark:text-green-400">✓ Lida</span>
             </div>
           </div>
         </div>
@@ -133,9 +133,9 @@
     </div>
 
     <!-- Footer -->
-    <div v-if="criticalNotifications.length > 0" class="px-6 py-4 bg-gray-50 border-t border-gray-200">
+    <div v-if="criticalNotifications.length > 0" class="px-6 py-4 bg-gray-50 border-t border-gray-200 dark:bg-gray-900 dark:border-gray-700">
       <div class="flex items-center justify-between">
-        <p class="text-sm text-gray-600">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
           Mostrando {{ criticalNotifications.length }} notificações críticas
         </p>
         <button

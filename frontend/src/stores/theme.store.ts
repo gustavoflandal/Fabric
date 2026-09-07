@@ -6,9 +6,13 @@ export type ThemeMode = 'system' | 'light' | 'dark'
 const STORAGE_KEY = 'themeMode'
 const VALID_MODES: ThemeMode[] = ['system', 'light', 'dark']
 
+// index.html tem um script inline que duplica esta lógica de resolução
+// (localStorage -> matchMedia -> 'light') para aplicar a classe `dark` antes
+// da hidratação do Vue e evitar um flash de tela clara. Mantenha os dois em
+// sincronia se as regras de resolução mudarem aqui.
 function readStoredMode(): ThemeMode {
   const stored = localStorage.getItem(STORAGE_KEY) as ThemeMode | null
-  return stored && VALID_MODES.includes(stored) ? stored : 'system'
+  return stored && VALID_MODES.includes(stored) ? stored : 'light'
 }
 
 function readSystemPrefersDark(): boolean {

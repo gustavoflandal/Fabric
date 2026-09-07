@@ -18,13 +18,13 @@ describe('ThemeToggle', () => {
     )
   })
 
-  it('inicia no modo "system" e cicla para "light" ao clicar', async () => {
+  it('inicia no modo "light" e cicla para "dark" ao clicar', async () => {
     const wrapper = mount(ThemeToggle)
     const store = useThemeStore()
-    expect(store.mode).toBe('system')
+    expect(store.mode).toBe('light')
 
     await wrapper.find('button').trigger('click')
-    expect(store.mode).toBe('light')
+    expect(store.mode).toBe('dark')
   })
 
   it('cicla light -> dark -> system corretamente', async () => {

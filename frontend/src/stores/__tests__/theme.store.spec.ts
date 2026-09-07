@@ -30,10 +30,10 @@ describe('useThemeStore', () => {
     vi.unstubAllGlobals()
   })
 
-  it('usa mode "system" por padrão quando não há preferência salva', () => {
+  it('usa mode "light" por padrão quando não há preferência salva', () => {
     mockMatchMedia(false)
     const store = useThemeStore()
-    expect(store.mode).toBe('system')
+    expect(store.mode).toBe('light')
   })
 
   it('carrega o modo salvo no localStorage na criação da store', () => {
@@ -43,16 +43,17 @@ describe('useThemeStore', () => {
     expect(store.mode).toBe('dark')
   })
 
-  it('ignora um valor inválido salvo no localStorage e usa "system"', () => {
+  it('ignora um valor inválido salvo no localStorage e usa "light"', () => {
     localStorage.setItem('themeMode', 'roxo')
     mockMatchMedia(false)
     const store = useThemeStore()
-    expect(store.mode).toBe('system')
+    expect(store.mode).toBe('light')
   })
 
   it('isDark resolve via matchMedia quando mode é "system"', () => {
     mockMatchMedia(true)
     const store = useThemeStore()
+    store.setMode('system')
     expect(store.isDark).toBe(true)
   })
 
@@ -67,6 +68,7 @@ describe('useThemeStore', () => {
   it('initialize() aplica a classe dark no documentElement conforme isDark', () => {
     mockMatchMedia(true)
     const store = useThemeStore()
+    store.setMode('system')
     store.initialize()
     expect(document.documentElement.classList.contains('dark')).toBe(true)
   })
@@ -82,6 +84,7 @@ describe('useThemeStore', () => {
   it('reage em tempo real a uma mudança do sistema quando mode é "system"', () => {
     const { fireChange } = mockMatchMedia(false)
     const store = useThemeStore()
+    store.setMode('system')
     store.initialize()
     expect(document.documentElement.classList.contains('dark')).toBe(false)
 
