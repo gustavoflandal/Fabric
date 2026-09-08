@@ -23,7 +23,7 @@ router.get(
 router.get('/:id', requirePermission('manutencao', 'visualizar'), maintenanceOrderController.getById);
 router.post(
   '/',
-  requirePermission('manutencao', 'gerenciar'),
+  requirePermission('manutencao', 'executar'),
   validate(createMaintenanceOrderSchema),
   maintenanceOrderController.create
 );

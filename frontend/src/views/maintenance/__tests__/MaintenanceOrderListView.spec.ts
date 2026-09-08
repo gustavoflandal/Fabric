@@ -146,4 +146,22 @@ describe('MaintenanceOrderListView', () => {
       expect.objectContaining({ equipmentId: 'eq-1', problemDescription: 'Vazamento de óleo' })
     )
   })
+
+  it('Fix 2a: carrega a lista de ordens mesmo quando userService.getAll() falha (perfil OPERATOR não tem usuarios:visualizar)', async () => {
+    vi.mocked(userService.getAll).mockRejectedValue({ response: { status: 403, data: { message: 'Permissão negada' } } })
+    vi.mocked(maintenanceOrderService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [mockOrderPending], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+
+    const router = makeRouter()
+    router.push('/maintenance/orders')
+    await router.isReady()
+
+    const wrapper = mount(MaintenanceOrderListView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    // A lista de ordens carregou normalmente, apesar da falha na busca de usuários.
+    expect(wrapper.text()).toContain('Torno CNC 1')
+    expect(wrapper.text()).toContain('Ruído anormal')
+  })
 })

@@ -295,8 +295,16 @@ const statusTone = (status: MaintenanceOrderStatus): 'success' | 'warning' | 'da
 
 onMounted(async () => {
   await equipmentStore.fetchEquipment()
-  const usersResult = await userService.getAll()
-  users.value = usersResult.data
+  try {
+    const usersResult = await userService.getAll()
+    users.value = usersResult.data
+  } catch {
+    // OPERATOR não tem `usuarios:visualizar` (atribuir responsável é ação de
+    // `gerenciar`, não de `visualizar`/`executar`) — o <select> de responsável
+    // simplesmente fica sem opções, mas a lista de ordens tem que carregar
+    // igual.
+    users.value = []
+  }
   await loadOrders()
 })
 </script>
