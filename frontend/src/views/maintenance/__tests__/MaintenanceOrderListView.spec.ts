@@ -8,7 +8,14 @@ import equipmentService from '@/services/equipment.service'
 import userService from '@/services/user.service'
 
 vi.mock('@/services/maintenance-order.service', () => ({
-  default: { getAll: vi.fn(), create: vi.fn(), start: vi.fn(), complete: vi.fn(), cancel: vi.fn() },
+  default: {
+    getAll: vi.fn(),
+    create: vi.fn(),
+    start: vi.fn(),
+    complete: vi.fn(),
+    cancel: vi.fn(),
+    updateAssignee: vi.fn(),
+  },
 }))
 
 vi.mock('@/services/equipment.service', () => ({
@@ -145,6 +152,33 @@ describe('MaintenanceOrderListView', () => {
     expect(maintenanceOrderService.create).toHaveBeenCalledWith(
       expect.objectContaining({ equipmentId: 'eq-1', problemDescription: 'Vazamento de óleo' })
     )
+  })
+
+  it('Fix 5: reatribui uma ordem pelo modal de Reatribuir', async () => {
+    const mockUser = { id: 'user-1', name: 'Fulano de Tal', email: 'fulano@teste.com' }
+    vi.mocked(userService.getAll).mockResolvedValue({ status: 'success', data: [mockUser], pagination: {} } as any)
+    vi.mocked(maintenanceOrderService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [mockOrderPending], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+    vi.mocked(maintenanceOrderService.updateAssignee).mockResolvedValue({ data: { status: 'success', data: {} } } as any)
+
+    const router = makeRouter()
+    router.push('/maintenance/orders')
+    await router.isReady()
+
+    const wrapper = mount(MaintenanceOrderListView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    const reassignButton = wrapper.findAll('button').find((b) => b.text() === 'Reatribuir')!
+    await reassignButton.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    await body.find('#mo-form-reassign').setValue('user-1')
+    await body.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(maintenanceOrderService.updateAssignee).toHaveBeenCalledWith('order-1', 'user-1')
   })
 
   it('Fix 2a: carrega a lista de ordens mesmo quando userService.getAll() falha (perfil OPERATOR não tem usuarios:visualizar)', async () => {

@@ -96,6 +96,13 @@
           </button>
           <button
             v-if="asItem(item).status === 'PENDING' || asItem(item).status === 'IN_PROGRESS'"
+            @click="openReassignModal(asItem(item))"
+            class="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
+          >
+            Reatribuir
+          </button>
+          <button
+            v-if="asItem(item).status === 'PENDING' || asItem(item).status === 'IN_PROGRESS'"
             @click="handleCancel(asItem(item))"
             class="text-red-600 hover:text-red-900"
           >
@@ -144,6 +151,22 @@
         </div>
       </form>
     </AppModal>
+
+    <AppModal v-model="showReassignModal" title="Reatribuir Ordem de Manutenção" @close="closeReassignModal">
+      <form @submit.prevent="handleReassignSubmit" class="space-y-4">
+        <FormField id="mo-form-reassign" label="Responsável">
+          <select v-model="reassignTo" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <option value="">Sem responsável definido</option>
+            <option v-for="user in users" :key="user.id" :value="user.id">{{ user.name }}</option>
+          </select>
+        </FormField>
+
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="closeReassignModal" class="flex-1">Cancelar</Button>
+          <Button type="submit" :disabled="saving" class="flex-1">Reatribuir</Button>
+        </div>
+      </form>
+    </AppModal>
   </AppLayout>
 </template>
 
@@ -174,8 +197,11 @@ const error = ref('')
 const saving = ref(false)
 const showCreateModal = ref(false)
 const showCompleteModal = ref(false)
+const showReassignModal = ref(false)
 const completingOrder = ref<MaintenanceOrder | null>(null)
+const reassigningOrder = ref<MaintenanceOrder | null>(null)
 const resolutionNotes = ref('')
+const reassignTo = ref('')
 const filters = ref({ equipmentId: '', type: '', status: '' })
 const pagination = ref({ page: 1, limit: 100, total: 0, pages: 0 })
 const createFormData = ref({ equipmentId: '', problemDescription: '', assignedTo: '' })
@@ -268,6 +294,28 @@ const handleCancel = async (order: MaintenanceOrder) => {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao cancelar ordem')
     }
+  }
+}
+
+const openReassignModal = (order: MaintenanceOrder) => {
+  reassigningOrder.value = order
+  reassignTo.value = order.assignedTo || ''
+  showReassignModal.value = true
+}
+const closeReassignModal = () => { showReassignModal.value = false; reassigningOrder.value = null }
+
+const handleReassignSubmit = async () => {
+  if (!reassigningOrder.value) return
+  try {
+    saving.value = true
+    await orderStore.reassignOrder(reassigningOrder.value.id, reassignTo.value || null)
+    toast.success('Ordem reatribuída!')
+    closeReassignModal()
+    await loadOrders()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao reatribuir ordem')
+  } finally {
+    saving.value = false
   }
 }
 

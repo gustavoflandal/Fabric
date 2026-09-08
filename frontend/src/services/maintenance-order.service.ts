@@ -58,6 +58,10 @@ class MaintenanceOrderService {
   async cancel(id: string, reason?: string) {
     return api.patch(`${this.basePath}/${id}/cancel`, { reason })
   }
+
+  async updateAssignee(id: string, assignedTo: string | null) {
+    return api.put(`${this.basePath}/${id}`, { assignedTo })
+  }
 }
 
 export default new MaintenanceOrderService()

@@ -88,5 +88,29 @@ export const useMaintenanceOrderStore = defineStore('maintenanceOrder', () => {
     }
   }
 
-  return { orders, loading, error, fetchOrders, createOrder, startOrder, completeOrder, cancelOrder }
+  const reassignOrder = async (id: string, assignedTo: string | null) => {
+    try {
+      loading.value = true
+      error.value = null
+      await maintenanceOrderService.updateAssignee(id, assignedTo)
+      await fetchOrders()
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao reatribuir ordem'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    orders,
+    loading,
+    error,
+    fetchOrders,
+    createOrder,
+    startOrder,
+    completeOrder,
+    cancelOrder,
+    reassignOrder,
+  }
 })
