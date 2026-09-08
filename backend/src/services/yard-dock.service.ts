@@ -43,11 +43,21 @@ const assertCodeUniqueInWarehouse = async (warehouseId: string, code: string, ex
   }
 };
 
+const assertStoragePositionNotLinked = async (storagePositionId: string, excludeId?: string) => {
+  const existing = await prisma.yardDock.findFirst({
+    where: { storagePositionId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+  });
+  if (existing) {
+    throw new AppError(400, 'Esta posição de armazenagem já está vinculada a outra doca');
+  }
+};
+
 export class YardDockService {
   async create(data: CreateYardDockDto) {
     await assertWarehouseExists(data.warehouseId);
     if (data.storagePositionId) {
       await assertStoragePositionIsDock(data.storagePositionId);
+      await assertStoragePositionNotLinked(data.storagePositionId);
     }
     await assertCodeUniqueInWarehouse(data.warehouseId, data.code);
     return prisma.yardDock.create({ data });
@@ -94,6 +104,7 @@ export class YardDockService {
 
     if (data.storagePositionId) {
       await assertStoragePositionIsDock(data.storagePositionId);
+      await assertStoragePositionNotLinked(data.storagePositionId, id);
     }
     if (data.code) {
       await assertCodeUniqueInWarehouse(current.warehouseId, data.code, id);

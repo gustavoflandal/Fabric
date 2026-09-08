@@ -1,4 +1,4 @@
-import { cleanDatabase, disconnectTestDb, testPrisma } from '../helpers/db';
+import { cleanDatabase, disconnectTestDb } from '../helpers/db';
 import { createTestPositions } from '../helpers/fixtures';
 import yardDockService from '../../src/services/yard-dock.service';
 
@@ -88,5 +88,37 @@ describe('YardDockService', () => {
 
     const updated = await yardDockService.update(dock.id, { active: false });
     expect(updated.active).toBe(false);
+  });
+
+  it('rejeita vincular duas docas à mesma StoragePosition', async () => {
+    const { warehouse, positions } = await createTestPositions(2, { positionType: 'DOCA' });
+    await yardDockService.create({
+      code: 'DOCA-07',
+      serviceType: 'RECEBIMENTO',
+      warehouseId: warehouse.id,
+      storagePositionId: positions[0].id,
+    });
+
+    await expect(
+      yardDockService.create({
+        code: 'DOCA-08',
+        serviceType: 'EXPEDICAO',
+        warehouseId: warehouse.id,
+        storagePositionId: positions[0].id,
+      })
+    ).rejects.toThrow('Esta posição de armazenagem já está vinculada a outra doca');
+  });
+
+  it('permite update de doca para a mesma StoragePosition (no-op relink)', async () => {
+    const { warehouse, positions } = await createTestPositions(1, { positionType: 'DOCA' });
+    const dock = await yardDockService.create({
+      code: 'DOCA-09',
+      serviceType: 'RECEBIMENTO',
+      warehouseId: warehouse.id,
+      storagePositionId: positions[0].id,
+    });
+
+    const updated = await yardDockService.update(dock.id, { storagePositionId: positions[0].id });
+    expect(updated.storagePositionId).toBe(positions[0].id);
   });
 });
