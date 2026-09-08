@@ -77,6 +77,18 @@
               >
                 YMS
               </button>
+              <button
+                v-if="authStore.canViewManutencao"
+                @click="activeTab = 'manutencao'"
+                :class="[
+                  'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === 'manutencao'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
+                ]"
+              >
+                Manutenção
+              </button>
             </nav>
           </div>
 
@@ -376,6 +388,46 @@
               </div>
             </div>
           </div>
+
+          <!-- Tab Content: Manutenção -->
+          <div v-else-if="activeTab === 'manutencao' && authStore.canViewManutencao" class="grid grid-cols-3 gap-3">
+            <RouterLink
+              to="/maintenance/equipment"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🔧</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Equipamentos</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/maintenance/plans"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🗓️</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Planos de Manutenção</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/maintenance/orders"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🛠️</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Ordens de Manutenção</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/maintenance/kpis"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">📊</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Dashboard de KPIs</p>
+              </div>
+            </RouterLink>
+          </div>
         </Card>
       </div>
     </div>
@@ -413,8 +465,10 @@ onMounted(() => {
     activeTab.value = 'wms'
   } else if (authStore.canViewYMS) {
     activeTab.value = 'yms'
+  } else if (authStore.canViewManutencao) {
+    activeTab.value = 'manutencao'
   }
-  
+
   console.log('📊 Dashboard - Aba selecionada:', activeTab.value)
   console.log('🔐 Permissões de módulos (computed):', {
     geral: authStore.canViewGeneral,

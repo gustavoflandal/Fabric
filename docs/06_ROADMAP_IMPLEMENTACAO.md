@@ -1,10 +1,10 @@
 # 🗺 Fabric - Roadmap de Implementação
 
-> **Atualizado em 2026-09-07** para refletir o estado real do projeto. A versão anterior deste documento era o plano original de início de projeto — os checkboxes nunca foram marcados durante a implementação, então o documento não acompanhava a realidade. Este status foi verificado contra o código (schema Prisma, rotas do backend, views do frontend), não contra memória ou suposição.
+> **Atualizado em 2026-09-08** para refletir o estado real do projeto. A versão anterior deste documento era o plano original de início de projeto — os checkboxes nunca foram marcados durante a implementação, então o documento não acompanhava a realidade. Este status foi verificado contra o código (schema Prisma, rotas do backend, views do frontend), não contra memória ou suposição.
 
 ## 📋 Visão Geral
 
-Plano original de implementação em 4 fases. As Fases 1-3 estão completas e, em vários pontos, foram entregues com escopo bem maior do que o originalmente previsto (WMS completo em vez de controle de estoque simples). A Fase 4 (Manutenção, Qualidade, Indicadores/Relatórios) é a única fase que ainda não foi iniciada.
+Plano original de implementação em 4 fases. As Fases 1-3 estão completas e, em vários pontos, foram entregues com escopo bem maior do que o originalmente previsto (WMS completo em vez de controle de estoque simples). Da Fase 4 (Manutenção, Qualidade, Indicadores/Relatórios), o subsistema de Manutenção já está completo (backend + frontend); Qualidade e Indicadores/Relatórios ainda não foram iniciados.
 
 ---
 
@@ -67,15 +67,16 @@ O escopo real entregue aqui foi muito além do previsto: em vez de um controle d
 
 ---
 
-## 📈 Fase 4: Apoio e Qualidade — ❌ NÃO INICIADA
+## 📈 Fase 4: Apoio e Qualidade — 🟡 PARCIALMENTE INICIADA
 
-Esta é a única fase do plano original que ainda não tem nenhum código associado. Verificado diretamente no schema Prisma: não existe nenhum model `Equipment`, `MaintenancePlan`, `MaintenanceOrder`, `InspectionPlan`, `QualityInspection`, `NonConformity`, `KPI` ou `KPIValue`.
+Dos três subsistemas originalmente escopados para esta fase (Manutenção, Qualidade, Indicadores/Relatórios), Manutenção foi implementado por completo em 2026-09-08 (11 tasks do plano `docs/superpowers/plans/2026-09-07-manutencao-fase4.md`, mais uma rodada de correções pós-revisão de branch). Qualidade e Indicadores/Relatórios continuam sem nenhum código associado — verificado diretamente no schema Prisma: não existe nenhum model `InspectionPlan`, `QualityInspection`, `NonConformity`, `KPI` ou `KPIValue`.
 
-### Manutenção — não iniciado
-- [ ] `Equipment`, `MaintenancePlan`, `MaintenanceOrder`
-- [ ] Planos preventivos, ordens de serviço
-- [ ] Indicadores MTBF/MTTR
-- [ ] Views: Equipamentos, Manutenção, calendário de manutenção, dashboard
+### Manutenção — ✅ COMPLETA
+- [x] `Equipment`, `MaintenancePlan`, `MaintenanceOrder` (schema Prisma, com licenciamento de módulo `MANUTENCAO` e RBAC dedicado `manutencao:visualizar/executar/gerenciar`)
+- [x] Planos preventivos (CRUD + frequência em dias) e ordens de serviço (ciclo de vida corretiva/preventiva: PENDING → IN_PROGRESS → COMPLETED/CANCELLED, reatribuição de responsável)
+- [x] Job agendado — geração automática de ordens preventivas a partir dos planos vencidos + notificação de ordens em atraso
+- [x] Indicadores MTBF/MTTR, taxa de cumprimento do preventivo e distribuição de ordens por status/tipo, com janela de período configurável (`?days=`, default 90)
+- [x] Views: Equipamentos, Planos de Manutenção, Ordens de Manutenção, Dashboard de KPIs (nativo em dark mode) — navegação integrada ao menu principal
 
 ### Qualidade — não iniciado (existe apenas um proxy parcial)
 - [ ] `InspectionPlan`, `QualityInspection`, `NonConformity`
@@ -109,17 +110,17 @@ Funcionalidades completas que não estavam previstas em nenhuma das 4 fases orig
 | **Fase 1** | ✅ Completa | Falta apenas `Shift`/`Calendar` (não bloqueante) |
 | **Fase 2** | ✅ Completa | MRP sem persistência de execuções (simplificação aceita) |
 | **Fase 3** | ✅ Completa e expandida | Virou um WMS completo, muito além do previsto |
-| **Fase 4** | ❌ Não iniciada | Manutenção e Qualidade em 0%; Indicadores parcialmente coberto por dashboards ad-hoc |
+| **Fase 4** | 🟡 Parcial | Manutenção completa (backend+frontend); Qualidade em 0%; Indicadores parcialmente coberto por dashboards ad-hoc |
 | *(fora do plano)* | ✅ Entregue | Notificações, Auditoria, Licenciamento, Configurações, Assistente de IA, Dark Mode (parcial) |
 
 ---
 
 ## 🎯 Próximos Passos (para "finalização e entrega" segundo o plano original)
 
-1. **Decidir se a Fase 4 ainda é prioridade como originalmente escopada** — Manutenção e Qualidade são módulos grandes e isolados do resto do sistema; vale um brainstorm dedicado antes de planejar.
-2. Se sim: começar pelo menor dos três (tipicamente Manutenção, por ter menos dependência cruzada com módulos existentes) via `superpowers:brainstorming` → spec → plano → `subagent-driven-development`, mesmo padrão usado em todo o projeto até aqui.
-3. Itens pequenos e independentes que podem ser resolvidos a qualquer momento, sem esperar a Fase 4: `Shift`/`Calendar` (Fase 1), retrofit das ~50 telas restantes do dark mode.
-4. Se a resposta for "não, o escopo real do projeto já é outro" — vale reescrever a Visão Geral (`01_VISAO_GERAL.md`) e este roadmap para descrever o sistema como ele é hoje (PCP + WMS + IA), em vez de manter Manutenção/Qualidade como uma fase pendente indefinidamente.
+1. Manutenção já está completa — próximo da Fase 4 é **decidir se Qualidade ainda é prioridade como originalmente escopada** (Indicadores/Relatórios já tem cobertura parcial via dashboards ad-hoc, então tende a valer menos esforço dedicado do que Qualidade, que ainda não tem nenhum código).
+2. Se sim: mesmo padrão usado para Manutenção — `superpowers:brainstorming` → spec → plano → `subagent-driven-development`, com revisão por task e revisão final de branch inteira antes do merge.
+3. Itens pequenos e independentes que podem ser resolvidos a qualquer momento, sem esperar o resto da Fase 4: `Shift`/`Calendar` (Fase 1), retrofit das ~50 telas restantes do dark mode.
+4. Se a resposta for "não, o escopo real do projeto já é outro" — vale reescrever a Visão Geral (`01_VISAO_GERAL.md`) e este roadmap para descrever o sistema como ele é hoje (PCP + WMS + Manutenção + IA), em vez de manter Qualidade como uma fase pendente indefinidamente.
 
 ---
 

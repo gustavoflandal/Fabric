@@ -1,4 +1,5 @@
 import notificationDetector from '../../src/services/notification-detector.service';
+import { clearLicensedModuleCache } from '../../src/services/licensed-module.service';
 import { testPrisma, cleanDatabase, disconnectTestDb } from '../helpers/db';
 import {
   createTestManager,
@@ -9,6 +10,7 @@ import {
   createTestProductionOrderWithBom,
   createTestUser,
   createTestWorkCenter,
+  setTestLicensedModule,
 } from '../helpers/fixtures';
 
 /**
@@ -329,5 +331,66 @@ describe('notification-detector: resumo diário (sendDailySummary)', () => {
     await expect(
       testPrisma.notification.count({ where: { eventType: 'DAILY_SUMMARY' } })
     ).resolves.toBe(1);
+  });
+});
+
+describe('detectOverdueMaintenance', () => {
+  // `detectOverdueMaintenance()` é fail-closed por licença ANTES da consulta
+  // (mesmo padrão de `checkExpiringLots()` em
+  // `lot-expiry-notification.service.test.ts`), e a tabela `licensed_modules`
+  // é truncada pelo `cleanDatabase()` do teste anterior — precisa ser
+  // religada aqui.
+  beforeEach(async () => {
+    clearLicensedModuleCache();
+    await setTestLicensedModule('MANUTENCAO', true);
+    clearLicensedModuleCache();
+  });
+
+  afterEach(async () => {
+    await cleanDatabase();
+    clearLicensedModuleCache();
+  });
+
+  it('notifica MANAGER quando uma ordem está aberta além do limiar configurado', async () => {
+    const manager = await createTestManager();
+
+    const workCenter = await createTestWorkCenter();
+    const equipment = await testPrisma.equipment.create({
+      data: { code: 'EQP-OVERDUE', name: 'Equipamento Atrasado', workCenterId: workCenter.id },
+    });
+    await testPrisma.maintenanceOrder.create({
+      data: {
+        equipmentId: equipment.id,
+        type: 'CORRECTIVE',
+        status: 'PENDING',
+        createdAt: new Date(Date.now() - 50 * 60 * 60 * 1000), // 50h atrás, > limiar default de 48h
+      },
+    });
+
+    const findings = await notificationDetector.detectOverdueMaintenance();
+
+    expect(findings).toHaveLength(1);
+    const notifications = await testPrisma.notification.findMany({ where: { userId: manager.id } });
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].eventType).toBe('MAINTENANCE_ORDER_OVERDUE');
+  });
+
+  it('não notifica ordem aberta há menos tempo que o limiar', async () => {
+    const workCenter = await createTestWorkCenter();
+    const equipment = await testPrisma.equipment.create({
+      data: { code: 'EQP-RECENT', name: 'Equipamento Recente', workCenterId: workCenter.id },
+    });
+    await testPrisma.maintenanceOrder.create({
+      data: {
+        equipmentId: equipment.id,
+        type: 'CORRECTIVE',
+        status: 'PENDING',
+        createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1h atrás
+      },
+    });
+
+    const findings = await notificationDetector.detectOverdueMaintenance();
+
+    expect(findings).toHaveLength(0);
   });
 });

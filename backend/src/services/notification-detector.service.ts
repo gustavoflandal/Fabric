@@ -1034,6 +1034,77 @@ export class NotificationDetectorService {
   }
 
   /**
+   * Ordens de manutenção PENDING/IN_PROGRESS abertas há mais tempo que o
+   * limiar configurado. Mesmo padrão de `checkExpiringLots()`: fail-closed
+   * por licença ANTES da consulta, limiar vindo de `SystemSetting` com
+   * fallback de config, dedupe por (eventType, resourceId) para não repetir
+   * notificação a cada execução do job enquanto a ordem seguir aberta.
+   */
+  async detectOverdueMaintenance() {
+    if (!(await isModuleEnabled('MANUTENCAO'))) {
+      return [];
+    }
+
+    const thresholdHours = await getSetting('manutencao.ordem_atraso_horas', 48);
+    const cutoff = new Date(Date.now() - thresholdHours * 60 * 60 * 1000);
+
+    const overdueOrders = await prisma.maintenanceOrder.findMany({
+      where: {
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+        createdAt: { lt: cutoff },
+      },
+      include: {
+        equipment: { select: { code: true, name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (overdueOrders.length === 0) {
+      return overdueOrders;
+    }
+
+    const recipients = await this.getUsersByRole('MANAGER');
+    if (recipients.length === 0) {
+      return overdueOrders;
+    }
+
+    for (const order of overdueOrders) {
+      const alreadyNotified = await notificationService.checkRecentNotification(
+        'MAINTENANCE_ORDER_OVERDUE',
+        order.id,
+        thresholdHours
+      );
+      if (alreadyNotified) {
+        continue;
+      }
+
+      const hoursOpen = Math.floor((Date.now() - order.createdAt.getTime()) / (60 * 60 * 1000));
+
+      await notificationService.createBulk(
+        recipients.map((u) => u.id),
+        {
+          type: 'WARNING',
+          category: 'MAINTENANCE',
+          eventType: 'MAINTENANCE_ORDER_OVERDUE',
+          title: 'Ordem de manutenção atrasada',
+          message: `${order.equipment.code} - ${order.equipment.name}: ordem ${order.type === 'PREVENTIVE' ? 'preventiva' : 'corretiva'} aberta há ${hoursOpen}h (limiar: ${thresholdHours}h)`,
+          data: {
+            orderId: order.id,
+            equipmentCode: order.equipment.code,
+            type: order.type,
+            hoursOpen,
+          },
+          resourceType: 'MaintenanceOrder',
+          resourceId: order.id,
+          priority: 3,
+        }
+      );
+    }
+
+    return overdueOrders;
+  }
+
+  /**
    * Notificar conclusão de operação
    */
   async notifyOperationCompleted(pointingId: string) {

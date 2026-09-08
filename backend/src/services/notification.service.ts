@@ -13,7 +13,11 @@ export interface CreateNotificationDto {
   // categoria, e misturar as duas obrigaria o comprador que quer alerta de
   // estoque baixo a receber tarefa de armazém, e vice-versa. São públicos
   // diferentes; a categoria é o mecanismo que os separa.
-  category: 'PRODUCTION' | 'STOCK' | 'PURCHASE' | 'QUALITY' | 'CAPACITY' | 'WAREHOUSE';
+  // MAINTENANCE segue o mesmo raciocínio de WAREHOUSE acima: categoria própria
+  // para os eventos do módulo licenciável MANUTENCAO (Fase 4), para que a
+  // preferência de notificação de ordem atrasada não se misture com nenhuma
+  // categoria do núcleo.
+  category: 'PRODUCTION' | 'STOCK' | 'PURCHASE' | 'QUALITY' | 'CAPACITY' | 'WAREHOUSE' | 'MAINTENANCE';
   eventType: string;
   title: string;
   message: string;

@@ -25,7 +25,8 @@ export const useAuthStore = defineStore('auth', () => {
   const canViewPCP = computed(() => permissions.value.includes('modules.view_pcp'))
   const canViewWMS = computed(() => permissions.value.includes('modules.view_wms'))
   const canViewYMS = computed(() => permissions.value.includes('modules.view_yms'))
-  
+  const canViewManutencao = computed(() => permissions.value.includes('modules.view_manutencao'))
+
   // Verificar permissões específicas do PCP
   const canViewPCPDashboard = computed(() => permissions.value.includes('pcp.dashboard.view'))
   
@@ -269,6 +270,7 @@ export const useAuthStore = defineStore('auth', () => {
     canViewPCP,
     canViewWMS,
     canViewYMS,
+    canViewManutencao,
     canViewPCPDashboard,
     canPrintCountingPlan,
     // Actions

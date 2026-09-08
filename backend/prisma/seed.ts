@@ -40,6 +40,7 @@ async function main() {
     { code: 'COMPRAS', enabled: true, core: false },
     { code: 'WMS', enabled: true, core: false },
     { code: 'YMS', enabled: false, core: false },
+    { code: 'MANUTENCAO', enabled: true, core: false },
   ];
 
   for (const { code, enabled, core } of licensedModules) {
@@ -147,6 +148,11 @@ async function main() {
     // consulta a dado transacional nem ação alguma, só leitura de manual.
     { resource: 'assistente_ia', action: 'usar', description: 'Usar o assistente virtual de IA' },
 
+    // Manutenção (Fase 4)
+    { resource: 'manutencao', action: 'visualizar', description: 'Visualizar equipamentos, planos e ordens de manutenção' },
+    { resource: 'manutencao', action: 'executar', description: 'Iniciar/concluir ordens de manutenção e abrir corretivas' },
+    { resource: 'manutencao', action: 'gerenciar', description: 'Gerenciar equipamentos, planos, cancelar/reatribuir ordens de manutenção' },
+
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
     { resource: 'suppliers', action: 'read', description: 'Visualizar fornecedores' },
@@ -192,6 +198,7 @@ async function main() {
     { resource: 'modules', action: 'view_pcp', description: 'Acessar módulo PCP' },
     { resource: 'modules', action: 'view_wms', description: 'Acessar módulo WMS' },
     { resource: 'modules', action: 'view_yms', description: 'Acessar módulo YMS' },
+    { resource: 'modules', action: 'view_manutencao', description: 'Acessar módulo Manutenção' },
 
     // Permissões específicas utilizadas no frontend
     { resource: 'pcp', action: 'dashboard.view', description: 'Visualizar dashboard do PCP' },
@@ -296,6 +303,15 @@ async function main() {
       label: 'Antecedência do alerta de validade de lote (dias)',
       description:
         'Quantos dias antes do vencimento um lote com saldo dispara o alerta LOT_EXPIRING_SOON. Antes migrado via LOT_EXPIRY_ALERT_DAYS.',
+    },
+    {
+      key: 'manutencao.ordem_atraso_horas',
+      value: '48',
+      type: 'NUMBER' as const,
+      category: 'manutencao',
+      label: 'Limiar de ordem de manutenção atrasada (horas)',
+      description:
+        'A partir de quantas horas aberta (PENDING/IN_PROGRESS) uma ordem de manutenção é sinalizada como atrasada.',
     },
     {
       key: 'audit.retention_days',
@@ -504,7 +520,8 @@ async function main() {
     contagem: ['executar', 'recontar', 'aprovar_divergencia'],
     relatorios_contagem: ['visualizar'],
     assistente_ia: ['usar'],
-    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms'],
+    manutencao: ['visualizar', 'executar', 'gerenciar'],
+    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
     audit_logs: ['read'],
     roles: ['read'],
     users: ['read'],
@@ -540,7 +557,8 @@ async function main() {
     contagem: ['executar', 'recontar'],
     relatorios_contagem: ['visualizar'],
     assistente_ia: ['usar'],
-    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms'],
+    manutencao: ['visualizar', 'executar'],
+    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
   };
 
   const permissionIdByKey = new Map(
