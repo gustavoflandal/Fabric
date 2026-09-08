@@ -66,13 +66,49 @@ Não é find-and-replace cego: onde `text-xs` está numa hierarquia visual inten
 
 ### 2.3 Handles nos 4 lados (Fix 3)
 
-Cada tipo de nó ganha handles em `Position.Top`, `Position.Right`, `Position.Bottom` e `Position.Left`, mantendo a semântica atual de cada tipo:
+Cada tipo de nó ganha handles em `Position.Top`, `Position.Right`, `Position.Bottom` e `Position.Left`, mantendo a semântica atual de cada tipo. **Confirmado contra a documentação do Vue Flow**: múltiplos handles do mesmo tipo (`source` ou `target`) no mesmo nó exigem `id` único cada — não dá pra ter 4 handles `source` sem id como hoje (1 handle sem id funciona porque não há ambiguidade; 4 exigem `id="top"`/`"right"`/`"bottom"`/`"left"` cada).
 
-- **`EntryNode`** (só emite, nunca recebe — o backend exige zero arestas chegando no nó de entrada): 4 handles `type="source"`, um por lado, todos sem `id` (Vue Flow trata handle sem `id` como o único "source" padrão do nó — múltiplos handles source sem id explícito em nós diferentes já funcionam hoje; se o Vue Flow exigir `id` único quando há mais de um handle do mesmo tipo no mesmo nó, usar `id="top"`/`"right"`/`"bottom"`/`"left"` e ajustar `onConnect` para ignorar `sourceHandle` neste tipo de nó, já que ele não carrega significado nenhum aqui).
-- **`OperationNode`** (recebe de 1 lado, emite para 1 lado — exceto `ALOCACAO`, terminal): 4 handles `type="target"` (um por lado) sempre presentes; 4 handles `type="source"` (um por lado) só quando `!isAlocacao`, exatamente como a condição que já existe hoje para o único handle source atual.
-- **`DecisionNode`** (2 saídas com significado fixo — SIM e NAO, o `id` do handle é o que a store usa para gravar `WorkflowEdge.branch`): 4 handles `type="target"` (um por lado, sem id, entrada não carrega branch); e, para cada um dos 4 lados, um **par** de handles source `id="SIM"` (verde) / `id="NAO"` (vermelho) posicionados lado a lado dentro daquele lado do nó — replicando o par que já existe hoje (posições 30%/70%), só que disponível nos 4 lados em vez de só embaixo. O `id` do handle continua sendo a única fonte da branch (`connection.sourceHandle` já é lido assim em `onConnect`, `WorkflowTemplateEditorView.vue:~205`) — nenhuma mudança no fluxo de dados, só na posição visual de onde a conexão pode sair.
+- **`EntryNode`** (só emite, nunca recebe — o backend exige zero arestas chegando no nó de entrada): 4 handles `type="source"`, com `id="top"`/`"right"`/`"bottom"`/`"left"`.
+- **`OperationNode`** (recebe de 1 lado, emite para 1 lado — exceto `ALOCACAO`, terminal): 4 handles `type="target"` com `id="top"`/`"right"`/`"bottom"`/`"left"` sempre presentes; os mesmos 4 `id`s como `type="source"` só quando `!isAlocacao`, exatamente como a condição que já existe hoje para o único handle source atual.
+- **`DecisionNode`** (2 saídas com significado fixo — SIM e NAO, o `id` do handle é o que a store usa para gravar `WorkflowEdge.branch`): 4 handles `type="target"` com os mesmos `id`s de lado (entrada não carrega branch, mas ainda precisa de `id` único por lado); e, para cada um dos 4 lados, um **par** de handles source com `id="SIM-top"`/`"NAO-top"`, `"SIM-right"`/`"NAO-right"` etc. (verde/vermelho) — **8 ids distintos**, não reaproveitando literalmente `"SIM"`/`"NAO"` puro, porque cada handle no DOM do Vue Flow precisa de um id verdadeiramente único no nó.
 
-Nenhuma mudança de modelo de dados: `WorkflowEdge.branch` continua vindo só do `id` do handle de origem, nunca da posição/lado. A task de implementação deve confirmar visualmente (screenshot, dark e light) que os 8 handles do `OperationNode` normal e os 4+8 do `DecisionNode` não colidem visualmente em nós pequenos — pode ser necessário um `min-width`/`min-height` maior nos nós para os handles dos 4 lados não ficarem espremidos.
+**Mudança necessária, não prevista na primeira versão deste spec** — como o `id` do handle passa a carregar informação de posição (`"SIM-top"`, não só `"SIM"`), o código que deriva `branch`/`label` a partir de `sourceHandle` precisa normalizar, e o código que decide se um `sourceHandle` é uma branch válida precisa checar o prefixo, não igualdade exata. Dois pontos em `WorkflowTemplateEditorView.vue` mudam:
+
+```typescript
+// Helper novo, usado nos dois pontos abaixo.
+function branchFromHandle(sourceHandle: string | null | undefined): 'SIM' | 'NAO' | null {
+  if (sourceHandle?.startsWith('SIM-')) return 'SIM'
+  if (sourceHandle?.startsWith('NAO-')) return 'NAO'
+  return null
+}
+
+function onConnect(connection: Connection): void {
+  const branch = branchFromHandle(connection.sourceHandle)
+  flowEdges.value.push({
+    id: `edge-${connection.source}-${connection.target}-${connection.sourceHandle ?? ''}`,
+    source: connection.source,
+    target: connection.target,
+    sourceHandle: connection.sourceHandle ?? undefined,
+    type: 'smoothstep',
+    label: branch ?? undefined,
+  })
+}
+```
+
+```typescript
+// Dentro de handleSave, no map de edges:
+edges: flowEdges.value.map((e) => ({
+  fromClientId: e.source,
+  toClientId: e.target,
+  branch: branchFromHandle(e.sourceHandle),
+})),
+```
+
+Sem essa correção, um handle `"right"`/`"top"` de um `OperationNode` (que não tem nada a ver com branch) vazaria pro campo `branch` do payload salvo — o Joi do backend rejeitaria (`branch` só aceita `SIM`/`NAO`/null), quebrando o salvamento de qualquer edge que não saia do lado direito de um `OperationNode`/`EntryNode`. Antes desta correção, isso não acontecia porque só existia 1 handle por lado, sem id, então `sourceHandle` já vinha `undefined` para qualquer edge que não fosse de decisão.
+
+**Limitação aceita, não é bug:** o lado de onde uma edge normal (não-decisão) sai visualmente **não é persistido** — só `fromNodeId`/`toNodeId`/`branch` são salvos no backend (`WorkflowEdge` não tem, e não ganha, um campo de handle/lado). Ao recarregar um template salvo, o Vue Flow reconecta essas edges usando um handle padrão, então o roteamento visual escolhido durante a edição pode não sobreviver a um reload. Isso resolve o problema relatado (rotear sem cruzar linhas *durante* a montagem do fluxo), mas não é uma persistência completa de layout de conectores — se isso incomodar na prática depois de usar por um tempo, persistir o lado escolhido é um incremento futuro (exigiria campo novo em `WorkflowEdge`, fora do escopo deste spec, que é frontend-only).
+
+Nenhuma mudança de modelo de dados: `WorkflowEdge.branch` continua vindo só do `id` do handle de origem (normalizado por `branchFromHandle`), nunca da posição/lado. A task de implementação deve confirmar visualmente (screenshot, dark e light) que os 8 handles do `OperationNode` normal e os 4+8 do `DecisionNode` não colidem visualmente em nós pequenos — pode ser necessário um `min-width`/`min-height` maior nos nós para os handles dos 4 lados não ficarem espremidos.
 
 ### 2.4 O que NÃO muda
 
@@ -83,7 +119,7 @@ Nenhuma mudança de modelo de dados: `WorkflowEdge.branch` continua vindo só do
 
 ## 3. Testes
 
-- `WorkflowTemplateEditorView.spec.ts` (já existe): adicionar asserções de que os `<option>` do seletor de campo/operador mostram o texto traduzido (`CONDITION_FIELD_LABELS`/`CONDITION_OPERATOR_LABELS`), não o valor técnico cru.
+- `ConditionRuleBuilder.spec.ts` (já existe): adicionar asserções de que os `<option>` do seletor de campo/operador mostram o texto traduzido (`CONDITION_FIELD_LABELS`/`CONDITION_OPERATOR_LABELS`), não o valor técnico cru.
 - Teste (novo ou nos specs existentes de `EntryNode`/`DecisionNode`/`OperationNode`, se existirem — conferir antes de criar arquivo novo) confirmando que cada tipo de nó renderiza o número esperado de handles (4 para `EntryNode`; 8 para `OperationNode` não-`ALOCACAO`, 4 para `ALOCACAO`; 4+8 para `DecisionNode`) e que os `id`s `SIM`/`NAO` do `DecisionNode` continuam presentes em todos os 4 pares.
 - Teste de regressão confirmando que criar uma aresta a partir de qualquer um dos 4 handles `SIM`/`NAO` do `DecisionNode` grava `branch: 'SIM'`/`'NAO'` corretamente no payload enviado ao salvar (não só que o handle existe visualmente).
 - Sem testes de backend novos — nada muda lá.
