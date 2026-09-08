@@ -54,10 +54,10 @@
       </template>
 
       <template #row="{ item }">
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ asItem(item).equipment?.name || '-' }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ asItem(item).name }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">a cada {{ asItem(item).frequencyDays }} dia(s)</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(asItem(item).nextDueDate) }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{{ asItem(item).equipment?.name || '-' }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{{ asItem(item).name }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">a cada {{ asItem(item).frequencyDays }} dia(s)</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ formatDate(asItem(item).nextDueDate) }}</td>
         <td class="px-6 py-4 whitespace-nowrap">
           <StatusBadge
             :label="asItem(item).active ? 'Ativo' : 'Inativo'"

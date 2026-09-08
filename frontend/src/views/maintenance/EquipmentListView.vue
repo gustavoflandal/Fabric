@@ -63,10 +63,10 @@
       </template>
 
       <template #row="{ item }">
-        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ asItem(item).code }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ asItem(item).name }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ asItem(item).workCenter?.name || '-' }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatManufacturer(asItem(item)) }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">{{ asItem(item).code }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">{{ asItem(item).name }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ asItem(item).workCenter?.name || '-' }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ formatManufacturer(asItem(item)) }}</td>
         <td class="px-6 py-4 whitespace-nowrap">
           <StatusBadge
             :label="asItem(item).active ? 'Ativo' : 'Inativo'"
