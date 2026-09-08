@@ -6,9 +6,10 @@ export const createMaintenanceOrderSchema = Joi.object({
     'string.guid': 'ID do equipamento inválido',
     'any.required': 'Equipamento é obrigatório',
   }),
-  problemDescription: Joi.string().trim().min(1).required().messages({
+  problemDescription: Joi.string().trim().min(1).max(5000).required().messages({
     'string.empty': 'Descrição do problema é obrigatória',
     'any.required': 'Descrição do problema é obrigatória',
+    'string.max': 'Descrição do problema deve ter no máximo 5000 caracteres',
   }),
   assignedTo: Joi.string().uuid().allow(null).messages({
     'string.guid': 'ID do responsável inválido',
@@ -16,9 +17,10 @@ export const createMaintenanceOrderSchema = Joi.object({
 });
 
 export const completeMaintenanceOrderSchema = Joi.object({
-  resolutionNotes: Joi.string().trim().min(1).required().messages({
+  resolutionNotes: Joi.string().trim().min(1).max(5000).required().messages({
     'string.empty': 'Descreva a solução aplicada',
     'any.required': 'Descreva a solução aplicada',
+    'string.max': 'Solução aplicada deve ter no máximo 5000 caracteres',
   }),
 });
 

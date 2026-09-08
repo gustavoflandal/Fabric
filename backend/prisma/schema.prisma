@@ -1978,7 +1978,7 @@ model MaintenancePlan {
   id            String   @id @default(uuid())
   equipmentId   String
   name          String
-  description   String?
+  description   String?  @db.Text
   frequencyDays Int
   nextDueDate   DateTime
   active        Boolean  @default(true)
@@ -2009,8 +2009,8 @@ model MaintenanceOrder {
   planId             String?
   type               MaintenanceOrderType
   status             MaintenanceOrderStatus @default(PENDING)
-  problemDescription String?
-  resolutionNotes    String?
+  problemDescription String?                @db.Text
+  resolutionNotes    String?                @db.Text
   assignedTo         String?
   createdAt          DateTime               @default(now())
   startedAt          DateTime?

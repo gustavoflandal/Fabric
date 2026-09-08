@@ -9,7 +9,9 @@ export const createMaintenancePlanSchema = Joi.object({
     'string.empty': 'Nome é obrigatório',
     'any.required': 'Nome é obrigatório',
   }),
-  description: Joi.string().trim().allow('', null),
+  description: Joi.string().trim().max(5000).allow('', null).messages({
+    'string.max': 'Descrição deve ter no máximo 5000 caracteres',
+  }),
   frequencyDays: Joi.number().integer().greater(0).required().messages({
     'number.greater': 'Frequência deve ser maior que zero dias',
     'any.required': 'Frequência é obrigatória',
@@ -24,7 +26,9 @@ export const updateMaintenancePlanSchema = Joi.object({
     'string.guid': 'ID do equipamento inválido',
   }),
   name: Joi.string().trim().min(1),
-  description: Joi.string().trim().allow('', null),
+  description: Joi.string().trim().max(5000).allow('', null).messages({
+    'string.max': 'Descrição deve ter no máximo 5000 caracteres',
+  }),
   frequencyDays: Joi.number().integer().greater(0).messages({
     'number.greater': 'Frequência deve ser maior que zero dias',
   }),
