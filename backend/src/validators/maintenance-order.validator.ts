@@ -25,7 +25,9 @@ export const completeMaintenanceOrderSchema = Joi.object({
 });
 
 export const cancelMaintenanceOrderSchema = Joi.object({
-  reason: Joi.string().trim().allow('', null),
+  reason: Joi.string().trim().max(5000).allow('', null).messages({
+    'string.max': 'Motivo do cancelamento deve ter no máximo 5000 caracteres',
+  }),
 });
 
 export const updateMaintenanceOrderSchema = Joi.object({
