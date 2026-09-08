@@ -89,6 +89,14 @@ export class MaintenancePlanService {
   }
 
   async delete(id: string) {
+    // A guarda também evita que `onDelete: SetNull` corrompa a convenção de
+    // que `planId` nulo identifica uma ordem corretiva (spec §1) — excluir um
+    // plano com ordens vinculadas faria essas ordens preventivas "virarem"
+    // corretivas silenciosamente.
+    const orderCount = await prisma.maintenanceOrder.count({ where: { planId: id } });
+    if (orderCount > 0) {
+      throw new AppError(400, 'Não é possível excluir um plano com ordens de manutenção vinculadas');
+    }
     return prisma.maintenancePlan.delete({ where: { id } });
   }
 

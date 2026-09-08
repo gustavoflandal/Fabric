@@ -73,6 +73,16 @@ export class EquipmentService {
   }
 
   async delete(id: string) {
+    const [planCount, orderCount] = await Promise.all([
+      prisma.maintenancePlan.count({ where: { equipmentId: id } }),
+      prisma.maintenanceOrder.count({ where: { equipmentId: id } }),
+    ]);
+    if (planCount > 0 || orderCount > 0) {
+      throw new AppError(
+        400,
+        'Não é possível excluir um equipamento com planos ou ordens de manutenção vinculados'
+      );
+    }
     return prisma.equipment.delete({ where: { id } });
   }
 

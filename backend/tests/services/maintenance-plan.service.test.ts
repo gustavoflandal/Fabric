@@ -2,6 +2,7 @@ import { cleanDatabase, disconnectTestDb } from '../helpers/db';
 import { createTestWorkCenter } from '../helpers/fixtures';
 import equipmentService from '../../src/services/equipment.service';
 import maintenancePlanService from '../../src/services/maintenance-plan.service';
+import maintenanceOrderService from '../../src/services/maintenance-order.service';
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -89,5 +90,36 @@ describe('MaintenancePlanService', () => {
 
     const toggled = await maintenancePlanService.toggleActive(plan.id);
     expect(toggled.active).toBe(false);
+  });
+
+  // Fix 3 da revisão final: excluir um plano com ordens vinculadas deixava a
+  // FK cair em SET NULL, o que corromperia a convenção de que `planId` nulo
+  // identifica uma ordem corretiva (spec §1) — uma preventiva "viraria"
+  // corretiva silenciosamente.
+  describe('delete (Fix 3: guarda de dependência)', () => {
+    it('rejeita excluir plano com ordem de manutenção vinculada', async () => {
+      const equipment = await createEquipment();
+      const plan = await maintenancePlanService.create({
+        equipmentId: equipment.id,
+        name: 'Plano com ordem',
+        frequencyDays: 30,
+      });
+      await maintenanceOrderService.createPreventiveFromPlan(plan.id);
+
+      await expect(maintenancePlanService.delete(plan.id)).rejects.toThrow(
+        'Não é possível excluir um plano com ordens de manutenção vinculadas'
+      );
+    });
+
+    it('permite excluir plano sem ordens vinculadas', async () => {
+      const equipment = await createEquipment();
+      const plan = await maintenancePlanService.create({
+        equipmentId: equipment.id,
+        name: 'Plano livre',
+        frequencyDays: 30,
+      });
+
+      await expect(maintenancePlanService.delete(plan.id)).resolves.toBeDefined();
+    });
   });
 });
