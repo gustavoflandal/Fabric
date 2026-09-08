@@ -91,10 +91,10 @@
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField id="dock-form-code" label="Código" required>
-            <input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
           </FormField>
           <FormField id="dock-form-service-type" label="Tipo de Serviço" required>
-            <select v-model="formData.serviceType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <select v-model="formData.serviceType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
               <option value="RECEBIMENTO">Recebimento</option>
               <option value="EXPEDICAO">Expedição</option>
               <option value="MULTIUSO">Multiuso</option>
@@ -103,7 +103,7 @@
         </div>
 
         <FormField id="dock-form-warehouse" label="Armazém" required>
-          <select v-model="formData.warehouseId" required :disabled="!!editingDock" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="formData.warehouseId" required :disabled="!!editingDock" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="wh in warehouseStore.warehouses" :key="wh.id" :value="wh.id">{{ wh.name }}</option>
           </select>
@@ -115,17 +115,17 @@
               v-model="positionCodeInput"
               type="text"
               placeholder="Ex.: WH1-R01-01-01"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
             />
             <Button type="button" variant="outline" @click="handleLookupPosition">Buscar</Button>
           </div>
-          <p v-if="positionLookupMessage" class="mt-1 text-sm" :class="positionLookupError ? 'text-red-600' : 'text-green-600'">
+          <p v-if="positionLookupMessage" class="mt-1 text-sm" :class="positionLookupError ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
             {{ positionLookupMessage }}
           </p>
         </FormField>
 
         <div class="flex items-center">
-          <input v-model="formData.active" type="checkbox" id="dock-form-active" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+          <input v-model="formData.active" type="checkbox" id="dock-form-active" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600" />
           <label for="dock-form-active" class="ml-2 text-sm text-gray-700 dark:text-gray-300">Ativa</label>
         </div>
 
