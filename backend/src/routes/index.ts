@@ -41,6 +41,7 @@ import yardDockRoutes from './yard-dock.routes';
 import driverRoutes from './driver.routes';
 import fleetRoutes from './fleet.routes';
 import vehicleRoutes from './vehicle.routes';
+import yardWarehouseParamsRoutes from './yard-warehouse-params.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -145,6 +146,7 @@ router.use('/yard-docks', requireModule('YMS'), yardDockRoutes);
 router.use('/drivers', requireModule('YMS'), driverRoutes);
 router.use('/fleets', requireModule('YMS'), fleetRoutes);
 router.use('/vehicles', requireModule('YMS'), vehicleRoutes);
+router.use('/yard-warehouse-params', requireModule('YMS'), yardWarehouseParamsRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);
