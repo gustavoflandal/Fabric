@@ -38,6 +38,7 @@ import maintenancePlanRoutes from './maintenance-plan.routes';
 import maintenanceOrderRoutes from './maintenance-order.routes';
 import maintenanceKpiRoutes from './maintenance-kpi.routes';
 import yardDockRoutes from './yard-dock.routes';
+import driverRoutes from './driver.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -139,6 +140,7 @@ router.use('/maintenance', requireModule('MANUTENCAO'), maintenanceKpiRoutes);
 // MÓDULO YMS (licenciável por instalação)
 // ============================================
 router.use('/yard-docks', requireModule('YMS'), yardDockRoutes);
+router.use('/drivers', requireModule('YMS'), driverRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);
