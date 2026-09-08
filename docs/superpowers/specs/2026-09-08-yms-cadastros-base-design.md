@@ -106,6 +106,7 @@ model Vehicle {
   id            String      @id @default(uuid())
   plate         String      @unique // validado nos 2 formatos (Mercosul/antigo) no Joi, não no banco
   type          VehicleType
+  model         String?     // marca/modelo (ex.: "Volvo FH") - retroagido pela Etapa 5, que precisa exibir isso na grade detalhada do dashboard
   supplierId    String
   fleetId       String?
   blocked       Boolean     @default(false)

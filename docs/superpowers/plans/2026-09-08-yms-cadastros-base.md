@@ -8,6 +8,8 @@
 
 **Tech Stack:** Node.js + TypeScript + Express + Prisma + MySQL (backend), Vue 3 Composition API + Pinia + TailwindCSS (frontend), Jest (backend tests), Vitest (frontend tests).
 
+> **Retroagido em 2026-09-08, durante a Etapa 5 (Dashboard/KPIs):** `Vehicle` ganhou o campo opcional `model` (marca/modelo, ex. "Volvo FH") — a grade detalhada do dashboard da Etapa 5 precisa exibir isso, e como esta etapa ainda não tinha sido implementada, foi mais barato corrigir aqui do que criar uma migration extra depois. Já refletido no schema (Task 1) e na Task 5 (backend + frontend de Veículos) deste documento.
+
 ## Global Constraints
 
 - YMS é um **módulo licenciável por instalação** (como WMS/Compras/Manutenção) — toda rota nova é montada com `requireModule('YMS')` no ponto de mount (`routes/index.ts`), nunca rota a rota. `'YMS'` já está em `MODULE_CODES` (`backend/src/services/licensed-module.service.ts:24`) — não precisa ser adicionado.
@@ -119,6 +121,7 @@ model Vehicle {
   id            String      @id @default(uuid())
   plate         String      @unique
   type          VehicleType
+  model         String?
   supplierId    String
   fleetId       String?
   blocked       Boolean     @default(false)
@@ -1624,6 +1627,7 @@ export const createVehicleSchema = Joi.object({
     'any.only': 'Tipo de rodado inválido',
     'any.required': 'Tipo de rodado é obrigatório',
   }),
+  model: Joi.string().trim().max(100).allow('', null),
   supplierId: Joi.string().uuid().required().messages({
     'string.guid': 'ID do fornecedor inválido',
     'any.required': 'Fornecedor é obrigatório',
@@ -1640,6 +1644,7 @@ export const updateVehicleSchema = Joi.object({
   type: Joi.string().valid('TRUCK', 'TOCO', 'CAVALO', 'MECANICO', 'VAN', 'UTILITARIO', 'OUTROS').messages({
     'any.only': 'Tipo de rodado inválido',
   }),
+  model: Joi.string().trim().max(100).allow('', null),
   supplierId: Joi.string().uuid().messages({
     'string.guid': 'ID do fornecedor inválido',
   }),
@@ -1675,6 +1680,7 @@ import { AppError } from '../middleware/error.middleware';
 export interface CreateVehicleDto {
   plate: string;
   type: 'TRUCK' | 'TOCO' | 'CAVALO' | 'MECANICO' | 'VAN' | 'UTILITARIO' | 'OUTROS';
+  model?: string | null;
   supplierId: string;
   fleetId?: string | null;
 }
@@ -4086,6 +4092,7 @@ export interface Vehicle {
   id: string
   plate: string
   type: VehicleType
+  model: string | null
   supplierId: string
   fleetId: string | null
   blocked: boolean
@@ -4099,6 +4106,7 @@ export interface Vehicle {
 export interface CreateVehicleDto {
   plate: string
   type: VehicleType
+  model?: string | null
   supplierId: string
   fleetId?: string | null
 }
@@ -4481,6 +4489,10 @@ Criar `frontend/src/views/yard/VehicleListView.vue`:
           </FormField>
         </div>
 
+        <FormField id="vehicle-form-model" label="Modelo (opcional)">
+          <input v-model="formData.model" type="text" placeholder="Ex.: Volvo FH" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+        </FormField>
+
         <FormField id="vehicle-form-supplier" label="Fornecedor" required>
           <select v-model="formData.supplierId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="formData.fleetId = ''">
             <option value="">Selecione...</option>
@@ -4560,7 +4572,7 @@ const blockingVehicle = ref<Vehicle | null>(null)
 const blockReasonInput = ref('')
 const filters = ref({ search: '', supplierId: '', type: '' })
 const pagination = ref({ page: 1, limit: 100, total: 0, pages: 0 })
-const formData = ref({ plate: '', type: 'TRUCK' as VehicleType, supplierId: '', fleetId: '' })
+const formData = ref({ plate: '', type: 'TRUCK' as VehicleType, model: '', supplierId: '', fleetId: '' })
 
 const fleetsForSelectedSupplier = computed(() =>
   fleetStore.fleets.filter((f) => f.supplierId === formData.value.supplierId)
@@ -4587,11 +4599,11 @@ const loadVehicles = async () => {
 const handleFilterChange = () => { pagination.value.page = 1; loadVehicles() }
 const debouncedFilterChange = useDebounce(handleFilterChange, 350)
 const changePage = (page: number) => { pagination.value.page = page; loadVehicles() }
-const resetFormData = () => ({ plate: '', type: 'TRUCK' as VehicleType, supplierId: '', fleetId: '' })
+const resetFormData = () => ({ plate: '', type: 'TRUCK' as VehicleType, model: '', supplierId: '', fleetId: '' })
 const openCreateModal = () => { editingVehicle.value = null; formData.value = resetFormData(); showModal.value = true }
 const openEditModal = (vehicle: Vehicle) => {
   editingVehicle.value = vehicle
-  formData.value = { plate: vehicle.plate, type: vehicle.type, supplierId: vehicle.supplierId, fleetId: vehicle.fleetId || '' }
+  formData.value = { plate: vehicle.plate, type: vehicle.type, model: vehicle.model || '', supplierId: vehicle.supplierId, fleetId: vehicle.fleetId || '' }
   showModal.value = true
 }
 const closeModal = () => { showModal.value = false; editingVehicle.value = null }
@@ -4602,7 +4614,7 @@ const closeBlockModal = () => { showBlockModal.value = false; blockingVehicle.va
 const handleSubmit = async () => {
   try {
     saving.value = true
-    const data = { ...formData.value, fleetId: formData.value.fleetId || null }
+    const data = { ...formData.value, model: formData.value.model || null, fleetId: formData.value.fleetId || null }
     if (editingVehicle.value) {
       await vehicleStore.updateVehicle(editingVehicle.value.id, data)
       toast.success('Veículo atualizado com sucesso!')
