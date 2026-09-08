@@ -3700,9 +3700,10 @@ onMounted(async () => {
 Create `frontend/src/views/maintenance/__tests__/MaintenancePlanListView.spec.ts`, mesmo padrão de `EquipmentListView.spec.ts` (Task 7):
 
 ```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, DOMWrapper } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
+import { setActivePinia, createPinia } from 'pinia'
 import MaintenancePlanListView from '../MaintenancePlanListView.vue'
 import maintenancePlanService from '@/services/maintenance-plan.service'
 import equipmentService from '@/services/equipment.service'
@@ -3751,9 +3752,17 @@ function makeRouter() {
 describe('MaintenancePlanListView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // useEquipmentStore()/useMaintenancePlanStore() são Pinia reais (só os
+    // services são mockados) — precisam de uma instância ativa, mesmo padrão
+    // já usado em OperationsPanelView.spec.ts.
+    setActivePinia(createPinia())
     vi.mocked(equipmentService.getAll).mockResolvedValue({
       data: { status: 'success', data: [mockEquipment], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
     } as any)
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 
   it('carrega e exibe a lista de planos com o nome do equipamento e a frequência', async () => {
@@ -3783,16 +3792,28 @@ describe('MaintenancePlanListView', () => {
     router.push('/maintenance/plans')
     await router.isReady()
 
-    const wrapper = mount(MaintenancePlanListView, { global: { plugins: [router] } })
+    // attachTo: document.body é necessário porque o AppModal renderiza via
+    // <Teleport to="body"> — sem isso, o DOMWrapper abaixo não alcançaria
+    // nada (mesmo padrão de AppModal.spec.ts).
+    const wrapper = mount(MaintenancePlanListView, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
 
-    await wrapper.find('button:not([type="submit"])').trigger('click')
+    // AppLayout renderiza o botão "Sair" ANTES do botão de ação da slot no
+    // DOM — um seletor por `button:not([type="submit"])` pegaria "Sair" por
+    // engano. Filtrar pelo texto exato é o padrão já usado em
+    // WorkflowTemplateEditorView.spec.ts.
+    const novoButton = wrapper.findAll('button').find((b) => b.text().includes('Novo Plano'))!
+    await novoButton.trigger('click')
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('#mp-form-equipment').setValue('eq-1')
-    await wrapper.find('#mp-form-name').setValue('Inspeção trimestral')
-    await wrapper.find('#mp-form-frequency').setValue(90)
-    await wrapper.find('form').trigger('submit.prevent')
+    // O formulário vive dentro do <Teleport to="body"> do AppModal, fora da
+    // árvore do wrapper — as consultas precisam ir por um DOMWrapper sobre o
+    // document.body real.
+    const body = new DOMWrapper(document.body)
+    await body.find('#mp-form-equipment').setValue('eq-1')
+    await body.find('#mp-form-name').setValue('Inspeção trimestral')
+    await body.find('#mp-form-frequency').setValue(90)
+    await body.find('form').trigger('submit.prevent')
     await flushPromises()
 
     expect(maintenancePlanService.create).toHaveBeenCalledWith(
@@ -4321,9 +4342,10 @@ onMounted(async () => {
 Create `frontend/src/views/maintenance/__tests__/MaintenanceOrderListView.spec.ts`:
 
 ```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, DOMWrapper } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
+import { setActivePinia, createPinia } from 'pinia'
 import MaintenanceOrderListView from '../MaintenanceOrderListView.vue'
 import maintenanceOrderService from '@/services/maintenance-order.service'
 import equipmentService from '@/services/equipment.service'
@@ -4383,10 +4405,17 @@ function makeRouter() {
 describe('MaintenanceOrderListView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // useEquipmentStore()/useMaintenanceOrderStore() são Pinia reais (só os
+    // services são mockados) — precisam de uma instância ativa.
+    setActivePinia(createPinia())
     vi.mocked(equipmentService.getAll).mockResolvedValue({
       data: { status: 'success', data: [mockEquipment], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
     } as any)
     vi.mocked(userService.getAll).mockResolvedValue({ status: 'success', data: [], pagination: {} } as any)
+  })
+
+  afterEach(() => {
+    document.body.innerHTML = ''
   })
 
   it('carrega e exibe a lista de ordens com o botão Iniciar para uma ordem PENDING', async () => {
@@ -4437,15 +4466,24 @@ describe('MaintenanceOrderListView', () => {
     router.push('/maintenance/orders')
     await router.isReady()
 
-    const wrapper = mount(MaintenanceOrderListView, { global: { plugins: [router] } })
+    // attachTo: document.body é necessário porque o AppModal renderiza via
+    // <Teleport to="body"> — sem isso, o DOMWrapper abaixo não alcançaria nada.
+    const wrapper = mount(MaintenanceOrderListView, { global: { plugins: [router] }, attachTo: document.body })
     await flushPromises()
 
-    await wrapper.find('button:not([type="submit"])').trigger('click') // "+ Nova Ordem Corretiva"
+    // AppLayout renderiza o botão "Sair" ANTES do botão de ação da slot no
+    // DOM — filtrar pelo texto exato evita pegar "Sair" por engano.
+    const novaOrdemButton = wrapper.findAll('button').find((b) => b.text().includes('Nova Ordem Corretiva'))!
+    await novaOrdemButton.trigger('click')
     await wrapper.vm.$nextTick()
 
-    await wrapper.find('#mo-form-equipment').setValue('eq-1')
-    await wrapper.find('#mo-form-problem').setValue('Vazamento de óleo')
-    await wrapper.find('form').trigger('submit.prevent')
+    // O formulário vive dentro do <Teleport to="body"> do AppModal, fora da
+    // árvore do wrapper — as consultas precisam ir por um DOMWrapper sobre o
+    // document.body real.
+    const body = new DOMWrapper(document.body)
+    await body.find('#mo-form-equipment').setValue('eq-1')
+    await body.find('#mo-form-problem').setValue('Vazamento de óleo')
+    await body.find('form').trigger('submit.prevent')
     await flushPromises()
 
     expect(maintenanceOrderService.create).toHaveBeenCalledWith(
