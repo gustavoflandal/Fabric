@@ -149,7 +149,7 @@ Segue exatamente o padrão já estabelecido (Manutenção, WMS):
 ### 2.4 Frontend
 
 4 telas novas, seguindo o padrão `DataTable.vue` + `AppModal.vue` já usado em Equipment/MaintenancePlan, nativas em dark mode desde o primeiro commit:
-- `YardDockListView.vue` — CRUD de docas, seletor de armazém, seletor opcional de `StoragePosition` (filtrado por `positionType: DOCA` do armazém selecionado).
+- `YardDockListView.vue` — CRUD de docas, seletor de armazém, campo de busca por código de `StoragePosition` pra vincular (opcional). **Não cria endpoint novo no WMS**: reaproveita `GET /storage-positions/by-code/:code`, que já existe — só é usável por quem também tem `estruturas_armazem:visualizar` (natural para ADMIN/MANAGER, que já têm as duas permissões; um usuário só-YMS sem essa permissão simplesmente não vê/usa esse campo, cadastra a doca sem vínculo).
 - `DriverListView.vue` — CRUD de motoristas, seletor de fornecedor, ação de bloquear/desbloquear com motivo.
 - `VehicleListView.vue` — CRUD de veículos, seletor de fornecedor, seletor de frota (filtrado pelo fornecedor escolhido), ação de bloquear/desbloquear.
 - `FleetListView.vue` — CRUD de frotas, seletor de fornecedor, ação de bloquear/desbloquear (com aviso de quantos veículos serão afetados).
@@ -157,7 +157,7 @@ Segue exatamente o padrão já estabelecido (Manutenção, WMS):
 Mais uma tela pequena, não uma listagem:
 - Seção "Parâmetros de Pátio" dentro da tela de edição/detalhe de Armazém já existente (ou uma nova sub-rota `/warehouses/:id/yard-params`, a task de implementação decide o melhor encaixe na navegação existente) — `useYard` (toggle) e `delayToleranceMinutes` (input numérico 0-60).
 
-Nova aba "Pátio" no Dashboard (mesmo padrão da aba "Manutenção"), visível só com `authStore.canViewYard`, com 4 atalhos (Docas/Motoristas/Veículos/Frotas).
+**A aba "Pátio" no Dashboard já existe** (`DashboardView.vue`, `activeTab === 'yms'`, gate `authStore.canViewYMS` — computed já implementado em `auth.store.ts`, ligado a `modules.view_yms`), como placeholder com 5 cards desabilitados ("Em breve"): Agendamento, Docas, Check-in/out, Tempo de Pátio, Relatórios YMS. Esta etapa: trocar o card "Docas" por um `RouterLink` de verdade (mesmo padrão da aba Manutenção) e ADICIONAR 3 novos cards ativos (Motoristas, Frotas, Veículos) — os outros 4 cards (Agendamento, Check-in/out, Tempo de Pátio, Relatórios YMS) continuam "Em breve", pertencem a sub-projetos futuros.
 
 ### 2.5 O que NÃO entra nesta etapa
 
