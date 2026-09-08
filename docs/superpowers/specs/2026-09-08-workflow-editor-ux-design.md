@@ -60,9 +60,9 @@ Em `ConditionRuleBuilder.vue`, os dois `<option>` passam a exibir o label traduz
 
 ### 2.2 Fonte maior (Fix 2)
 
-Troca sistemática de `text-xs` (12px) por `text-sm` (14px) nos arquivos do editor:
-- `WorkflowTemplateEditorView.vue`: paleta de operações (linha ~47), label do nó selecionado (~70), botão remover nó (~76)
-- `ConditionRuleBuilder.vue`: os 2 `<select>`, o `<input>` de valor, e os botões (+ condição, + subgrupo, remover, ✕)
+Troca sistemática de `text-xs` (12px) por `text-sm` (14px) nos arquivos do editor. Confirmado ocorrência a ocorrência (o parágrafo "Nó selecionado" usa `class="label mb-2"`, uma classe sem regra CSS correspondente no projeto — não é `text-xs`, não faz parte desta troca):
+- `WorkflowTemplateEditorView.vue`: item da paleta de operações (linha ~47, `text-xs border border-gray-300 rounded-md px-2 py-1 cursor-grab bg-gray-50`) e botão "Remover nó" (linha ~76, `mt-3 text-xs text-red-600 hover:underline`)
+- `ConditionRuleBuilder.vue`: os 2 `<select>`, o `<input>` de valor, e os botões (+ condição, + subgrupo, remover, ✕) — todos `text-xs` hoje
 - `EntryNode.vue`, `DecisionNode.vue`, `OperationNode.vue`: o texto do nó (hoje `text-xs font-semibold`) — só a classe de texto; os `<Handle>` existentes nestes 3 arquivos não são tocados (ver seção 1, fora de escopo)
 
 Não é find-and-replace cego: onde `text-xs` está numa hierarquia visual intencional (ex.: um rótulo auxiliar menor que o texto principal ao lado), a task de implementação deve preservar a hierarquia subindo os dois um degrau (`text-xs`→`text-sm`, `text-sm`→`text-base`) em vez de igualar tudo. Na leitura destes arquivos hoje, não há essa hierarquia de dois níveis — é `text-xs` uniforme — então na prática deve ser uma troca direta, mas a task de implementação deve conferir cada ocorrência antes de aplicar, não assumir.
