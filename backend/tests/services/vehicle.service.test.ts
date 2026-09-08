@@ -105,4 +105,49 @@ describe('VehicleService', () => {
     expect(result.data).toHaveLength(1);
     expect(result.data[0].plate).toBe('ABC1111');
   });
+
+  it('ao atualizar, reporta fornecedor inexistente antes de comparar a frota (não mascara o erro real)', async () => {
+    const supplier = await createTestSupplier();
+    const fleet = await fleetService.create({ name: 'Frota C', supplierId: supplier.id });
+    const vehicle = await vehicleService.create({
+      plate: 'ABC5001',
+      type: 'CAVALO',
+      supplierId: supplier.id,
+      fleetId: fleet.id,
+    });
+
+    await expect(
+      vehicleService.update(vehicle.id, { supplierId: 'id-que-nao-existe', fleetId: fleet.id })
+    ).rejects.toThrow('Fornecedor informado não existe');
+  });
+
+  it('ao atualizar apenas a frota, usa o supplierId atual do veículo para validar o vínculo', async () => {
+    const supplier = await createTestSupplier();
+    const vehicle = await vehicleService.create({ plate: 'ABC5002', type: 'TRUCK', supplierId: supplier.id });
+    const fleet = await fleetService.create({ name: 'Frota D', supplierId: supplier.id });
+
+    await expect(vehicleService.update(vehicle.id, { fleetId: fleet.id })).resolves.toMatchObject({
+      fleetId: fleet.id,
+    });
+  });
+
+  it('rejeita atualizar apenas a frota quando ela pertence a outro fornecedor (sem passar supplierId)', async () => {
+    const supplier = await createTestSupplier();
+    const outroSupplier = await createTestSupplier();
+    const vehicle = await vehicleService.create({ plate: 'ABC5003', type: 'TRUCK', supplierId: supplier.id });
+    const fleetDeOutroFornecedor = await fleetService.create({ name: 'Frota E', supplierId: outroSupplier.id });
+
+    await expect(
+      vehicleService.update(vehicle.id, { fleetId: fleetDeOutroFornecedor.id })
+    ).rejects.toThrow('A frota informada pertence a outro fornecedor');
+  });
+
+  it('permite reenviar a mesma placa do próprio veículo ao atualizar (exclui o próprio id da checagem)', async () => {
+    const supplier = await createTestSupplier();
+    const vehicle = await vehicleService.create({ plate: 'ABC5004', type: 'VAN', supplierId: supplier.id });
+
+    await expect(vehicleService.update(vehicle.id, { plate: 'ABC5004' })).resolves.toMatchObject({
+      plate: 'ABC5004',
+    });
+  });
 });
