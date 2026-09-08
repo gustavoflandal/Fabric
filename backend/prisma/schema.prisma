@@ -1988,6 +1988,7 @@ model MaintenancePlan {
   equipment Equipment          @relation(fields: [equipmentId], references: [id])
   orders    MaintenanceOrder[]
 
+  @@index([active, nextDueDate])
   @@map("maintenance_plans")
 }
 
@@ -2020,5 +2021,6 @@ model MaintenanceOrder {
   plan      MaintenancePlan? @relation(fields: [planId], references: [id])
   assignee  User?            @relation(fields: [assignedTo], references: [id])
 
+  @@index([status, createdAt])
   @@map("maintenance_orders")
 }
