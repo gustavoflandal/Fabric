@@ -54,6 +54,41 @@ describe('maintenance-kpi.service', () => {
       const kpis = await getMaintenanceKpis();
       expect(kpis.mttrHours).toBe(3);
     });
+
+    // Fix 4 da revisão final: o dashboard não tinha janela de período — MTTR
+    // e MTBF misturavam dado de anos atrás com dado recente. Agora
+    // `completedAt >= since` (since = now - days*24h) exclui o que está fora
+    // da janela.
+    it('ignora ordem COMPLETED fora da janela de days no cálculo do MTTR', async () => {
+      const equipment = await createEquipment();
+      // Dentro da janela padrão (90 dias): 2h de reparo.
+      await testPrisma.maintenanceOrder.create({
+        data: {
+          equipmentId: equipment.id,
+          type: 'CORRECTIVE',
+          status: 'COMPLETED',
+          startedAt: new Date(Date.now() - 10 * HOUR),
+          completedAt: new Date(Date.now() - 8 * HOUR),
+        },
+      });
+      // Fora da janela de 30 dias (completedAt há 60 dias): 100h de reparo —
+      // se entrasse, puxaria a média para muito longe de 2h.
+      await testPrisma.maintenanceOrder.create({
+        data: {
+          equipmentId: equipment.id,
+          type: 'CORRECTIVE',
+          status: 'COMPLETED',
+          startedAt: new Date(Date.now() - 60 * DAY - 100 * HOUR),
+          completedAt: new Date(Date.now() - 60 * DAY),
+        },
+      });
+
+      const kpis30 = await getMaintenanceKpis(30);
+      expect(kpis30.mttrHours).toBe(2);
+
+      const kpis90 = await getMaintenanceKpis(90);
+      expect(kpis90.mttrHours).toBe(51); // média de 2h e 100h
+    });
   });
 
   describe('mtbfByEquipment', () => {
@@ -114,6 +149,54 @@ describe('maintenance-kpi.service', () => {
       const kpis = await getMaintenanceKpis();
       const entry = kpis.mtbfByEquipment.find((e) => e.equipmentId === equipment.id);
       expect(entry!.mtbfHours).toBeNull();
+    });
+
+    it('ignora corretiva fora da janela de days no cálculo do MTBF', async () => {
+      const equipment = await createEquipment();
+      const now = Date.now();
+      // Duas corretivas dentro de 90 dias (gap de 48h) e uma terceira, bem
+      // mais antiga, fora da janela de 90 dias — não pode entrar no gap.
+      await testPrisma.maintenanceOrder.create({
+        data: { equipmentId: equipment.id, type: 'CORRECTIVE', status: 'COMPLETED', createdAt: new Date(now - 200 * DAY) },
+      });
+      await testPrisma.maintenanceOrder.create({
+        data: { equipmentId: equipment.id, type: 'CORRECTIVE', status: 'COMPLETED', createdAt: new Date(now - 10 * DAY) },
+      });
+      await testPrisma.maintenanceOrder.create({
+        data: { equipmentId: equipment.id, type: 'CORRECTIVE', status: 'COMPLETED', createdAt: new Date(now - 8 * DAY) },
+      });
+
+      const kpis = await getMaintenanceKpis(90);
+      const entry = kpis.mtbfByEquipment.find((e) => e.equipmentId === equipment.id);
+      expect(entry!.mtbfHours).toBe(48); // só as duas dentro da janela contam
+    });
+
+    it('limita mtbfByEquipment a 20 entradas, ordenadas com o pior MTBF primeiro', async () => {
+      const now = Date.now();
+      for (let i = 0; i < 25; i += 1) {
+        const equipment = await createEquipment(`EQP-MTBF-${i}`);
+        const gapHours = 10 + i; // equipamento 0 tem o menor gap (pior MTBF)
+        await testPrisma.maintenanceOrder.create({
+          data: {
+            equipmentId: equipment.id,
+            type: 'CORRECTIVE',
+            status: 'COMPLETED',
+            createdAt: new Date(now - (gapHours + 24) * HOUR),
+          },
+        });
+        await testPrisma.maintenanceOrder.create({
+          data: { equipmentId: equipment.id, type: 'CORRECTIVE', status: 'COMPLETED', createdAt: new Date(now - 24 * HOUR) },
+        });
+      }
+
+      const kpis = await getMaintenanceKpis();
+
+      expect(kpis.mtbfByEquipment).toHaveLength(20);
+      const hours = kpis.mtbfByEquipment.map((e) => e.mtbfHours);
+      // Todas com dado (não-null) e em ordem ascendente (pior primeiro).
+      expect(hours.every((h) => h !== null)).toBe(true);
+      expect(hours).toEqual([...hours].sort((a, b) => (a as number) - (b as number)));
+      expect(kpis.mtbfByEquipment[0].mtbfHours).toBe(10);
     });
   });
 

@@ -2086,6 +2086,18 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ### Task 6: Backend — Indicadores MTBF/MTTR (`maintenance-kpi.service.ts`)
 
+> **Correção pós-review (Fix 4, `.superpowers/sdd/final-review-fixes.md`):** a
+> versão original desta task não tinha janela de período — `getMaintenanceKpis()`
+> calculava MTTR/MTBF sobre o histórico inteiro, sem o parâmetro `days` que a
+> spec original §5 já pedia (mesmo padrão de `wms-kpi.service.ts::getTaskKpis(days)`).
+> Corrigido: `getMaintenanceKpis(days = 90)` aplica `completedAt >= since` no
+> MTTR e `createdAt >= since` nas corretivas usadas pelo MTBF, expõe
+> `period: { days }` na resposta, e `mtbfByEquipment` agora é limitado a 20
+> entradas (pior MTBF primeiro). `computeOrdersByStatusAndType()` foi
+> deliberadamente mantido SEM filtro de período — é uma contagem de status
+> atual das ordens, não uma série histórica, mesmo critério já aplicado a
+> `computePreventiveComplianceRate()`.
+
 **Files:**
 - Create: `backend/src/services/maintenance-kpi.service.ts`
 - Create: `backend/src/controllers/maintenance-kpi.controller.ts`

@@ -14,6 +14,7 @@ export interface OrdersByStatusAndType {
 }
 
 export interface MaintenanceKpis {
+  period: { days: number }
   mttrHours: number | null
   mtbfByEquipment: MtbfEntry[]
   preventiveComplianceRate: number
@@ -21,8 +22,8 @@ export interface MaintenanceKpis {
 }
 
 class MaintenanceKpiService {
-  async getKpis() {
-    return api.get('/maintenance/kpis')
+  async getKpis(days: number = 90) {
+    return api.get('/maintenance/kpis', { params: { days } })
   }
 }
 

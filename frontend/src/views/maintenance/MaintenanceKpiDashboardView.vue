@@ -11,6 +11,15 @@
     </div>
 
     <div v-else>
+      <div class="flex items-center justify-end mb-4 gap-2">
+        <select v-model.number="days" class="rounded-md border-gray-300 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100">
+          <option :value="30">30 dias</option>
+          <option :value="90">90 dias</option>
+          <option :value="180">180 dias</option>
+        </select>
+        <Button @click="loadKpis">Atualizar</Button>
+      </div>
+
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700">
           <p class="text-sm text-gray-600 dark:text-gray-400">MTTR (tempo médio de reparo)</p>
@@ -69,6 +78,7 @@ const chartGridColor = computed(() => (themeStore.isDark ? '#374151' : '#e5e7eb'
 const loading = ref(true)
 const error = ref('')
 const kpis = ref<MaintenanceKpis | null>(null)
+const days = ref(90)
 
 const openOrdersCount = computed(() => {
   const rows = kpis.value?.ordersByStatusAndType ?? []
@@ -126,7 +136,7 @@ async function loadKpis(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const response = await maintenanceKpiService.getKpis()
+    const response = await maintenanceKpiService.getKpis(days.value)
     kpis.value = response.data.data
   } catch (err: any) {
     error.value = err.response?.data?.message || 'Erro ao carregar KPIs de manutenção'
@@ -135,6 +145,8 @@ async function loadKpis(): Promise<void> {
     setTimeout(createChart, 100)
   }
 }
+
+watch(days, loadKpis)
 
 watch(
   () => themeStore.isDark,

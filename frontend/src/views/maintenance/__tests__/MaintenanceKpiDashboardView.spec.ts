@@ -119,6 +119,24 @@ describe('MaintenanceKpiDashboardView', () => {
     expect(datasets['Preventiva']).toEqual([0, 1, 5, 0])
   });
 
+  it('Fix 4: chama getKpis com days=90 por padrão e recarrega ao trocar o período', async () => {
+    vi.mocked(maintenanceKpiService.getKpis).mockResolvedValue({ data: { status: 'success', data: mockKpis } } as any)
+
+    const router = makeRouter()
+    router.push('/maintenance/kpis')
+    await router.isReady()
+
+    const wrapper = mount(MaintenanceKpiDashboardView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(maintenanceKpiService.getKpis).toHaveBeenCalledWith(90)
+
+    await wrapper.find('select').setValue('30')
+    await flushPromises()
+
+    expect(maintenanceKpiService.getKpis).toHaveBeenLastCalledWith(30)
+  })
+
   it('usa cores claras no gráfico quando o tema está escuro', async () => {
     vi.mocked(maintenanceKpiService.getKpis).mockResolvedValue({ data: { status: 'success', data: mockKpis } } as any)
     vi.mocked(useThemeStore).mockReturnValue({ mode: 'dark', isDark: true, setMode: vi.fn() } as any)
