@@ -36,6 +36,7 @@ const KEY_NUMERIC_BOUNDS: Record<string, { min: number }> = {
   'audit.retention_days': { min: 1 },
   'wms.lot_expiry_alert_days': { min: 1 },
   'wms.task_delay_threshold_hours': { min: 1 },
+  'manutencao.ordem_atraso_horas': { min: 1 },
   'rate_limit.general.max_requests': { min: 1 },
   'rate_limit.general.window_ms': { min: 1000 },
   'rate_limit.login.max_requests': { min: 1 },

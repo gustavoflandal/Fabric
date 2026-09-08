@@ -33,6 +33,10 @@ import storageRuleRoutes from './storage-rule.routes';
 import workflowTemplateRoutes from './workflow-template.routes';
 import systemRoutes from './system.routes';
 import assistantRoutes from './assistant.routes';
+import equipmentRoutes from './equipment.routes';
+import maintenancePlanRoutes from './maintenance-plan.routes';
+import maintenanceOrderRoutes from './maintenance-order.routes';
+import maintenanceKpiRoutes from './maintenance-kpi.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -121,6 +125,14 @@ router.use('/reports', reportsRoutes);
 router.use('/purchase-quotations', requireModule('COMPRAS'), purchaseQuotationRoutes);
 router.use('/purchase-orders', requireModule('COMPRAS'), purchaseOrderRoutes);
 router.use('/purchase-receipts', requireModule('COMPRAS'), purchaseReceiptRoutes);
+
+// ============================================
+// MÓDULO MANUTENÇÃO (licenciável por instalação)
+// ============================================
+router.use('/equipment', requireModule('MANUTENCAO'), equipmentRoutes);
+router.use('/maintenance-plans', requireModule('MANUTENCAO'), maintenancePlanRoutes);
+router.use('/maintenance-orders', requireModule('MANUTENCAO'), maintenanceOrderRoutes);
+router.use('/maintenance', requireModule('MANUTENCAO'), maintenanceKpiRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);

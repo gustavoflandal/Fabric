@@ -229,6 +229,30 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/wms/WmsKpiDashboardView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/maintenance/equipment',
+    name: 'maintenance-equipment',
+    component: () => import('../views/maintenance/EquipmentListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/maintenance/plans',
+    name: 'maintenance-plans',
+    component: () => import('../views/maintenance/MaintenancePlanListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/maintenance/orders',
+    name: 'maintenance-orders',
+    component: () => import('../views/maintenance/MaintenanceOrderListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/maintenance/kpis',
+    name: 'maintenance-kpis',
+    component: () => import('../views/maintenance/MaintenanceKpiDashboardView.vue'),
+    meta: { requiresAuth: true }
+  },
 ]
 
 const router = createRouter({
