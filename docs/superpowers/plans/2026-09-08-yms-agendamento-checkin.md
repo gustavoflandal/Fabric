@@ -703,6 +703,13 @@ export class YardVisitService {
   async update(id: string, data: UpdateYardVisitDto) {
     const current = await prisma.yardVisit.findUnique({ where: { id } });
     if (!current) throw new AppError(404, 'Visita não encontrada');
+    // Depois do check-in o registro vira histórico de auditoria — só pode ser
+    // cancelado, nunca editado (mesma guarda de delete(), abaixo). Sem isso, um
+    // PUT numa visita CHECKED_IN/CANCELLED reescreveria retroativamente o
+    // cálculo de pontualidade de um registro que deveria ser imutável.
+    if (current.status !== 'SCHEDULED') {
+      throw new AppError(400, 'Só é possível editar agendamentos que ainda não fizeram check-in');
+    }
 
     const updateData: UpdateYardVisitDto = { ...data };
 
