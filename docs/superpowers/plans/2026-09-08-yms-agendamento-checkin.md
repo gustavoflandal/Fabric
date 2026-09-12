@@ -704,11 +704,14 @@ export class YardVisitService {
     const current = await prisma.yardVisit.findUnique({ where: { id } });
     if (!current) throw new AppError(404, 'Visita não encontrada');
 
+    const updateData: UpdateYardVisitDto = { ...data };
+
     if (data.purchaseOrderId) {
-      await assertPurchaseOrderExists(data.purchaseOrderId);
+      const po = await assertPurchaseOrderExists(data.purchaseOrderId);
+      updateData.supplierId = po.supplierId;
     }
 
-    return prisma.yardVisit.update({ where: { id }, data });
+    return prisma.yardVisit.update({ where: { id }, data: updateData });
   }
 
   async delete(id: string) {
