@@ -352,13 +352,15 @@
 
           <!-- Tab Content: YMS -->
           <div v-else-if="activeTab === 'yms' && authStore.canViewYMS" class="grid grid-cols-3 gap-3">
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
+            <RouterLink
+              to="/yard/visits"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
               <div class="text-center">
                 <div class="text-3xl mb-2">🚚</div>
-                <p class="text-sm font-medium text-gray-500">Agendamento</p>
-                <p class="text-xs text-gray-400 mt-1">Em breve</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Agendamento</p>
               </div>
-            </div>
+            </RouterLink>
             <RouterLink
               to="/yard/docks"
               class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
