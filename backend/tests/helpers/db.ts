@@ -17,11 +17,21 @@ export async function cleanDatabase(): Promise<void> {
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME != '_prisma_migrations'
   `;
 
-  await testPrisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
-  for (const { TABLE_NAME } of tables) {
-    await testPrisma.$executeRawUnsafe(`TRUNCATE TABLE \`${TABLE_NAME}\``);
-  }
-  await testPrisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1');
+  // `SET FOREIGN_KEY_CHECKS` e por sessao/conexao, nao por chamada. Disparado
+  // via `await` sequencial, cada `$executeRawUnsafe` pode ser servido por uma
+  // conexao diferente do pool interno do Prisma (o padrao cresce com o numero
+  // de CPUs do host) - nesse caso o `SET ... = 0` fica preso numa conexao que
+  // nunca roda o TRUNCATE seguinte, e o MySQL rejeita truncar uma tabela
+  // referenciada por FK (erro 1701). `$transaction([...])` (forma array, nao
+  // callback) fixa toda a sequencia numa unica conexao emprestada do pool.
+  // So foi observado em CI (pool maior por mais CPUs no runner) - nunca em
+  // execucao local - mas o bug de isolamento existe independente de quando
+  // ele decide aparecer.
+  await testPrisma.$transaction([
+    testPrisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0'),
+    ...tables.map(({ TABLE_NAME }) => testPrisma.$executeRawUnsafe(`TRUNCATE TABLE \`${TABLE_NAME}\``)),
+    testPrisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1'),
+  ]);
 }
 
 export async function disconnectTestDb(): Promise<void> {
