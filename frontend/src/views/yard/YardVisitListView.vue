@@ -282,7 +282,7 @@ const onPurchaseOrderChange = () => {
   const po = confirmedPurchaseOrders.value.find((p) => p.id === formData.value.purchaseOrderId)
   if (po) {
     formData.value.supplierId = po.supplierId
-    formData.value.scheduledAt = po.expectedDate.slice(0, 16)
+    formData.value.scheduledAt = toLocalDatetimeInputValue(po.expectedDate)
   }
 }
 
@@ -296,7 +296,7 @@ const openEditModal = (visit: YardVisit) => {
     serviceType: visit.serviceType,
     supplierId: visit.supplierId || '',
     purchaseOrderId: visit.purchaseOrderId || '',
-    scheduledAt: visit.scheduledAt.slice(0, 16),
+    scheduledAt: toLocalDatetimeInputValue(visit.scheduledAt),
     notes: visit.notes || '',
     driverId: '',
     vehicleId: '',
@@ -320,7 +320,7 @@ const handleSubmit = async () => {
         serviceType: formData.value.serviceType,
         supplierId: formData.value.supplierId || null,
         purchaseOrderId: formData.value.purchaseOrderId || null,
-        scheduledAt: formData.value.scheduledAt,
+        scheduledAt: fromLocalDatetimeInputValue(formData.value.scheduledAt),
         notes: formData.value.notes || null,
       }
       await yardVisitStore.updateVisit(editingVisit.value.id, data)
@@ -330,6 +330,7 @@ const handleSubmit = async () => {
         ...formData.value,
         supplierId: formData.value.supplierId || null,
         purchaseOrderId: formData.value.purchaseOrderId || null,
+        scheduledAt: fromLocalDatetimeInputValue(formData.value.scheduledAt),
         notes: formData.value.notes || null,
         driverId: isWalkIn.value ? formData.value.driverId : undefined,
         vehicleId: isWalkIn.value ? formData.value.vehicleId : undefined,
@@ -384,6 +385,20 @@ const handleCancel = async (visit: YardVisit) => {
 
 const asItem = (item: unknown) => item as YardVisit
 const formatDateTime = (iso: string) => new Date(iso).toLocaleString('pt-BR')
+
+// Converte um ISO UTC (vindo da API) para o formato que <input type="datetime-local">
+// espera, já no fuso horário LOCAL do navegador (não corta a string UTC direto).
+const toLocalDatetimeInputValue = (iso: string): string => {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// Converte o valor naive de <input type="datetime-local"> (interpretado como
+// horário LOCAL do navegador) para um ISO UTC de verdade, pronto pra mandar à API.
+const fromLocalDatetimeInputValue = (localValue: string): string => {
+  return new Date(localValue).toISOString()
+}
 
 onMounted(async () => {
   await Promise.all([

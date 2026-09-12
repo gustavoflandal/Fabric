@@ -194,6 +194,38 @@ describe('YardVisitListView', () => {
     expect(manualPayload.vehicleId).toBeUndefined()
   })
 
+  it('converte o horário local digitado no formulário para o instante UTC correto ao criar (sem deslocamento de fuso)', async () => {
+    vi.mocked(yardVisitService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [], pagination: { page: 1, limit: 100, total: 0, pages: 0 } },
+    } as any)
+    vi.mocked(yardVisitService.create).mockResolvedValue({ data: { status: 'success', data: mockVisit } } as any)
+
+    const router = makeRouter()
+    router.push('/yard/visits')
+    await router.isReady()
+
+    const wrapper = mount(YardVisitListView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    const novoButton = wrapper.findAll('button').find((b) => b.text().includes('Novo Agendamento'))!
+    await novoButton.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    await body.find('#visit-form-warehouse').setValue('wh-1')
+    await body.find('#visit-form-service-type').setValue('RECEBIMENTO')
+    await body.find('#visit-form-supplier').setValue('sup-1')
+    await body.find('#visit-form-scheduled-at').setValue('2026-12-01T10:00')
+    await body.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const payload = vi.mocked(yardVisitService.create).mock.calls[0][0] as any
+    // O valor mandado deve ser o ISO UTC correspondente ao horário LOCAL digitado
+    // (mesma referência de instante que new Date('2026-12-01T10:00') produz no
+    // ambiente de teste), não a string naive cortada direto do input.
+    expect(new Date(payload.scheduledAt).getTime()).toBe(new Date('2026-12-01T10:00').getTime())
+  })
+
   it('faz check-in direto (walk-in), informando motorista e veículo no próprio agendamento', async () => {
     vi.mocked(yardVisitService.getAll).mockResolvedValue({
       data: { status: 'success', data: [], pagination: { page: 1, limit: 100, total: 0, pages: 0 } },
