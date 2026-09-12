@@ -9,11 +9,27 @@ export const createYardVisitSchema = Joi.object({
     'any.only': 'Tipo de serviço inválido',
     'any.required': 'Tipo de serviço é obrigatório',
   }),
-  supplierId: Joi.string().uuid().allow(null).messages({
-    'string.guid': 'ID do fornecedor inválido',
-  }),
   purchaseOrderId: Joi.string().uuid().allow(null).messages({
     'string.guid': 'ID do pedido de compra inválido',
+  }),
+  // Fornecedor é obrigatório para qualquer serviço que não seja Expedição —
+  // exceto quando há purchaseOrderId, caso em que o service deriva o
+  // supplierId a partir do PO e o payload pode omiti-lo.
+  supplierId: Joi.when('purchaseOrderId', {
+    is: Joi.string().uuid().required(),
+    then: Joi.string().uuid().allow(null).messages({
+      'string.guid': 'ID do fornecedor inválido',
+    }),
+    otherwise: Joi.when('serviceType', {
+      is: 'EXPEDICAO',
+      then: Joi.string().uuid().allow(null).messages({
+        'string.guid': 'ID do fornecedor inválido',
+      }),
+      otherwise: Joi.string().uuid().required().messages({
+        'string.guid': 'ID do fornecedor inválido',
+        'any.required': 'Fornecedor é obrigatório para este tipo de serviço',
+      }),
+    }),
   }),
   scheduledAt: Joi.date().iso().required().messages({
     'any.required': 'Data/hora agendada é obrigatória',
