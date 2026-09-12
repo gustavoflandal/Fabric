@@ -109,12 +109,13 @@ export class VehicleService {
 
     const plate = data.plate ? normalizePlate(data.plate) : undefined;
     const supplierId = data.supplierId ?? current.supplierId;
+    const effectiveFleetId = data.fleetId !== undefined ? data.fleetId : current.fleetId;
 
     if (data.supplierId) {
       await assertSupplierExists(data.supplierId);
     }
-    if (data.fleetId) {
-      await assertFleetBelongsToSupplier(data.fleetId, supplierId);
+    if (effectiveFleetId) {
+      await assertFleetBelongsToSupplier(effectiveFleetId, supplierId);
     }
     if (plate) {
       await assertPlateNotTaken(plate, id);

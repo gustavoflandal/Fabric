@@ -142,6 +142,22 @@ describe('VehicleService', () => {
     ).rejects.toThrow('A frota informada pertence a outro fornecedor');
   });
 
+  it('rejeita atualizar apenas o fornecedor quando o veículo já tem frota do fornecedor ANTIGO (sem passar fleetId)', async () => {
+    const supplierAntigo = await createTestSupplier();
+    const supplierNovo = await createTestSupplier();
+    const fleetDoAntigo = await fleetService.create({ name: 'Frota Antiga', supplierId: supplierAntigo.id });
+    const vehicle = await vehicleService.create({
+      plate: 'ABC5005',
+      type: 'TRUCK',
+      supplierId: supplierAntigo.id,
+      fleetId: fleetDoAntigo.id,
+    });
+
+    await expect(
+      vehicleService.update(vehicle.id, { supplierId: supplierNovo.id })
+    ).rejects.toThrow('A frota informada pertence a outro fornecedor');
+  });
+
   it('permite reenviar a mesma placa do próprio veículo ao atualizar (exclui o próprio id da checagem)', async () => {
     const supplier = await createTestSupplier();
     const vehicle = await vehicleService.create({ plate: 'ABC5004', type: 'VAN', supplierId: supplier.id });
