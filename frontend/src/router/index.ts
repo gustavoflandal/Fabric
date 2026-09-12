@@ -230,6 +230,36 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/yard/docks',
+    name: 'yard-docks',
+    component: () => import('../views/yard/YardDockListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/yard/drivers',
+    name: 'yard-drivers',
+    component: () => import('../views/yard/DriverListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/yard/fleets',
+    name: 'yard-fleets',
+    component: () => import('../views/yard/FleetListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/yard/vehicles',
+    name: 'yard-vehicles',
+    component: () => import('../views/yard/VehicleListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/yard/warehouse-params',
+    name: 'yard-warehouse-params',
+    component: () => import('../views/yard/YardWarehouseParamsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/maintenance/equipment',
     name: 'maintenance-equipment',
     component: () => import('../views/maintenance/EquipmentListView.vue'),

@@ -1785,12 +1785,13 @@ export class VehicleService {
 
     const plate = data.plate ? normalizePlate(data.plate) : undefined;
     const supplierId = data.supplierId ?? current.supplierId;
+    const effectiveFleetId = data.fleetId !== undefined ? data.fleetId : current.fleetId;
 
-    if (data.fleetId) {
-      await assertFleetBelongsToSupplier(data.fleetId, supplierId);
-    }
     if (data.supplierId) {
       await assertSupplierExists(data.supplierId);
+    }
+    if (effectiveFleetId) {
+      await assertFleetBelongsToSupplier(effectiveFleetId, supplierId);
     }
     if (plate) {
       await assertPlateNotTaken(plate, id);
@@ -2625,10 +2626,10 @@ Criar `frontend/src/views/yard/YardDockListView.vue`:
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField id="dock-form-code" label="Código" required>
-            <input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input v-model="formData.code" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
           </FormField>
           <FormField id="dock-form-service-type" label="Tipo de Serviço" required>
-            <select v-model="formData.serviceType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <select v-model="formData.serviceType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
               <option value="RECEBIMENTO">Recebimento</option>
               <option value="EXPEDICAO">Expedição</option>
               <option value="MULTIUSO">Multiuso</option>
@@ -2637,7 +2638,7 @@ Criar `frontend/src/views/yard/YardDockListView.vue`:
         </div>
 
         <FormField id="dock-form-warehouse" label="Armazém" required>
-          <select v-model="formData.warehouseId" required :disabled="!!editingDock" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="formData.warehouseId" required :disabled="!!editingDock" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="wh in warehouseStore.warehouses" :key="wh.id" :value="wh.id">{{ wh.name }}</option>
           </select>
@@ -2649,7 +2650,7 @@ Criar `frontend/src/views/yard/YardDockListView.vue`:
               v-model="positionCodeInput"
               type="text"
               placeholder="Ex.: WH1-R01-01-01"
-              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
             />
             <Button type="button" variant="outline" @click="handleLookupPosition">Buscar</Button>
           </div>
@@ -3201,7 +3202,7 @@ Criar `frontend/src/views/yard/DriverListView.vue`:
             v-model="filters.search"
             type="text"
             placeholder="Nome ou CPF..."
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
             @input="debouncedFilterChange"
           />
         </FormField>
@@ -3266,13 +3267,13 @@ Criar `frontend/src/views/yard/DriverListView.vue`:
     >
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <FormField id="driver-form-name" label="Nome" required>
-          <input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          <input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
         </FormField>
         <FormField id="driver-form-cpf" label="CPF (somente números)" required>
-          <input v-model="formData.cpf" type="text" required maxlength="11" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          <input v-model="formData.cpf" type="text" required maxlength="11" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
         </FormField>
         <FormField id="driver-form-supplier" label="Fornecedor" required>
-          <select v-model="formData.supplierId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="formData.supplierId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="sup in supplierStore.suppliers" :key="sup.id" :value="sup.id">{{ sup.name }}</option>
           </select>
@@ -3288,7 +3289,7 @@ Criar `frontend/src/views/yard/DriverListView.vue`:
     <AppModal v-model="showBlockModal" title="Bloquear Motorista" @close="closeBlockModal">
       <form id="driver-block-form" @submit.prevent="handleConfirmBlock" class="space-y-4">
         <FormField id="driver-block-reason" label="Motivo do bloqueio" required>
-          <textarea v-model="blockReasonInput" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+          <textarea v-model="blockReasonInput" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"></textarea>
         </FormField>
         <div class="flex gap-3 pt-4">
           <Button type="button" variant="outline" @click="closeBlockModal" class="flex-1">Cancelar</Button>
@@ -3843,10 +3844,10 @@ Criar `frontend/src/views/yard/FleetListView.vue`:
     >
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <FormField id="fleet-form-name" label="Nome" required>
-          <input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          <input v-model="formData.name" type="text" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
         </FormField>
         <FormField id="fleet-form-supplier" label="Fornecedor" required>
-          <select v-model="formData.supplierId" required :disabled="!!editingFleet" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="formData.supplierId" required :disabled="!!editingFleet" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="sup in supplierStore.suppliers" :key="sup.id" :value="sup.id">{{ sup.name }}</option>
           </select>
@@ -3865,7 +3866,7 @@ Criar `frontend/src/views/yard/FleetListView.vue`:
           Bloquear esta frota também bloqueia {{ blockingFleet._count?.vehicles ?? 0 }} veículo(s) vinculado(s) a ela.
         </p>
         <FormField id="fleet-block-reason" label="Motivo do bloqueio" required>
-          <textarea v-model="blockReasonInput" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+          <textarea v-model="blockReasonInput" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"></textarea>
         </FormField>
         <div class="flex gap-3 pt-4">
           <Button type="button" variant="outline" @click="closeBlockModal" class="flex-1">Cancelar</Button>
@@ -4402,7 +4403,7 @@ Criar `frontend/src/views/yard/VehicleListView.vue`:
             v-model="filters.search"
             type="text"
             placeholder="Placa..."
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
             @input="debouncedFilterChange"
           />
         </FormField>
@@ -4480,28 +4481,28 @@ Criar `frontend/src/views/yard/VehicleListView.vue`:
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField id="vehicle-form-plate" label="Placa" required>
-            <input v-model="formData.plate" type="text" required maxlength="7" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase" />
+            <input v-model="formData.plate" type="text" required maxlength="7" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
           </FormField>
           <FormField id="vehicle-form-type" label="Tipo de Rodado" required>
-            <select v-model="formData.type" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <select v-model="formData.type" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
               <option v-for="type in VEHICLE_TYPES" :key="type" :value="type">{{ VEHICLE_TYPE_LABELS[type] }}</option>
             </select>
           </FormField>
         </div>
 
         <FormField id="vehicle-form-model" label="Modelo (opcional)">
-          <input v-model="formData.model" type="text" placeholder="Ex.: Volvo FH" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+          <input v-model="formData.model" type="text" placeholder="Ex.: Volvo FH" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
         </FormField>
 
         <FormField id="vehicle-form-supplier" label="Fornecedor" required>
-          <select v-model="formData.supplierId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="formData.fleetId = ''">
+          <select v-model="formData.supplierId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" @change="formData.fleetId = ''">
             <option value="">Selecione...</option>
             <option v-for="sup in supplierStore.suppliers" :key="sup.id" :value="sup.id">{{ sup.name }}</option>
           </select>
         </FormField>
 
         <FormField id="vehicle-form-fleet" label="Frota (opcional)">
-          <select v-model="formData.fleetId" :disabled="!formData.supplierId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="formData.fleetId" :disabled="!formData.supplierId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Nenhuma</option>
             <option v-for="fleet in fleetsForSelectedSupplier" :key="fleet.id" :value="fleet.id">{{ fleet.name }}</option>
           </select>
@@ -4517,7 +4518,7 @@ Criar `frontend/src/views/yard/VehicleListView.vue`:
     <AppModal v-model="showBlockModal" title="Bloquear Veículo" @close="closeBlockModal">
       <form id="vehicle-block-form" @submit.prevent="handleConfirmBlock" class="space-y-4">
         <FormField id="vehicle-block-reason" label="Motivo do bloqueio" required>
-          <textarea v-model="blockReasonInput" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"></textarea>
+          <textarea v-model="blockReasonInput" rows="3" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"></textarea>
         </FormField>
         <div class="flex gap-3 pt-4">
           <Button type="button" variant="outline" @click="closeBlockModal" class="flex-1">Cancelar</Button>
@@ -4740,7 +4741,7 @@ git commit -m "feat(yms): adiciona CRUD de Veículos ao frontend"
 - Create: `frontend/src/views/yard/YardWarehouseParamsView.vue`
 - Create: `frontend/src/views/yard/__tests__/YardWarehouseParamsView.spec.ts`
 - Modify: `frontend/src/router/index.ts`
-- Modify: `frontend/src/views/DashboardView.vue`
+- Modify: `frontend/src/views/yard/YardDockListView.vue`
 
 **Interfaces:**
 - Consumes: `GET/PUT /yard-warehouse-params/:warehouseId` (Task 6); `useWarehouseStore` (já existente).
@@ -4920,7 +4921,7 @@ Criar `frontend/src/views/yard/YardWarehouseParamsView.vue`:
             min="0"
             max="60"
             required
-            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100"
           />
         </FormField>
 

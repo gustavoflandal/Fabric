@@ -39,7 +39,7 @@ async function main() {
     { code: 'PCP', enabled: true, core: true },
     { code: 'COMPRAS', enabled: true, core: false },
     { code: 'WMS', enabled: true, core: false },
-    { code: 'YMS', enabled: false, core: false },
+    { code: 'YMS', enabled: true, core: false },
     { code: 'MANUTENCAO', enabled: true, core: false },
   ];
 
@@ -152,6 +152,10 @@ async function main() {
     { resource: 'manutencao', action: 'visualizar', description: 'Visualizar equipamentos, planos e ordens de manutenção' },
     { resource: 'manutencao', action: 'executar', description: 'Iniciar/concluir ordens de manutenção e abrir corretivas' },
     { resource: 'manutencao', action: 'gerenciar', description: 'Gerenciar equipamentos, planos, cancelar/reatribuir ordens de manutenção' },
+
+    // YMS (Pátio - Fase 1)
+    { resource: 'yard', action: 'visualizar', description: 'Visualizar docas, motoristas, veículos e frotas do pátio' },
+    { resource: 'yard', action: 'gerenciar', description: 'Gerenciar docas, motoristas, veículos, frotas e parâmetros de pátio' },
 
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
@@ -521,6 +525,7 @@ async function main() {
     relatorios_contagem: ['visualizar'],
     assistente_ia: ['usar'],
     manutencao: ['visualizar', 'executar', 'gerenciar'],
+    yard: ['visualizar', 'gerenciar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
     audit_logs: ['read'],
     roles: ['read'],
@@ -558,6 +563,7 @@ async function main() {
     relatorios_contagem: ['visualizar'],
     assistente_ia: ['usar'],
     manutencao: ['visualizar', 'executar'],
+    yard: ['visualizar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
   };
 

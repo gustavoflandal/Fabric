@@ -37,6 +37,11 @@ import equipmentRoutes from './equipment.routes';
 import maintenancePlanRoutes from './maintenance-plan.routes';
 import maintenanceOrderRoutes from './maintenance-order.routes';
 import maintenanceKpiRoutes from './maintenance-kpi.routes';
+import yardDockRoutes from './yard-dock.routes';
+import driverRoutes from './driver.routes';
+import fleetRoutes from './fleet.routes';
+import vehicleRoutes from './vehicle.routes';
+import yardWarehouseParamsRoutes from './yard-warehouse-params.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -133,6 +138,15 @@ router.use('/equipment', requireModule('MANUTENCAO'), equipmentRoutes);
 router.use('/maintenance-plans', requireModule('MANUTENCAO'), maintenancePlanRoutes);
 router.use('/maintenance-orders', requireModule('MANUTENCAO'), maintenanceOrderRoutes);
 router.use('/maintenance', requireModule('MANUTENCAO'), maintenanceKpiRoutes);
+
+// ============================================
+// MÓDULO YMS (licenciável por instalação)
+// ============================================
+router.use('/yard-docks', requireModule('YMS'), yardDockRoutes);
+router.use('/drivers', requireModule('YMS'), driverRoutes);
+router.use('/fleets', requireModule('YMS'), fleetRoutes);
+router.use('/vehicles', requireModule('YMS'), vehicleRoutes);
+router.use('/yard-warehouse-params', requireModule('YMS'), yardWarehouseParamsRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);

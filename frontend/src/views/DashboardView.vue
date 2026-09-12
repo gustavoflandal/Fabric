@@ -359,13 +359,42 @@
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
               </div>
             </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
+            <RouterLink
+              to="/yard/docks"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
               <div class="text-center">
                 <div class="text-3xl mb-2">🚪</div>
-                <p class="text-sm font-medium text-gray-500">Docas</p>
-                <p class="text-xs text-gray-400 mt-1">Em breve</p>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Docas</p>
               </div>
-            </div>
+            </RouterLink>
+            <RouterLink
+              to="/yard/drivers"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🧑‍✈️</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Motoristas</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/yard/fleets"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🚛</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Frotas</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/yard/vehicles"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🚗</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Veículos</p>
+              </div>
+            </RouterLink>
             <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>

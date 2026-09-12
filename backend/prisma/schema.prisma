@@ -237,6 +237,9 @@ model Supplier {
   // Fase 5 do WMS: o fornecedor de um lote. Opcional do lado do lote (nem todo
   // lote vem de compra), por isso aqui e uma lista que pode ficar vazia.
   lots           Lot[]
+  fleets         Fleet[]
+  drivers        Driver[]
+  vehicles       Vehicle[]
 
   @@map("suppliers")
 }
@@ -318,7 +321,7 @@ model Product {
   // aplicada aqui a PRODUTO: um produto sem lote controlado percorre todos os
   // fluxos exatamente como antes desta fase, sem uma linha de comportamento
   // diferente.
-  lotTracked       Boolean @default(false)
+  lotTracked Boolean @default(false)
 
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -492,9 +495,9 @@ model ProductCategory {
   description String?
   parentId    String?
 
-  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children ProductCategory[] @relation("CategoryHierarchy")
-  products Product[]
+  parent       ProductCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     ProductCategory[] @relation("CategoryHierarchy")
+  products     Product[]
   // F4.6: regra de armazenagem por CATEGORIA (ver `StorageRule`).
   storageRules StorageRule[]
 
@@ -1363,6 +1366,8 @@ model Warehouse {
   updatedAt   DateTime @updatedAt
 
   structures WarehouseStructure[]
+  yardParams YardWarehouseParams?
+  yardDocks  YardDock[]
 
   @@map("warehouses")
 }
@@ -1455,6 +1460,7 @@ model StoragePosition {
   warehouseTasksFrom    WarehouseTask[]        @relation("WarehouseTaskFrom")
   warehouseTasksTo      WarehouseTask[]        @relation("WarehouseTaskTo")
   receiptPutaways       ReceiptPutaway[]
+  yardDock              YardDock?
 
   @@unique([structureId, floor, position])
   @@index([warehouseCode, streetCode])
@@ -1659,16 +1665,16 @@ model WorkflowTemplate {
 }
 
 model WorkflowNode {
-  id         String           @id @default(uuid())
-  templateId String
-  type       WorkflowNodeType
-  label      String?
+  id            String           @id @default(uuid())
+  templateId    String
+  type          WorkflowNodeType
+  label         String?
   // ConditionRule serializado — só usado quando type = DECISAO.
   conditionRule Json?
   // Só layout do canvas (arrastar-e-soltar livre) — não participa da
   // resolução do grafo.
-  positionX  Float
-  positionY  Float
+  positionX     Float
+  positionY     Float
 
   // Cascade: apagar o template apaga seus nós/arestas — não faz sentido nó
   // órfão de template nenhum.
@@ -1773,7 +1779,7 @@ model WarehouseTask {
   // reposicao, que herda o lote da linha de saldo de origem. NULL para tarefa
   // de produto sem `lotTracked` e para toda a cadeia de recebimento, onde o
   // lote mora em `PurchaseReceiptItem` ate a alocacao acontecer.
-  lotId     String?
+  lotId String?
 
   priority   Int     @default(0)
   assignedTo String?
@@ -2023,4 +2029,102 @@ model MaintenanceOrder {
 
   @@index([status, createdAt])
   @@map("maintenance_orders")
+}
+
+// ============================================
+// YMS - YARD MANAGEMENT SYSTEM (Fase 1: Cadastros Base)
+// ============================================
+
+enum DockServiceType {
+  RECEBIMENTO
+  EXPEDICAO
+  MULTIUSO
+}
+
+enum VehicleType {
+  TRUCK
+  TOCO
+  CAVALO
+  MECANICO
+  VAN
+  UTILITARIO
+  OUTROS
+}
+
+model YardWarehouseParams {
+  id                    String   @id @default(uuid())
+  warehouseId           String   @unique
+  useYard               Boolean  @default(true)
+  delayToleranceMinutes Int      @default(15)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@map("yard_warehouse_params")
+}
+
+model YardDock {
+  id                String          @id @default(uuid())
+  code              String
+  serviceType       DockServiceType
+  warehouseId       String
+  storagePositionId String?         @unique
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  warehouse       Warehouse        @relation(fields: [warehouseId], references: [id])
+  storagePosition StoragePosition? @relation(fields: [storagePositionId], references: [id], onDelete: SetNull)
+
+  @@unique([warehouseId, code])
+  @@map("yard_docks")
+}
+
+model Fleet {
+  id            String   @id @default(uuid())
+  name          String
+  supplierId    String
+  blocked       Boolean  @default(false)
+  blockedReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier Supplier  @relation(fields: [supplierId], references: [id])
+  vehicles Vehicle[]
+
+  @@map("fleets")
+}
+
+model Driver {
+  id            String   @id @default(uuid())
+  name          String
+  cpf           String   @unique
+  supplierId    String
+  blocked       Boolean  @default(false)
+  blockedReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  @@map("drivers")
+}
+
+model Vehicle {
+  id            String      @id @default(uuid())
+  plate         String      @unique
+  type          VehicleType
+  model         String?
+  supplierId    String
+  fleetId       String?
+  blocked       Boolean     @default(false)
+  blockedReason String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  fleet    Fleet?   @relation(fields: [fleetId], references: [id], onDelete: SetNull)
+
+  @@map("vehicles")
 }

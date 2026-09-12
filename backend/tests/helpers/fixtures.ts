@@ -339,6 +339,14 @@ export async function createTestPositions(
 let supplierCounter = 0;
 let orderCounter = 0;
 
+/** Cria um fornecedor de teste standalone — usado por Task 3+ (Driver, Fleet, Vehicle). */
+export async function createTestSupplier() {
+  supplierCounter += 1;
+  return testPrisma.supplier.create({
+    data: { code: `SUP-TEST-${supplierCounter}`, name: `Fornecedor de Teste ${supplierCounter}` },
+  });
+}
+
 /**
  * F4.3 do plano do WMS: pedido de compra CONFIRMADO pronto para ser recebido —
  * o gatilho do recebimento nos dois modos (com e sem WMS licenciado).
