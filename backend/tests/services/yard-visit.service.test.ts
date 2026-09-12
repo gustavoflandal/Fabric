@@ -252,6 +252,29 @@ describe('YardVisitService', () => {
     });
   });
 
+  describe('update', () => {
+    it('re-deriva supplierId a partir do novo purchaseOrderId ao atualizar a visita', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      const supplierA = await createTestSupplier();
+      const supplierB = await createTestSupplier();
+      const expectedDate = new Date(Date.now() + 7200_000);
+      const poA = await createTestPurchaseOrderMinimal(supplierA.id, expectedDate);
+      const poB = await createTestPurchaseOrderMinimal(supplierB.id, expectedDate);
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id,
+        serviceType: 'RECEBIMENTO',
+        purchaseOrderId: poA.id,
+        scheduledAt: expectedDate,
+      });
+      expect(visit.supplierId).toBe(supplierA.id);
+
+      const updated = await yardVisitService.update(visit.id, { purchaseOrderId: poB.id });
+
+      expect(updated.purchaseOrderId).toBe(poB.id);
+      expect(updated.supplierId).toBe(supplierB.id);
+    });
+  });
+
   it('lista visitas filtrando por armazém e status', async () => {
     const { warehouse: wh1 } = await createTestPositions(1, { positionType: 'DOCA' });
     const { warehouse: wh2 } = await createTestPositions(1, { positionType: 'DOCA' });
