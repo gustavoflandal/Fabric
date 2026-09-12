@@ -4480,7 +4480,7 @@ Criar `frontend/src/views/yard/VehicleListView.vue`:
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField id="vehicle-form-plate" label="Placa" required>
-            <input v-model="formData.plate" type="text" required maxlength="7" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase" />
+            <input v-model="formData.plate" type="text" required maxlength="7" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 uppercase dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
           </FormField>
           <FormField id="vehicle-form-type" label="Tipo de Rodado" required>
             <select v-model="formData.type" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
