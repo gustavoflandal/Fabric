@@ -208,9 +208,9 @@ const PUNCTUALITY_LABELS: Record<Exclude<PunctualityStatus, null>, string> = {
   ANTECIPADO: 'Antecipado',
   ATRASADO: 'Atrasado',
 }
-const PUNCTUALITY_TONES: Record<Exclude<PunctualityStatus, null>, 'success' | 'warning' | 'danger'> = {
+const PUNCTUALITY_TONES: Record<Exclude<PunctualityStatus, null>, 'success' | 'info' | 'danger'> = {
   NO_HORARIO: 'success',
-  ANTECIPADO: 'warning',
+  ANTECIPADO: 'info',
   ATRASADO: 'danger',
 }
 
