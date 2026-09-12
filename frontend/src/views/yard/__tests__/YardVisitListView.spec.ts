@@ -47,13 +47,20 @@ const mockVisit = {
   driverId: null,
   vehicleId: null,
   checkedInAt: null,
-  punctuality: null,
+  punctuality: 'ANTECIPADO',
   createdAt: '',
   updatedAt: '',
   warehouse: { id: 'wh-1', code: 'WH-1', name: 'Armazém Central' },
   supplier: { id: 'sup-1', code: 'SUP-1', name: 'Transportadora Alfa' },
   driver: null,
   vehicle: null,
+}
+
+const mockCancelledVisit = {
+  ...mockVisit,
+  id: 'visit-2',
+  status: 'CANCELLED',
+  punctuality: null,
 }
 
 function makeRouter() {
@@ -91,7 +98,7 @@ describe('YardVisitListView', () => {
     document.body.innerHTML = ''
   })
 
-  it('carrega e exibe a lista de visitas, sem pontualidade para agendamentos ainda pendentes', async () => {
+  it('carrega e exibe a lista de visitas, mostrando a pontualidade quando presente', async () => {
     vi.mocked(yardVisitService.getAll).mockResolvedValue({
       data: { status: 'success', data: [mockVisit], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
     } as any)
@@ -105,6 +112,25 @@ describe('YardVisitListView', () => {
 
     expect(wrapper.text()).toContain('Armazém Central')
     expect(wrapper.text()).toContain('Transportadora Alfa')
+    expect(wrapper.text()).toContain('Antecipado')
+  })
+
+  it('não exibe pontualidade para visitas canceladas', async () => {
+    vi.mocked(yardVisitService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [mockCancelledVisit], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+
+    const router = makeRouter()
+    router.push('/yard/visits')
+    await router.isReady()
+
+    const wrapper = mount(YardVisitListView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Armazém Central')
+    expect(wrapper.text()).not.toContain('No horário')
+    expect(wrapper.text()).not.toContain('Antecipado')
+    expect(wrapper.text()).not.toContain('Atrasado')
   })
 
   it('faz check-in de um agendamento, informando motorista e veículo', async () => {
@@ -162,6 +188,47 @@ describe('YardVisitListView', () => {
 
     expect(yardVisitService.create).toHaveBeenCalledWith(
       expect.objectContaining({ warehouseId: 'wh-1', serviceType: 'RECEBIMENTO', supplierId: 'sup-1' })
+    )
+    const manualPayload = vi.mocked(yardVisitService.create).mock.calls[0][0] as any
+    expect(manualPayload.driverId).toBeUndefined()
+    expect(manualPayload.vehicleId).toBeUndefined()
+  })
+
+  it('faz check-in direto (walk-in), informando motorista e veículo no próprio agendamento', async () => {
+    vi.mocked(yardVisitService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [], pagination: { page: 1, limit: 100, total: 0, pages: 0 } },
+    } as any)
+    vi.mocked(yardVisitService.create).mockResolvedValue({ data: { status: 'success', data: mockVisit } } as any)
+
+    const router = makeRouter()
+    router.push('/yard/visits')
+    await router.isReady()
+
+    const wrapper = mount(YardVisitListView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    const walkInButton = wrapper.findAll('button').find((b) => b.text().includes('Check-in Direto'))!
+    await walkInButton.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    await body.find('#visit-form-warehouse').setValue('wh-1')
+    await body.find('#visit-form-service-type').setValue('RECEBIMENTO')
+    await body.find('#visit-form-supplier').setValue('sup-1')
+    await body.find('#visit-form-scheduled-at').setValue('2026-12-01T10:00')
+    await body.find('#visit-form-driver').setValue(mockDriver.id)
+    await body.find('#visit-form-vehicle').setValue(mockVehicle.id)
+    await body.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(yardVisitService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        warehouseId: 'wh-1',
+        serviceType: 'RECEBIMENTO',
+        supplierId: 'sup-1',
+        driverId: mockDriver.id,
+        vehicleId: mockVehicle.id,
+      })
     )
   })
 

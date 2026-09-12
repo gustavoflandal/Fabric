@@ -175,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useYardVisitStore } from '@/stores/yard-visit.store'
 import { useWarehouseStore } from '@/stores/warehouse.store'
 import { useSupplierStore } from '@/stores/supplier.store'
