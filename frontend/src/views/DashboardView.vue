@@ -368,6 +368,15 @@
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Docas</p>
               </div>
             </RouterLink>
+            <RouterLink
+              to="/yard/drivers"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🧑‍✈️</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Motoristas</p>
+              </div>
+            </RouterLink>
             <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
                 <div class="text-3xl mb-2">📋</div>
