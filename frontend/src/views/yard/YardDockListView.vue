@@ -1,6 +1,7 @@
 <template>
   <AppLayout title="Docas" subtitle="Gerencie as docas de carga e descarga do pátio">
     <template #actions>
+      <RouterLink to="/yard/warehouse-params" class="text-sm text-primary-600 hover:underline mr-4 self-center">Parâmetros de Pátio</RouterLink>
       <Button @click="openCreateModal"><span class="mr-2">+</span>Nova Doca</Button>
     </template>
 
@@ -140,6 +141,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useYardDockStore } from '@/stores/yard-dock.store'
 import { useWarehouseStore } from '@/stores/warehouse.store'
 import { storagePositionService } from '@/services/storage-position.service'
