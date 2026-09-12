@@ -59,6 +59,19 @@ describe('YardVisitService', () => {
     expect(visit.supplierId).toBe(supplier.id);
   });
 
+  it('rejeita criar com supplierId inexistente com erro 400 claro, não 500 do Prisma', async () => {
+    const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+
+    await expect(
+      yardVisitService.create({
+        warehouseId: warehouse.id,
+        serviceType: 'RECEBIMENTO',
+        supplierId: '99999999-9999-9999-9999-999999999999',
+        scheduledAt: new Date(Date.now() + 3600_000),
+      })
+    ).rejects.toThrow('Fornecedor informado não existe');
+  });
+
   it('cria um walk-in (check-in direto) já com motorista e veículo, em status CHECKED_IN', async () => {
     const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
     const supplier = await createTestSupplier();
@@ -208,6 +221,33 @@ describe('YardVisitService', () => {
     });
   });
 
+  describe('create — walk-in (check-in direto) bloqueado pela mesma validação de checkIn', () => {
+    it('rejeita walk-in com motorista bloqueado e NÃO persiste nenhum registro', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'Bloqueado Walk-in', cpf: '12312312312', supplierId: supplier.id });
+      await driverService.setBlocked(driver.id, true, 'CNH vencida');
+      const vehicle = await vehicleService.create({ plate: 'WLK1111', type: 'TRUCK', supplierId: supplier.id });
+
+      await expect(
+        yardVisitService.create({
+          warehouseId: warehouse.id,
+          serviceType: 'RECEBIMENTO',
+          supplierId: supplier.id,
+          scheduledAt: new Date(),
+          driverId: driver.id,
+          vehicleId: vehicle.id,
+        })
+      ).rejects.toThrow('Motorista está bloqueado');
+
+      // Prova que a ordem "validar antes de inserir" foi respeitada: nenhum
+      // registro deve ter sido gravado no banco pra esse walk-in reprovado.
+      const persisted = await testPrisma.yardVisit.findFirst({ where: { vehicleId: vehicle.id } });
+      expect(persisted).toBeNull();
+      expect(await testPrisma.yardVisit.count()).toBe(0);
+    });
+  });
+
   describe('delete e cancel', () => {
     it('permite excluir um agendamento em SCHEDULED', async () => {
       const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
@@ -272,6 +312,21 @@ describe('YardVisitService', () => {
 
       expect(updated.purchaseOrderId).toBe(poB.id);
       expect(updated.supplierId).toBe(supplierB.id);
+    });
+
+    it('rejeita editar uma visita já em CHECKED_IN — vira histórico de auditoria imutável', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'D7', cpf: '13131313131', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'ABC1313', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+
+      await expect(yardVisitService.update(visit.id, { notes: 'Tentando reescrever histórico' })).rejects.toThrow(
+        'Só é possível editar agendamentos que ainda não fizeram check-in'
+      );
     });
   });
 

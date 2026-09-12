@@ -41,6 +41,16 @@ function computePunctuality(scheduledAt: Date, referenceTime: Date, toleranceMin
   return diffMinutes < 0 ? 'ANTECIPADO' : 'ATRASADO';
 }
 
+// Lógica pura de "dado os params do armazém + a visita, calcula a pontualidade".
+// Reutilizada tanto pelo caminho de um item só (attachPunctuality) quanto pelo
+// caminho em lote (getAll, que monta um cache de params por armazém pra não
+// repetir a mesma query de yardWarehouseParams por visita).
+function derivePunctuality(visit: { status: string; scheduledAt: Date; checkedInAt: Date | null }, params: { delayToleranceMinutes: number }): PunctualityStatus | null {
+  if (visit.status === 'CANCELLED') return null;
+  const referenceTime = visit.checkedInAt ?? new Date();
+  return computePunctuality(visit.scheduledAt, referenceTime, params.delayToleranceMinutes);
+}
+
 const assertWarehouseExists = async (warehouseId: string) => {
   const warehouse = await prisma.warehouse.findUnique({ where: { id: warehouseId } });
   if (!warehouse) throw new AppError(400, 'Armazém informado não existe');
@@ -50,6 +60,11 @@ const assertPurchaseOrderExists = async (purchaseOrderId: string) => {
   const po = await prisma.purchaseOrder.findUnique({ where: { id: purchaseOrderId } });
   if (!po) throw new AppError(400, 'Pedido de compra informado não existe');
   return po;
+};
+
+const assertSupplierExists = async (supplierId: string) => {
+  const supplier = await prisma.supplier.findUnique({ where: { id: supplierId } });
+  if (!supplier) throw new AppError(400, 'Fornecedor informado não existe');
 };
 
 const runCheckInValidations = async (visit: { supplierId: string | null }, driverId: string, vehicleId: string) => {
@@ -84,6 +99,8 @@ export class YardVisitService {
     if (data.purchaseOrderId) {
       const po = await assertPurchaseOrderExists(data.purchaseOrderId);
       supplierId = po.supplierId;
+    } else if (supplierId) {
+      await assertSupplierExists(supplierId);
     }
 
     const isWalkIn = !!data.driverId && !!data.vehicleId;
@@ -92,20 +109,22 @@ export class YardVisitService {
       await runCheckInValidations({ supplierId }, data.driverId!, data.vehicleId!);
     }
 
-    return prisma.yardVisit.create({
+    const result = await prisma.yardVisit.create({
       data: {
         warehouseId: data.warehouseId,
         serviceType: data.serviceType,
         supplierId,
         purchaseOrderId: data.purchaseOrderId ?? null,
         scheduledAt: data.scheduledAt,
-        notes: data.notes ?? null,
+        notes: data.notes || null,
         status: isWalkIn ? 'CHECKED_IN' : 'SCHEDULED',
         driverId: isWalkIn ? data.driverId : null,
         vehicleId: isWalkIn ? data.vehicleId : null,
         checkedInAt: isWalkIn ? new Date() : null,
       },
     });
+
+    return this.getById(result.id);
   }
 
   async getAll(page = 1, limit = 100, filters?: YardVisitFilters) {
@@ -133,7 +152,19 @@ export class YardVisitService {
       prisma.yardVisit.count({ where }),
     ]);
 
-    const withPunctuality = await Promise.all(visits.map((v) => this.attachPunctuality(v)));
+    // Evita N+1: busca os params de cada armazém ÚNICO presente no lote uma
+    // única vez (não uma query por visita), e reusa o cache pra montar a
+    // pontualidade inline com a mesma lógica pura de attachPunctuality.
+    const uniqueWarehouseIds = [...new Set(visits.map((v) => v.warehouseId))];
+    const paramsEntries = await Promise.all(
+      uniqueWarehouseIds.map(async (warehouseId) => [warehouseId, await yardWarehouseParamsService.getByWarehouseId(warehouseId)] as const)
+    );
+    const paramsCache = new Map(paramsEntries);
+
+    const withPunctuality = visits.map((v) => ({
+      ...v,
+      punctuality: derivePunctuality(v, paramsCache.get(v.warehouseId)!),
+    }));
 
     return { data: withPunctuality, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
   }
@@ -155,23 +186,31 @@ export class YardVisitService {
   private async attachPunctuality(visit: any) {
     if (visit.status === 'CANCELLED') return { ...visit, punctuality: null };
     const params = await yardWarehouseParamsService.getByWarehouseId(visit.warehouseId);
-    const referenceTime = visit.checkedInAt ?? new Date();
-    const punctuality = computePunctuality(visit.scheduledAt, referenceTime, params.delayToleranceMinutes);
-    return { ...visit, punctuality };
+    return { ...visit, punctuality: derivePunctuality(visit, params) };
   }
 
   async update(id: string, data: UpdateYardVisitDto) {
     const current = await prisma.yardVisit.findUnique({ where: { id } });
     if (!current) throw new AppError(404, 'Visita não encontrada');
+    if (current.status !== 'SCHEDULED') {
+      throw new AppError(400, 'Só é possível editar agendamentos que ainda não fizeram check-in');
+    }
 
     const updateData: UpdateYardVisitDto = { ...data };
 
     if (data.purchaseOrderId) {
       const po = await assertPurchaseOrderExists(data.purchaseOrderId);
       updateData.supplierId = po.supplierId;
+    } else if (data.supplierId) {
+      await assertSupplierExists(data.supplierId);
     }
 
-    return prisma.yardVisit.update({ where: { id }, data: updateData });
+    if (data.notes !== undefined) {
+      updateData.notes = data.notes || null;
+    }
+
+    const result = await prisma.yardVisit.update({ where: { id }, data: updateData });
+    return this.getById(result.id);
   }
 
   async delete(id: string) {
@@ -206,7 +245,8 @@ export class YardVisitService {
     if (visit.status === 'CANCELLED') {
       throw new AppError(400, 'Esta visita já está cancelada');
     }
-    return prisma.yardVisit.update({ where: { id }, data: { status: 'CANCELLED' } });
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { status: 'CANCELLED' } });
+    return { ...updated, punctuality: null };
   }
 }
 
