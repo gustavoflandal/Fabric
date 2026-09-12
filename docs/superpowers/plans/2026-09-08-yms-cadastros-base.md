@@ -4740,7 +4740,7 @@ git commit -m "feat(yms): adiciona CRUD de Veículos ao frontend"
 - Create: `frontend/src/views/yard/YardWarehouseParamsView.vue`
 - Create: `frontend/src/views/yard/__tests__/YardWarehouseParamsView.spec.ts`
 - Modify: `frontend/src/router/index.ts`
-- Modify: `frontend/src/views/DashboardView.vue`
+- Modify: `frontend/src/views/yard/YardDockListView.vue`
 
 **Interfaces:**
 - Consumes: `GET/PUT /yard-warehouse-params/:warehouseId` (Task 6); `useWarehouseStore` (já existente).
