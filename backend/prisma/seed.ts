@@ -156,6 +156,8 @@ async function main() {
     // YMS (Pátio - Fase 1)
     { resource: 'yard', action: 'visualizar', description: 'Visualizar docas, motoristas, veículos e frotas do pátio' },
     { resource: 'yard', action: 'gerenciar', description: 'Gerenciar docas, motoristas, veículos, frotas e parâmetros de pátio' },
+    // YMS (Pátio - Etapa 2: Agendamento e Check-in)
+    { resource: 'yard', action: 'executar', description: 'Criar agendamentos e fazer check-in de veículos no pátio' },
 
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
@@ -525,7 +527,7 @@ async function main() {
     relatorios_contagem: ['visualizar'],
     assistente_ia: ['usar'],
     manutencao: ['visualizar', 'executar', 'gerenciar'],
-    yard: ['visualizar', 'gerenciar'],
+    yard: ['visualizar', 'executar', 'gerenciar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
     audit_logs: ['read'],
     roles: ['read'],
@@ -563,7 +565,7 @@ async function main() {
     relatorios_contagem: ['visualizar'],
     assistente_ia: ['usar'],
     manutencao: ['visualizar', 'executar'],
-    yard: ['visualizar'],
+    yard: ['visualizar', 'executar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
   };
 

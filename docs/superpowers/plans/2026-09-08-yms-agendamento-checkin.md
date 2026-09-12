@@ -703,12 +703,22 @@ export class YardVisitService {
   async update(id: string, data: UpdateYardVisitDto) {
     const current = await prisma.yardVisit.findUnique({ where: { id } });
     if (!current) throw new AppError(404, 'Visita não encontrada');
-
-    if (data.purchaseOrderId) {
-      await assertPurchaseOrderExists(data.purchaseOrderId);
+    // Depois do check-in o registro vira histórico de auditoria — só pode ser
+    // cancelado, nunca editado (mesma guarda de delete(), abaixo). Sem isso, um
+    // PUT numa visita CHECKED_IN/CANCELLED reescreveria retroativamente o
+    // cálculo de pontualidade de um registro que deveria ser imutável.
+    if (current.status !== 'SCHEDULED') {
+      throw new AppError(400, 'Só é possível editar agendamentos que ainda não fizeram check-in');
     }
 
-    return prisma.yardVisit.update({ where: { id }, data });
+    const updateData: UpdateYardVisitDto = { ...data };
+
+    if (data.purchaseOrderId) {
+      const po = await assertPurchaseOrderExists(data.purchaseOrderId);
+      updateData.supplierId = po.supplierId;
+    }
+
+    return prisma.yardVisit.update({ where: { id }, data: updateData });
   }
 
   async delete(id: string) {
@@ -1486,13 +1496,13 @@ Criar `frontend/src/views/yard/YardVisitListView.vue`:
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <FormField id="visit-form-warehouse" label="Armazém" required>
-            <select v-model="formData.warehouseId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <select v-model="formData.warehouseId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
               <option value="">Selecione...</option>
               <option v-for="wh in warehouseStore.warehouses" :key="wh.id" :value="wh.id">{{ wh.name }}</option>
             </select>
           </FormField>
           <FormField id="visit-form-service-type" label="Tipo de Serviço" required>
-            <select v-model="formData.serviceType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="onServiceTypeChange">
+            <select v-model="formData.serviceType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" @change="onServiceTypeChange">
               <option value="RECEBIMENTO">Recebimento</option>
               <option value="EXPEDICAO">Expedição</option>
               <option value="MULTIUSO">Multiuso</option>
@@ -1501,14 +1511,14 @@ Criar `frontend/src/views/yard/YardVisitListView.vue`:
         </div>
 
         <FormField v-if="formData.serviceType === 'RECEBIMENTO'" id="visit-form-purchase-order" label="Pedido de Compra (opcional)">
-          <select v-model="formData.purchaseOrderId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" @change="onPurchaseOrderChange">
+          <select v-model="formData.purchaseOrderId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" @change="onPurchaseOrderChange">
             <option value="">Nenhum (preenchimento manual)</option>
             <option v-for="po in confirmedPurchaseOrders" :key="po.id" :value="po.id">{{ po.orderNumber }} — {{ po.supplier?.name }}</option>
           </select>
         </FormField>
 
         <FormField id="visit-form-supplier" label="Fornecedor" :required="formData.serviceType !== 'EXPEDICAO'">
-          <select v-model="formData.supplierId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="formData.supplierId" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Nenhum</option>
             <option v-for="sup in supplierStore.suppliers" :key="sup.id" :value="sup.id">{{ sup.name }}</option>
           </select>
@@ -1516,22 +1526,22 @@ Criar `frontend/src/views/yard/YardVisitListView.vue`:
 
         <div class="grid grid-cols-2 gap-4">
           <FormField id="visit-form-scheduled-at" label="Data/Hora agendada" required>
-            <input v-model="formData.scheduledAt" type="datetime-local" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input v-model="formData.scheduledAt" type="datetime-local" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
           </FormField>
           <FormField id="visit-form-notes" label="Observação (até 70 caracteres)">
-            <input v-model="formData.notes" type="text" maxlength="70" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500" />
+            <input v-model="formData.notes" type="text" maxlength="70" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100" />
           </FormField>
         </div>
 
         <template v-if="isWalkIn">
           <FormField id="visit-form-driver" label="Motorista" required>
-            <select v-model="formData.driverId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <select v-model="formData.driverId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
               <option value="">Selecione...</option>
               <option v-for="d in driverStore.drivers" :key="d.id" :value="d.id">{{ d.name }}</option>
             </select>
           </FormField>
           <FormField id="visit-form-vehicle" label="Veículo" required>
-            <select v-model="formData.vehicleId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+            <select v-model="formData.vehicleId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
               <option value="">Selecione...</option>
               <option v-for="v in vehicleStore.vehicles" :key="v.id" :value="v.id">{{ v.plate }}</option>
             </select>
@@ -1548,13 +1558,13 @@ Criar `frontend/src/views/yard/YardVisitListView.vue`:
     <AppModal v-model="showCheckInModal" title="Fazer Check-in" @close="closeCheckInModal">
       <form id="checkin-form" @submit.prevent="handleConfirmCheckIn" class="space-y-4">
         <FormField id="checkin-driver" label="Motorista" required>
-          <select v-model="checkInData.driverId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="checkInData.driverId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="d in driverStore.drivers" :key="d.id" :value="d.id">{{ d.name }}</option>
           </select>
         </FormField>
         <FormField id="checkin-vehicle" label="Veículo" required>
-          <select v-model="checkInData.vehicleId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="checkInData.vehicleId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="v in vehicleStore.vehicles" :key="v.id" :value="v.id">{{ v.plate }}</option>
           </select>
