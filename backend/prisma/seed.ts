@@ -28,7 +28,9 @@ async function main() {
   //   de requireModule('WMS') e responderiam 404 se a linha viesse desabilitada.
   //   Numa instalação de cliente só-PCP, este valor é `false` (ou a linha nem
   //   existe: módulo ausente da tabela conta como não licenciado).
-  // - YMS ainda não tem código nenhum — só o nome reservado. Nasce desabilitado.
+  // - YMS nasce habilitado NESTE ambiente — módulo implementado (5 etapas
+  //   completas: Cadastros Base, Agendamento/Check-in, Pátio, Operação de
+  //   Doca, Dashboard/KPIs). Numa instalação de cliente sem YMS, `false`.
   //
   // `update: {}` nos módulos opcionais é deliberado: rodar o seed de novo NÃO
   // reativa um módulo que o fornecedor desligou nesta instalação. O PCP é a
