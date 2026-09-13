@@ -98,6 +98,13 @@ describe('AppLayout', () => {
     expect(wrapper.find('h2').exists()).toBe(false)
   })
 
+  it('renderiza o link de Ajuda pra /help em toda tela, independente do slot nav', () => {
+    const wrapper = mountLayout({ title: 'Fornecedores' })
+    const help = wrapper.findAll('a').find((a) => a.attributes('href') === '/help')
+    expect(help).toBeTruthy()
+    expect(help!.attributes('aria-label')).toBe('Ajuda')
+  })
+
   it('permite substituir a navegacao pelo slot nav', () => {
     const wrapper = mountLayout({ title: 'Usuários' }, { nav: '<a href="/roles">Perfis</a>' })
     const hrefs = wrapper.findAll('a').map((a) => a.attributes('href'))

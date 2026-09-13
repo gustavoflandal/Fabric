@@ -18,6 +18,14 @@
             <span class="text-sm text-gray-700 dark:text-gray-300">
               Olá, <span class="font-semibold">{{ authStore.userName }}</span>
             </span>
+            <RouterLink
+              to="/help"
+              title="Ajuda"
+              aria-label="Ajuda"
+              class="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700"
+            >
+              <QuestionMarkCircleIcon class="w-6 h-6" />
+            </RouterLink>
             <ThemeToggle />
             <Button variant="outline" size="sm" @click="handleLogout">
               Sair
@@ -43,6 +51,7 @@
 
 <script setup lang="ts">
 import { RouterLink, useRouter } from 'vue-router'
+import { QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth.store'
 import Button from '@/components/common/Button.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
