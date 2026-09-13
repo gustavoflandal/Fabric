@@ -62,6 +62,7 @@ async function seedPointings() {
           pointings.push({
             productionOrderId: order.id,
             operationId: operation.id,
+            workCenterId: operation.workCenterId,
             userId: user.id,
             startTime,
             endTime,

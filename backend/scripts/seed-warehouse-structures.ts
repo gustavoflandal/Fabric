@@ -1,13 +1,17 @@
 import { PrismaClient } from '@prisma/client';
+import { generatePositions } from '../src/services/storage-position.service';
+import stockService from '../src/services/stock.service';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🏗️ Criando estruturas de armazenagem...');
 
-  // Buscar os armazéns existentes
+  // Buscar os armazéns existentes (ordem determinística: o índice de cada
+  // armazém no array abaixo é usado para distribuir as estruturas).
   const warehouses = await prisma.warehouse.findMany({
-    where: { active: true }
+    where: { active: true },
+    orderBy: { code: 'asc' }
   });
 
   if (warehouses.length === 0) {
@@ -232,14 +236,90 @@ async function main() {
     },
   ];
 
+  const createdStructures = [];
   for (const structure of structures) {
     const created = await prisma.warehouseStructure.create({
       data: structure,
     });
+    createdStructures.push(created);
     console.log(`✅ Estrutura criada: ${created.streetCode} - ${created.positionType}`);
   }
 
   console.log(`\n✨ ${structures.length} estruturas de armazenagem criadas com sucesso!`);
+
+  // ============================================
+  // Gerar as posições (endereços) de cada estrutura — sem isso a tabela
+  // storage_positions fica vazia e nenhuma tela de WMS (ocupação, putaway,
+  // picking, contagem por endereço) tem o que mostrar.
+  // ============================================
+  console.log('\n🧭 Gerando posições de armazenagem...');
+  let totalPositions = 0;
+  for (const structure of createdStructures) {
+    const positions = await generatePositions(structure.id);
+    totalPositions += positions.length;
+    console.log(`  ✅ ${structure.streetCode}: ${positions.length} posições geradas`);
+
+    // Marca o nível do chão (andar 1) como área de picking numa rua a cada
+    // duas — dá para a tela de reposição (F4.10) ter picking E pulmão de
+    // verdade para comparar, sem marcar TODA posição como picking.
+    if (!structure.blocked) {
+      await prisma.storagePosition.updateMany({
+        where: { structureId: structure.id, floor: 1 },
+        data: { isPickingArea: true },
+      });
+    }
+  }
+  console.log(`✨ ${totalPositions} posições geradas no total.`);
+
+  // ============================================
+  // Popular saldo endereçado (stock_position_balances) para um subconjunto de
+  // produtos — sem isso as posições existem mas aparecem sempre vazias, e as
+  // telas de ocupação/putaway/contagem por endereço não têm nada para exibir.
+  // ============================================
+  console.log('\n📦 Populando saldo endereçado em algumas posições...');
+
+  const admin = await prisma.user.findFirst({ where: { email: 'admin@fabric.com' } });
+  const products = await prisma.product.findMany({ where: { active: true } });
+
+  if (!admin || products.length === 0) {
+    console.log('⚠️  Usuário admin ou produtos não encontrados — pulei o saldo endereçado.');
+  } else {
+    // Só as ruas NÃO bloqueadas dos 2 primeiros armazéns (ARM-001/ARM-002),
+    // para manter o volume de movimentações gerado sob controle sem deixar a
+    // ocupação vazia demais para avaliar as telas.
+    const mainWarehouseIds = new Set([warehouses[0]?.id, warehouses[1]?.id].filter(Boolean));
+    const mainStructures = createdStructures.filter(
+      (s) => mainWarehouseIds.has(s.warehouseId) && !s.blocked
+    );
+
+    let balancesCreated = 0;
+    for (let i = 0; i < mainStructures.length; i++) {
+      const structure = mainStructures[i];
+      const positions = await prisma.storagePosition.findMany({
+        where: { structureId: structure.id, floor: 1 },
+        orderBy: { position: 'asc' },
+        take: 6, // 6 primeiras posições do chão de cada rua principal
+      });
+
+      for (let j = 0; j < positions.length; j++) {
+        const position = positions[j];
+        const product = products[(i * 6 + j) % products.length];
+        const quantity = 20 + Math.floor(Math.random() * 180); // 20–200
+
+        await stockService.registerMovement({
+          productId: product.id,
+          type: 'IN',
+          quantity,
+          reason: 'Carga inicial de endereçamento (seed)',
+          referenceType: 'ADJUSTMENT',
+          userId: admin.id,
+          toPositionId: position.id,
+        });
+        balancesCreated++;
+      }
+    }
+    console.log(`✅ ${balancesCreated} saldos endereçados criados em ${mainStructures.length} ruas.`);
+  }
 }
 
 main()
