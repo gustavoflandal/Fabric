@@ -12,9 +12,25 @@ import purchaseOrderService from '@/services/purchase-order.service'
 import yardWarehouseParamsService from '@/services/yard-warehouse-params.service'
 import yardAreaService from '@/services/yard-area.service'
 import yardSpotService from '@/services/yard-spot.service'
+import yardDockService from '@/services/yard-dock.service'
 
 vi.mock('@/services/yard-visit.service', () => ({
-  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), checkIn: vi.fn(), cancel: vi.fn(), allocateSpot: vi.fn() },
+  default: {
+    getAll: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    checkIn: vi.fn(),
+    cancel: vi.fn(),
+    allocateSpot: vi.fn(),
+    moveToDock: vi.fn(),
+    startLoading: vi.fn(),
+    endLoading: vi.fn(),
+    complete: vi.fn(),
+  },
+}))
+vi.mock('@/services/yard-dock.service', () => ({
+  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
 }))
 vi.mock('@/services/warehouse.service', () => ({ default: { getAll: vi.fn() } }))
 vi.mock('@/services/supplier.service', () => ({ default: { getAll: vi.fn() } }))
@@ -112,6 +128,9 @@ describe('YardVisitListView', () => {
     } as any)
     vi.mocked(yardSpotService.getAll).mockResolvedValue({
       data: { status: 'success', data: [{ id: 'spot-1', areaId: 'area-1', code: 'SETOR-A-01', active: true, blocked: false, blockedReason: null, createdAt: '', updatedAt: '', visits: [] }], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+    vi.mocked(yardDockService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [{ id: 'dock-1', code: 'DOCA-01', serviceType: 'RECEBIMENTO', warehouseId: 'wh-1', storagePositionId: null, active: true, createdAt: '', updatedAt: '' }], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
     } as any)
   })
 
@@ -337,5 +356,51 @@ describe('YardVisitListView', () => {
     await flushPromises()
 
     expect(yardVisitService.allocateSpot).toHaveBeenCalledWith('visit-1', 'spot-1')
+  })
+
+  it('move uma visita alocada em pátio (IN_YARD) para uma doca', async () => {
+    const inYardVisit = { ...mockVisit, status: 'IN_YARD', driverId: 'drv-1', vehicleId: 'veh-1', yardSpotId: 'spot-1' }
+    vi.mocked(yardVisitService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [inYardVisit], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+    vi.mocked(yardVisitService.moveToDock).mockResolvedValue({ data: { status: 'success', data: { ...inYardVisit, status: 'AT_DOCK' } } } as any)
+
+    const router = makeRouter()
+    router.push('/yard/visits')
+    await router.isReady()
+
+    const wrapper = mount(YardVisitListView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    const moveButton = wrapper.findAll('button').find((b) => b.text().trim() === 'Mover para Doca')!
+    await moveButton.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    await body.find('#move-to-dock-select').setValue('dock-1')
+    await body.find('#move-to-dock-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(yardVisitService.moveToDock).toHaveBeenCalledWith('visit-1', 'dock-1')
+  })
+
+  it('exibe as ações de carga/descarga e checkout para uma visita AT_DOCK', async () => {
+    const atDockVisit = {
+      ...mockVisit, status: 'AT_DOCK', driverId: 'drv-1', vehicleId: 'veh-1', yardDockId: 'dock-1',
+      loadingStartedAt: null, loadingEndedAt: null,
+    }
+    vi.mocked(yardVisitService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [atDockVisit], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+
+    const router = makeRouter()
+    router.push('/yard/visits')
+    await router.isReady()
+
+    const wrapper = mount(YardVisitListView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((b) => b.text().trim() === 'Iniciar Carga/Descarga')).toBe(true)
+    expect(wrapper.findAll('button').some((b) => b.text().trim() === 'Finalizar e Liberar')).toBe(true)
   })
 })

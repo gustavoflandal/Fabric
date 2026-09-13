@@ -118,5 +118,76 @@ export const useYardVisitStore = defineStore('yardVisit', () => {
     }
   }
 
-  return { visits, loading, error, fetchVisits, createVisit, updateVisit, deleteVisit, checkIn, cancelVisit, allocateSpot }
+  const moveToDock = async (id: string, yardDockId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await yardVisitService.moveToDock(id, yardDockId)
+      await fetchVisits()
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao mover para a doca'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const startLoading = async (id: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await yardVisitService.startLoading(id)
+      await fetchVisits()
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao iniciar carga/descarga'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const endLoading = async (id: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await yardVisitService.endLoading(id)
+      await fetchVisits()
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao concluir carga/descarga'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  const completeVisit = async (id: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await yardVisitService.complete(id)
+      await fetchVisits()
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao finalizar/liberar visita'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    visits,
+    loading,
+    error,
+    fetchVisits,
+    createVisit,
+    updateVisit,
+    deleteVisit,
+    checkIn,
+    cancelVisit,
+    allocateSpot,
+    moveToDock,
+    startLoading,
+    endLoading,
+    completeVisit,
+  }
 })

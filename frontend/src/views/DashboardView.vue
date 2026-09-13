@@ -408,13 +408,6 @@
             </RouterLink>
             <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
               <div class="text-center">
-                <div class="text-3xl mb-2">📋</div>
-                <p class="text-sm font-medium text-gray-500">Check-in/out</p>
-                <p class="text-xs text-gray-400 mt-1">Em breve</p>
-              </div>
-            </div>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
-              <div class="text-center">
                 <div class="text-3xl mb-2">⏱️</div>
                 <p class="text-sm font-medium text-gray-500">Tempo de Pátio</p>
                 <p class="text-xs text-gray-400 mt-1">Em breve</p>
