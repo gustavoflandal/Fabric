@@ -68,6 +68,20 @@
           <div class="flex items-center justify-end space-x-3">
             <button @click="viewQuotation(item)" class="text-primary-600 hover:text-primary-900 whitespace-nowrap">Ver</button>
             <button
+              v-if="!['APPROVED', 'REJECTED', 'EXPIRED'].includes(item.status)"
+              @click="approveQuotation(item)"
+              class="text-primary-600 hover:text-primary-900 whitespace-nowrap"
+            >
+              Aprovar
+            </button>
+            <button
+              v-if="!['APPROVED', 'REJECTED', 'EXPIRED'].includes(item.status)"
+              @click="rejectQuotation(item)"
+              class="text-red-600 hover:text-red-900 whitespace-nowrap"
+            >
+              Rejeitar
+            </button>
+            <button
               v-if="item.status === 'APPROVED'"
               @click="createOrder(item)"
               class="text-primary-600 hover:text-primary-900 whitespace-nowrap"
@@ -211,6 +225,20 @@
             @click="printQuotationPDF(selectedQuotation)"
           >
             📄 Imprimir PDF
+          </Button>
+          <Button
+            v-if="selectedQuotation && !['APPROVED', 'REJECTED', 'EXPIRED'].includes(selectedQuotation.status)"
+            variant="outline"
+            @click="rejectQuotation(selectedQuotation)"
+          >
+            Rejeitar
+          </Button>
+          <Button
+            v-if="selectedQuotation && !['APPROVED', 'REJECTED', 'EXPIRED'].includes(selectedQuotation.status)"
+            variant="primary"
+            @click="approveQuotation(selectedQuotation)"
+          >
+            Aprovar
           </Button>
           <Button
             v-if="selectedQuotation && selectedQuotation.status === 'APPROVED'"
@@ -373,6 +401,32 @@ const viewQuotation = async (quotation: PurchaseQuotation) => {
     showViewModal.value = true;
   } catch (error: any) {
     toast.error(error.message || 'Erro ao carregar detalhes do orçamento');
+  }
+};
+
+const approveQuotation = async (quotation: PurchaseQuotation) => {
+  if (await confirmDialog(`Aprovar o orçamento ${quotation.quotationNumber}? Depois de aprovado, será possível gerar um pedido de compra a partir dele.`)) {
+    try {
+      await quotationStore.approve(quotation.id);
+      showViewModal.value = false;
+      await loadQuotations();
+      toast.success('Orçamento aprovado com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao aprovar orçamento');
+    }
+  }
+};
+
+const rejectQuotation = async (quotation: PurchaseQuotation) => {
+  if (await confirmDialog(`Rejeitar o orçamento ${quotation.quotationNumber}?`)) {
+    try {
+      await quotationStore.reject(quotation.id);
+      showViewModal.value = false;
+      await loadQuotations();
+      toast.success('Orçamento rejeitado.');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao rejeitar orçamento');
+    }
   }
 };
 

@@ -23,6 +23,7 @@
           >
             <option value="">Todos os Status</option>
             <option value="PENDING">Pendente</option>
+            <option value="APPROVED">Aprovado</option>
             <option value="CONFIRMED">Confirmado</option>
             <option value="PARTIAL">Parcial</option>
             <option value="RECEIVED">Recebido</option>
@@ -68,6 +69,13 @@
             <button @click="viewOrder(item)" class="text-primary-600 hover:text-primary-900 whitespace-nowrap">Ver</button>
             <button
               v-if="item.status === 'PENDING'"
+              @click="approveOrder(item.id)"
+              class="text-primary-600 hover:text-primary-900 whitespace-nowrap"
+            >
+              Aprovar
+            </button>
+            <button
+              v-if="item.status === 'APPROVED'"
               @click="confirmOrder(item.id)"
               class="text-primary-600 hover:text-primary-900 whitespace-nowrap"
             >
@@ -238,6 +246,13 @@
           <Button
             v-if="selectedOrder && selectedOrder.status === 'PENDING'"
             variant="primary"
+            @click="approveOrder(selectedOrder.id)"
+          >
+            Aprovar Pedido
+          </Button>
+          <Button
+            v-if="selectedOrder && selectedOrder.status === 'APPROVED'"
+            variant="primary"
             @click="confirmOrder(selectedOrder.id)"
           >
             Confirmar Pedido
@@ -299,12 +314,14 @@ const formatCurrency = (value: number) => {
 };
 
 // yellow/blue/purple/green/red do badge antigo normalizados para a paleta do StatusBadge (§4.2):
-// PENDING = warning (aguarda ação nossa), CONFIRMED = info (aceito, aguardando entrega),
-// PARTIAL = warning (recebimento incompleto, ainda exige acompanhamento — não `neutral`,
-// que leria como estado inerte), RECEIVED = success, CANCELLED = danger.
+// PENDING = warning (aguarda aprovação nossa), APPROVED = warning (aprovado, mas ainda
+// aguarda ação nossa: confirmar com o fornecedor), CONFIRMED = info (aceito, aguardando
+// entrega), PARTIAL = warning (recebimento incompleto, ainda exige acompanhamento — não
+// `neutral`, que leria como estado inerte), RECEIVED = success, CANCELLED = danger.
 const getStatusTone = (status: string): BadgeTone => {
   const tones: Record<string, BadgeTone> = {
     PENDING: 'warning',
+    APPROVED: 'warning',
     CONFIRMED: 'info',
     PARTIAL: 'warning',
     RECEIVED: 'success',
@@ -316,6 +333,7 @@ const getStatusTone = (status: string): BadgeTone => {
 const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
     PENDING: 'Pendente',
+    APPROVED: 'Aprovado',
     CONFIRMED: 'Confirmado',
     PARTIAL: 'Parcial',
     RECEIVED: 'Recebido',
@@ -392,6 +410,18 @@ const viewOrder = async (order: PurchaseOrder) => {
     showViewModal.value = true;
   } catch (error: any) {
     toast.error(error.message || 'Erro ao carregar detalhes do pedido');
+  }
+};
+
+const approveOrder = async (id: string) => {
+  if (await confirmDialog('Aprovar este pedido? Depois de aprovado, ele poderá ser confirmado com o fornecedor.')) {
+    try {
+      await orderStore.approveOrder(id);
+      await loadOrders();
+      toast.success('Pedido aprovado com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao aprovar pedido');
+    }
   }
 };
 
