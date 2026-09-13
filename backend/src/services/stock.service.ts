@@ -5,7 +5,10 @@ import notificationDetector from './notification-detector.service';
 import { AppError } from '../middleware/error.middleware';
 import { AGGREGATE_MOVEMENT_TYPES } from '../utils/stock-movement.util';
 import { isModuleEnabled } from './licensed-module.service';
-import { createPickingTasks } from './warehouse-task.service';
+import {
+  PRODUCTION_ORDER_TASK_REFERENCE_TYPE,
+  createPickingTasks,
+} from './warehouse-task.service';
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -31,7 +34,17 @@ export interface StockMovementDto {
   quantity: number;
   reason: string;
   reference?: string;
-  referenceType?: 'PRODUCTION' | 'PURCHASE' | 'ADJUSTMENT' | 'MANUAL' | 'COUNTING';
+  referenceType?:
+    | 'PRODUCTION'
+    | 'PURCHASE'
+    | 'ADJUSTMENT'
+    | 'MANUAL'
+    | 'COUNTING'
+    // EXPEDIÇÃO — saída de material separado para um romaneio. É o único valor
+    // novo do módulo: o despacho do romaneio NÃO gera movimentação (ver a nota
+    // da seção EXPEDIÇÃO no schema), então a saída do picking é o único
+    // `StockMovement` do fluxo inteiro e este é o `referenceType` dele.
+    | 'SHIPMENT';
   countingSessionId?: string;
   userId: string;
   notes?: string;
@@ -1304,8 +1317,23 @@ export class StockServiceRefactored {
    *     quando a flag foi ligada) continua sendo candidata, ordenada junto dos
    *     lotes sem validade, no fim. Excluí-la deixaria esse estoque preso para
    *     sempre; consumi-la por último é o comportamento conservador.
+   *
+   * ✅ EXPEDIÇÃO — DEIXOU DE SER `private`, e só isso. O romaneio precisa
+   * EXATAMENTE deste planejamento (FIFO/FEFO, posição não bloqueada, lote
+   * vencido fora, erro de "saldo não endereçado" com a mesma mensagem), e
+   * reimplementá-lo em `shipment.service.ts` seria criar uma segunda política
+   * de alocação que divergiria da primeira na próxima mudança de regra de
+   * armazém. O corpo não mudou nenhuma linha.
+   *
+   * O QUE ELE **NÃO** FAZ, e o romaneio herda: não filtra por armazém. O
+   * planejamento varre toda `stock_position_balances` com saldo do produto,
+   * como sempre fez para a ordem de produção. Numa instalação com mais de um
+   * armazém endereçado isso pode planejar separação fora do
+   * `Shipment.warehouseId` — limitação CONHECIDA e deliberada nesta etapa
+   * (corrigi-la é mudar a política de alocação para os dois fluxos, inclusive o
+   * de produção que já está em produção, e isso é uma decisão própria).
    */
-  private async planPickingFromPositions(
+  async planPickingFromPositions(
     tx: TransactionClient,
     productId: string,
     productCode: string,
@@ -1526,7 +1554,15 @@ export class StockServiceRefactored {
         // As tarefas nascem na MESMA transação do planejamento: uma reserva que
         // "deu certo" sem tarefa nenhuma seria uma ordem que ninguém consegue
         // separar — mesmo raciocínio da cadeia de recebimento em F4.3.
-        await createPickingTasks(tx, order.id, allocations);
+        // A referência vai EXPLÍCITA desde a generalização de
+        // `createPickingTasks` (módulo de Expedição): a função deixou de assumir
+        // "ordem de produção" e passou a receber o par inteiro. O valor gravado
+        // é byte-a-byte o mesmo de antes.
+        await createPickingTasks(
+          tx,
+          { referenceId: order.id, referenceType: PRODUCTION_ORDER_TASK_REFERENCE_TYPE },
+          allocations
+        );
 
         return {
           orderId: order.id,

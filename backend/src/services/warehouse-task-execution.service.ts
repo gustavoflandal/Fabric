@@ -1,9 +1,10 @@
 import { Prisma, StockMovementType, WarehouseTaskType } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
-import stockService from './stock.service';
+import stockService, { StockMovementDto } from './stock.service';
 import {
   PRODUCTION_ORDER_TASK_REFERENCE_TYPE,
+  SHIPMENT_TASK_REFERENCE_TYPE,
   STOCK_MOVING_TASK_TYPES,
   assertChainOrderResolved,
   assertTaskIsOpen,
@@ -142,18 +143,30 @@ export const executeTask = async (
         );
       }
 
+      // A quem esta separação serve. Ver `resolvePickingDestination()`.
+      const destination = await resolvePickingDestination(
+        tx,
+        task.reference,
+        task.referenceType
+      );
+
       // ---- LOCKS 2 e 3 + a movimentação, na MESMA transação -----------------
       movement = await stockService.registerMovementInTransaction(tx, {
         productId: task.productId,
         type: StockMovementType.OUT,
         quantity,
-        reason: 'Separação para produção',
-        // `reference`/`referenceType` iguais aos do caminho SEM WMS: a reserva
-        // direta grava (`orderNumber`, 'MANUAL'), e é o par que os relatórios
-        // de consumo já procuram. Divergir aqui faria a mesma saída de material
-        // aparecer de dois jeitos conforme a licença.
-        reference: await resolveOrderNumber(tx, task.reference, task.referenceType),
-        referenceType: 'MANUAL',
+        reason: destination.reason,
+        // PRODUÇÃO: `reference`/`referenceType` iguais aos do caminho SEM WMS —
+        // a reserva direta grava (`orderNumber`, 'MANUAL'), e é o par que os
+        // relatórios de consumo já procuram. Divergir aqui faria a mesma saída
+        // de material aparecer de dois jeitos conforme a licença.
+        //
+        // EXPEDIÇÃO: não existe caminho sem WMS com que se alinhar (o romaneio
+        // só separa por tarefa), então o par é o natural —
+        // (`shipmentNumber`, 'SHIPMENT'), que dá ao relatório de saída a mesma
+        // legibilidade do `orderNumber` da produção.
+        reference: destination.reference,
+        referenceType: destination.referenceType,
         userId,
         notes: `Separação (tarefa ${task.id})`,
         fromPositionId: task.fromPositionId,
@@ -229,35 +242,76 @@ export const executeTask = async (
 };
 
 /**
- * A tarefa guarda o `ProductionOrder.id` em `reference` (ver
- * `PRODUCTION_ORDER_TASK_REFERENCE_TYPE`), mas a movimentação de estoque do
- * caminho sem WMS grava o `orderNumber`. Esta função faz a tradução no único
- * ponto em que os dois formatos se encontram, para que o histórico de
- * movimentação fique idêntico nos dois modos.
+ * ✅ EXPEDIÇÃO — PARA QUEM ESTA SEPARAÇÃO ESTÁ SENDO FEITA.
  *
- * Ordem de produção apagada entre a criação e a conclusão da tarefa: cai no
- * fallback (o id), porque perder a rastreabilidade inteira por causa de um
- * documento ausente seria pior do que registrar a referência menos legível.
+ * Sucede a antiga `resolveOrderNumber()`, que só sabia traduzir ordem de
+ * produção. Agora devolve as TRÊS coisas que a movimentação de saída precisa
+ * (`reason`, `reference`, `referenceType`) porque as três variam juntas, pelo
+ * mesmo motivo: elas descrevem o DESTINO do material. Devolver só a
+ * `reference` e deixar `reason`/`referenceType` decididos no chamador espalharia
+ * o mesmo `if` por três lugares.
+ *
+ * A tarefa guarda um ID em `reference` (`ProductionOrder.id` ou `Shipment.id`,
+ * conforme `referenceType`), mas a movimentação grava o NÚMERO legível do
+ * documento — `orderNumber` ou `shipmentNumber`. Esta função é o único ponto em
+ * que os dois formatos se encontram.
+ *
+ * COMPATIBILIDADE COM O QUE JÁ ESTÁ EM PRODUÇÃO: o ramo
+ * `PRODUCTION_ORDER` devolve exatamente o que a função anterior devolvia
+ * (`orderNumber` com fallback para o id) e o par ('Separação para produção',
+ * 'MANUAL') que estava escrito no corpo do `executeTask`. Nenhum picking de
+ * ordem de produção grava nada diferente do que gravava antes desta mudança.
+ *
+ * DEFAULT DELIBERADAMENTE CONSERVADOR: qualquer `referenceType` que não seja um
+ * dos dois conhecidos (hoje, na prática, `REPLENISHMENT` — que nem passa por
+ * aqui — ou uma tarefa legada) cai no mesmo comportamento de antes: devolve a
+ * `reference` crua com 'MANUAL'. Um tipo novo de referência não pode fazer a
+ * saída de estoque falhar.
+ *
+ * Documento apagado entre a criação e a conclusão da tarefa: cai no fallback (o
+ * id), porque perder a rastreabilidade inteira por causa de um documento
+ * ausente seria pior do que registrar a referência menos legível.
  */
-const resolveOrderNumber = async (
+const resolvePickingDestination = async (
   tx: Prisma.TransactionClient,
   reference: string | null,
   referenceType: string | null
-): Promise<string | undefined> => {
-  if (!reference) {
-    return undefined;
+): Promise<{
+  reason: string;
+  reference: string | undefined;
+  referenceType: StockMovementDto['referenceType'];
+}> => {
+  if (referenceType === SHIPMENT_TASK_REFERENCE_TYPE && reference) {
+    const shipment = await tx.shipment.findUnique({
+      where: { id: reference },
+      select: { shipmentNumber: true },
+    });
+
+    return {
+      reason: 'Separação para expedição',
+      reference: shipment?.shipmentNumber ?? reference,
+      referenceType: 'SHIPMENT',
+    };
   }
 
-  if (referenceType !== PRODUCTION_ORDER_TASK_REFERENCE_TYPE) {
-    return reference;
+  if (referenceType === PRODUCTION_ORDER_TASK_REFERENCE_TYPE && reference) {
+    const order = await tx.productionOrder.findUnique({
+      where: { id: reference },
+      select: { orderNumber: true },
+    });
+
+    return {
+      reason: 'Separação para produção',
+      reference: order?.orderNumber ?? reference,
+      referenceType: 'MANUAL',
+    };
   }
 
-  const order = await tx.productionOrder.findUnique({
-    where: { id: reference },
-    select: { orderNumber: true },
-  });
-
-  return order?.orderNumber ?? reference;
+  return {
+    reason: 'Separação para produção',
+    reference: reference ?? undefined,
+    referenceType: 'MANUAL',
+  };
 };
 
 /**
