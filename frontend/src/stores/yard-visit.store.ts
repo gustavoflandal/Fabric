@@ -104,5 +104,19 @@ export const useYardVisitStore = defineStore('yardVisit', () => {
     }
   }
 
-  return { visits, loading, error, fetchVisits, createVisit, updateVisit, deleteVisit, checkIn, cancelVisit }
+  const allocateSpot = async (id: string, yardSpotId: string) => {
+    try {
+      loading.value = true
+      error.value = null
+      await yardVisitService.allocateSpot(id, yardSpotId)
+      await fetchVisits()
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao alocar vaga'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { visits, loading, error, fetchVisits, createVisit, updateVisit, deleteVisit, checkIn, cancelVisit, allocateSpot }
 })

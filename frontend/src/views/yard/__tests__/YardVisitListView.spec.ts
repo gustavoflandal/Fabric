@@ -9,9 +9,12 @@ import supplierService from '@/services/supplier.service'
 import driverService from '@/services/driver.service'
 import vehicleService from '@/services/vehicle.service'
 import purchaseOrderService from '@/services/purchase-order.service'
+import yardWarehouseParamsService from '@/services/yard-warehouse-params.service'
+import yardAreaService from '@/services/yard-area.service'
+import yardSpotService from '@/services/yard-spot.service'
 
 vi.mock('@/services/yard-visit.service', () => ({
-  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), checkIn: vi.fn(), cancel: vi.fn() },
+  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), checkIn: vi.fn(), cancel: vi.fn(), allocateSpot: vi.fn() },
 }))
 vi.mock('@/services/warehouse.service', () => ({ default: { getAll: vi.fn() } }))
 vi.mock('@/services/supplier.service', () => ({ default: { getAll: vi.fn() } }))
@@ -22,6 +25,15 @@ vi.mock('@/services/vehicle.service', () => ({
   default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setBlocked: vi.fn() },
 }))
 vi.mock('@/services/purchase-order.service', () => ({ default: { getAll: vi.fn() } }))
+vi.mock('@/services/yard-warehouse-params.service', () => ({
+  default: { getByWarehouseId: vi.fn(), upsert: vi.fn() },
+}))
+vi.mock('@/services/yard-area.service', () => ({
+  default: { getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), setBlocked: vi.fn(), generateSpots: vi.fn() },
+}))
+vi.mock('@/services/yard-spot.service', () => ({
+  default: { getAll: vi.fn(), update: vi.fn(), delete: vi.fn(), setBlocked: vi.fn() },
+}))
 
 vi.mock('@/stores/auth.store', () => ({
   useAuthStore: () => ({ userName: 'Teste', logout: vi.fn() }),
@@ -91,6 +103,15 @@ describe('YardVisitListView', () => {
     } as any)
     vi.mocked(purchaseOrderService.getAll).mockResolvedValue({
       data: { status: 'success', data: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } },
+    } as any)
+    vi.mocked(yardWarehouseParamsService.getByWarehouseId).mockResolvedValue({
+      data: { status: 'success', data: { id: null, warehouseId: 'wh-1', useYard: true, delayToleranceMinutes: 15, createdAt: null, updatedAt: null } },
+    } as any)
+    vi.mocked(yardAreaService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [{ id: 'area-1', warehouseId: 'wh-1', code: 'SETOR-A', name: 'Setor A', active: true, blocked: false, blockedReason: null, createdAt: '', updatedAt: '' }], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+    vi.mocked(yardSpotService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [{ id: 'spot-1', areaId: 'area-1', code: 'SETOR-A-01', active: true, blocked: false, blockedReason: null, createdAt: '', updatedAt: '', visits: [] }], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
     } as any)
   })
 
@@ -290,5 +311,31 @@ describe('YardVisitListView', () => {
       'visit-1',
       expect.objectContaining({ notes: 'Chegada pelo portão 2' })
     )
+  })
+
+  it('aloca uma visita CHECKED_IN numa vaga livre', async () => {
+    const checkedInVisit = { ...mockVisit, status: 'CHECKED_IN', driverId: 'drv-1', vehicleId: 'veh-1', driver: { id: 'drv-1', name: 'João da Silva' }, vehicle: { id: 'veh-1', plate: 'ABC1D23' } }
+    vi.mocked(yardVisitService.getAll).mockResolvedValue({
+      data: { status: 'success', data: [checkedInVisit], pagination: { page: 1, limit: 100, total: 1, pages: 1 } },
+    } as any)
+    vi.mocked(yardVisitService.allocateSpot).mockResolvedValue({ data: { status: 'success', data: { ...checkedInVisit, status: 'IN_YARD' } } } as any)
+
+    const router = makeRouter()
+    router.push('/yard/visits')
+    await router.isReady()
+
+    const wrapper = mount(YardVisitListView, { global: { plugins: [router] }, attachTo: document.body })
+    await flushPromises()
+
+    const allocateButton = wrapper.findAll('button').find((b) => b.text().trim() === 'Alocar Vaga')!
+    await allocateButton.trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const body = new DOMWrapper(document.body)
+    await body.find('#allocate-spot-select').setValue('spot-1')
+    await body.find('#allocate-spot-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(yardVisitService.allocateSpot).toHaveBeenCalledWith('visit-1', 'spot-1')
   })
 })
