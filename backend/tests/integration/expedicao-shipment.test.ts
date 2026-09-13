@@ -518,6 +518,46 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     expect(dispatched.status).toBe(400);
   }, 30000);
 
+  it('cancelar o PEDIDO cascateia até os romaneios abertos e as tarefas deles', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 50, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      items: [{ salesOrderItemId: created.body.data.items[0].id, quantity: 50 }],
+    });
+    const shipmentId = shipmentRes.body.data.id as string;
+    await client.startSeparation(shipmentId).expect(200);
+
+    const cancelled = await request(app)
+      .post(`/api/v1/sales-orders/${orderId}/cancel`)
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(cancelled.status).toBe(200);
+    expect(cancelled.body.data.status).toBe('CANCELLED');
+
+    // Sem a cascata, este romaneio continuaria separável e despacharia material
+    // de um pedido que não existe mais — e a tarefa aberta debitaria estoque de
+    // verdade na conclusão.
+    const shipment = await testPrisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
+    expect(shipment.status).toBe('CANCELLED');
+
+    const tasks = await testPrisma.warehouseTask.findMany();
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe('CANCELLED');
+
+    expect(await testPrisma.stockMovement.count()).toBe(0);
+  }, 30000);
+
   // ==========================================================================
   // GUARDAS DE STATUS.
   // ==========================================================================

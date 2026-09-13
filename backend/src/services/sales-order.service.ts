@@ -1,7 +1,13 @@
-import { Prisma, SalesOrderStatus } from '@prisma/client';
+import {
+  Prisma,
+  SalesOrderStatus,
+  ShipmentStatus,
+  WarehouseTaskStatus,
+} from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { SEQUENCE_PREFIXES, nextDocumentNumber } from './document-sequence.service';
+import { SHIPMENT_TASK_REFERENCE_TYPE } from './warehouse-task.service';
 
 /**
  * EXPEDIÇÃO — PEDIDO DE VENDA.
@@ -304,6 +310,20 @@ export class SalesOrderService {
    *
    * Romaneio já despachado com o pedido ainda parcialmente aberto também
    * bloqueia, pelo mesmo motivo: parte do material já saiu.
+   *
+   * CASCATA ATÉ A TAREFA DE ARMAZÉM, e é o ponto que faz este método valer uma
+   * transação. Cancelar só o pedido deixaria de pé:
+   *
+   *   * romaneios PENDING/SEPARATING apontando para um pedido cancelado — que
+   *     alguém separaria e despacharia, expedindo material de um pedido que não
+   *     existe mais;
+   *   * e, pior, as tarefas de `PICKING` desses romaneios, cuja conclusão
+   *     DEBITA ESTOQUE DE VERDADE (`applyMovement`).
+   *
+   * Então o cancelamento desce os três níveis. Tarefa já `COMPLETED` fica como
+   * está — o material realmente saiu do endereço, e apagar esse fato esconderia
+   * uma divergência que o inventário precisa enxergar (mesmo critério de
+   * `shipment.service.ts::cancel()`).
    */
   async cancel(id: string) {
     const order = await this.getById(id);
@@ -325,10 +345,34 @@ export class SalesOrderService {
       );
     }
 
-    return prisma.salesOrder.update({
-      where: { id },
-      data: { status: SalesOrderStatus.CANCELLED },
-      include: orderInclude,
+    const openShipmentIds = order.shipments
+      .filter((shipment) => shipment.status !== ShipmentStatus.CANCELLED)
+      .map((shipment) => shipment.id);
+
+    return prisma.$transaction(async (tx) => {
+      if (openShipmentIds.length > 0) {
+        await tx.warehouseTask.updateMany({
+          where: {
+            referenceType: SHIPMENT_TASK_REFERENCE_TYPE,
+            reference: { in: openShipmentIds },
+            status: {
+              in: [WarehouseTaskStatus.PENDING, WarehouseTaskStatus.IN_PROGRESS],
+            },
+          },
+          data: { status: WarehouseTaskStatus.CANCELLED },
+        });
+
+        await tx.shipment.updateMany({
+          where: { id: { in: openShipmentIds } },
+          data: { status: ShipmentStatus.CANCELLED },
+        });
+      }
+
+      return tx.salesOrder.update({
+        where: { id },
+        data: { status: SalesOrderStatus.CANCELLED },
+        include: orderInclude,
+      });
     });
   }
 
