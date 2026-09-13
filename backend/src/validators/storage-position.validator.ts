@@ -68,3 +68,34 @@ export const positionMovementsQuerySchema = Joi.object({
     'string.guid': 'productId deve ser um UUID válido',
   }),
 }).unknown(true);
+
+/**
+ * `GET /storage-positions` — tela de Localizações (Tarefa 1).
+ *
+ * Todos os filtros são opcionais (diferente de `occupiedPositionsQuerySchema`,
+ * que exige escopo): esta é uma tela de browse/busca paginada, não uma
+ * varredura sem teto — `limit` tem máximo 100 e `page`/`limit` têm default no
+ * controller.
+ *
+ * `blocked`/`isPickingArea`/`occupied` chegam como STRING pela query string
+ * (`'true'`/`'false'`) — validados aqui como `Joi.string().valid(...)` (não
+ * `Joi.boolean()`, que exigiria conversão automática do Joi) porque o
+ * controller já faz o parse manual `=== 'true' ? true : === 'false' ? false :
+ * undefined`, o mesmo padrão usado em todo o resto do backend (ver
+ * warehouse-structure.controller.ts, yard-spot.controller.ts etc.).
+ *
+ * `.unknown(true)` pelo mesmo motivo de `positionMovementsQuerySchema`:
+ * `validateQuery()` não reatribui `req.query`, então não há `stripUnknown`.
+ */
+export const searchPositionsQuerySchema = Joi.object({
+  warehouseId: Joi.string().uuid().messages({
+    'string.guid': 'warehouseId deve ser um UUID válido',
+  }),
+  streetCode: Joi.string(),
+  blocked: Joi.string().valid('true', 'false'),
+  isPickingArea: Joi.string().valid('true', 'false'),
+  occupied: Joi.string().valid('true', 'false'),
+  code: Joi.string(),
+  page: Joi.number().integer().min(1),
+  limit: Joi.number().integer().min(1).max(100),
+}).unknown(true);

@@ -307,6 +307,68 @@ export const getPositionMovements = async (
   };
 };
 
+/**
+ * Tarefa 1 (tela de Localizações do WMS): browse/busca paginada de posições,
+ * complementar a `getPositionsByStructure` (que lista TODAS as posições de
+ * UMA estrutura, sem paginação — pensada para a tela de gerar/gerenciar
+ * posições de uma estrutura específica). Esta aqui atende a busca livre entre
+ * armazéns/estruturas, por isso a paginação e o conjunto de filtros maior.
+ */
+export interface SearchPositionsFilters {
+  warehouseId?: string;
+  streetCode?: string;
+  blocked?: boolean;
+  isPickingArea?: boolean;
+  occupied?: boolean;
+  code?: string;
+}
+
+export const searchPositions = async (
+  filters: SearchPositionsFilters,
+  page: number,
+  limit: number
+) => {
+  const where: any = {
+    ...(filters.warehouseId ? { structure: { warehouseId: filters.warehouseId } } : {}),
+    ...(filters.streetCode ? { streetCode: filters.streetCode } : {}),
+    ...(filters.blocked !== undefined ? { blocked: filters.blocked } : {}),
+    ...(filters.isPickingArea !== undefined ? { isPickingArea: filters.isPickingArea } : {}),
+    ...(filters.code ? { code: { contains: filters.code } } : {}),
+    ...(filters.occupied !== undefined
+      ? {
+          stockPositionBalances: filters.occupied
+            ? { some: { quantity: { gt: 0 } } }
+            : { none: { quantity: { gt: 0 } } },
+        }
+      : {}),
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.storagePosition.findMany({
+      where,
+      include: {
+        structure: {
+          select: { warehouseId: true, warehouse: { select: { code: true, name: true } } },
+        },
+      },
+      orderBy: [{ warehouseCode: 'asc' }, { streetCode: 'asc' }, { floor: 'asc' }, { position: 'asc' }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.storagePosition.count({ where }),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+};
+
 export interface WarehouseOccupancy {
   warehouseCode: string;
   occupied: number;

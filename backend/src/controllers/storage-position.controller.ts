@@ -124,6 +124,38 @@ export const deletePosition = async (req: Request, res: Response, next: NextFunc
   }
 };
 
+/**
+ * Tarefa 1: browse/busca paginada de posições para a tela de Localizações.
+ * Parse manual de booleano de query string (`=== 'true' ? true : === 'false'
+ * ? false : undefined`) — mesmo padrão usado em warehouse-structure.controller.ts,
+ * yard-spot.controller.ts etc. em todo o backend.
+ */
+export const searchPositions = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const page = parsePositiveInt(req.query.page, 1);
+    const limit = parsePositiveInt(req.query.limit, 20, 100);
+
+    const filters = {
+      warehouseId: req.query.warehouseId as string | undefined,
+      streetCode: req.query.streetCode as string | undefined,
+      blocked: req.query.blocked === 'true' ? true : req.query.blocked === 'false' ? false : undefined,
+      isPickingArea:
+        req.query.isPickingArea === 'true' ? true : req.query.isPickingArea === 'false' ? false : undefined,
+      occupied: req.query.occupied === 'true' ? true : req.query.occupied === 'false' ? false : undefined,
+      code: req.query.code as string | undefined,
+    };
+
+    const result = await storagePositionService.searchPositions(filters, page, limit);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    next(error);
+  }
+};
+
 export const getOccupancy = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const data = await storagePositionService.getOccupancy();

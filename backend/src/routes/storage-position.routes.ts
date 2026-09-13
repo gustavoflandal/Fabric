@@ -6,6 +6,7 @@ import { validate, validateQuery } from '../middleware/validation.middleware';
 import {
   updateStoragePositionSchema,
   positionMovementsQuerySchema,
+  searchPositionsQuerySchema,
 } from '../validators/storage-position.validator';
 
 const router = Router();
@@ -61,6 +62,18 @@ router.get(
   '/occupancy',
   requirePermission('estruturas_armazem', 'visualizar'),
   storagePositionController.getOccupancy
+);
+
+// Tarefa 1 (tela de Localizações): browse/busca paginada entre armazéns e
+// estruturas. Rota RAIZ (0 segmentos) — não colide com '/:structureId'
+// (1 segmento) nem com as rotas de 2 segmentos acima; Express trata padrões
+// com número de segmentos diferente como rotas distintas. Mesmo RBAC das
+// demais leituras de posição deste arquivo.
+router.get(
+  '/',
+  requirePermission('estruturas_armazem', 'visualizar'),
+  validateQuery(searchPositionsQuerySchema),
+  storagePositionController.searchPositions
 );
 
 // Listar posições de uma estrutura
