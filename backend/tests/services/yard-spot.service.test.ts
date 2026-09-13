@@ -36,6 +36,18 @@ describe('YardSpotService', () => {
     expect(moreSpots.map((s) => s.code).sort()).toEqual(['SETOR-TEST-04', 'SETOR-TEST-05']);
   });
 
+  it('continua a numeração pela maior sequência (não pela contagem) mesmo depois de excluir uma vaga do meio', async () => {
+    const area = await createTestArea();
+    const spots = await yardSpotService.generateBatch(area.id, 5); // gera -01 a -05
+
+    const middleSpot = spots.find((s) => s.code === 'SETOR-TEST-03')!;
+    await yardSpotService.delete(middleSpot.id);
+
+    const moreSpots = await yardSpotService.generateBatch(area.id, 2);
+
+    expect(moreSpots.map((s) => s.code).sort()).toEqual(['SETOR-TEST-06', 'SETOR-TEST-07']);
+  });
+
   it('rejeita gerar 0 ou mais de 500 vagas de uma vez', async () => {
     const area = await createTestArea();
 
@@ -54,6 +66,15 @@ describe('YardSpotService', () => {
     const blocked = await yardSpotService.setBlocked(spot.id, true, 'Buraco no asfalto');
 
     expect(blocked.blocked).toBe(true);
+  });
+
+  it('rejeita atualizar o código de uma vaga para um código já usado por outra vaga da mesma área', async () => {
+    const area = await createTestArea();
+    const [spot1, spot2] = await yardSpotService.generateBatch(area.id, 2);
+
+    await expect(yardSpotService.update(spot2.id, { code: spot1.code })).rejects.toThrow(
+      'Já existe uma vaga com este código nesta área'
+    );
   });
 
   it('lista vagas filtrando por área', async () => {
