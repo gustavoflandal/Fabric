@@ -292,6 +292,25 @@ export const useCountingStore = defineStore('counting', () => {
     }
   }
 
+  // Achado numa auditoria: `CountingSessionReport.vue` sempre chamou
+  // `countingStore.fetchSessionReport(...)`, mas essa action nunca existiu
+  // aqui — só `countingService.getSessionReport()` (camada de serviço) era
+  // implementado. Chamar um método inexistente numa store Pinia dá
+  // `TypeError` em runtime: a tela de relatório de contagem nunca funcionou,
+  // sempre caía direto no estado de erro ("Tentar Novamente").
+  async function fetchSessionReport(id: string) {
+    loading.value = true;
+    error.value = null;
+    try {
+      return await countingService.getSessionReport(id);
+    } catch (err: any) {
+      error.value = err.message || 'Erro ao carregar relatório';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function adjustStock(id: string) {
     loading.value = true;
     error.value = null;
@@ -440,6 +459,7 @@ export const useCountingStore = defineStore('counting', () => {
     startSession,
     completeSession,
     cancelSession,
+    fetchSessionReport,
     adjustStock,
     fetchItems,
     countItem,

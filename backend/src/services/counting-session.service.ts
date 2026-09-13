@@ -536,6 +536,7 @@ class CountingSessionService {
         totalDifferenceValue,
       },
       divergences: itemsWithDiff.map((item) => ({
+        id: item.id,
         product: {
           code: item.product.code,
           name: item.product.name,

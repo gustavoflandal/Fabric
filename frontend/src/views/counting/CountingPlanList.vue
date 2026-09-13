@@ -26,9 +26,10 @@
         <FormField id="counting-plans-filter-type" label="Tipo">
           <select v-model="filters.type" class="w-full border-gray-300 rounded-md shadow-sm">
             <option value="">Todos</option>
-            <option value="FULL">Completa</option>
-            <option value="PARTIAL">Parcial</option>
+            <option value="FULL_INVENTORY">Completa</option>
+            <option value="SPOT">Parcial</option>
             <option value="CYCLIC">Cíclica</option>
+            <option value="BLIND">Cega</option>
           </select>
         </FormField>
         <FormField id="counting-plans-filter-frequency" label="Frequência">
@@ -36,9 +37,12 @@
             <option value="">Todas</option>
             <option value="DAILY">Diária</option>
             <option value="WEEKLY">Semanal</option>
+            <option value="BIWEEKLY">Quinzenal</option>
             <option value="MONTHLY">Mensal</option>
             <option value="QUARTERLY">Trimestral</option>
-            <option value="YEARLY">Anual</option>
+            <option value="SEMIANNUAL">Semestral</option>
+            <option value="ANNUAL">Anual</option>
+            <option value="ON_DEMAND">Sob Demanda</option>
           </select>
         </FormField>
         <FormField id="counting-plans-filter-search" label="Buscar">
@@ -221,9 +225,10 @@ const deletePlan = async (id: string) => {
 
 const formatType = (type: string) => {
   const types: Record<string, string> = {
-    FULL: 'Completa',
-    PARTIAL: 'Parcial',
+    FULL_INVENTORY: 'Completa',
+    SPOT: 'Parcial',
     CYCLIC: 'Cíclica',
+    BLIND: 'Cega',
   };
   return types[type] || type;
 };
@@ -232,9 +237,12 @@ const formatFrequency = (frequency: string) => {
   const frequencies: Record<string, string> = {
     DAILY: 'Diária',
     WEEKLY: 'Semanal',
+    BIWEEKLY: 'Quinzenal',
     MONTHLY: 'Mensal',
     QUARTERLY: 'Trimestral',
-    YEARLY: 'Anual',
+    SEMIANNUAL: 'Semestral',
+    ANNUAL: 'Anual',
+    ON_DEMAND: 'Sob Demanda',
   };
   return frequencies[frequency] || frequency;
 };

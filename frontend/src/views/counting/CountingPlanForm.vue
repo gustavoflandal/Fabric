@@ -10,13 +10,13 @@
         <div class="mb-6">
           <h3 class="text-lg font-medium text-gray-900 mb-4">Informações Básicas</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField id="counting-plan-code" label="Código" required>
+            <FormField id="counting-plan-code" label="Código" hint="Gerado automaticamente pelo sistema">
               <input
                 v-model="form.code"
                 type="text"
-                required
-                class="w-full border-gray-300 rounded-md shadow-sm"
-                placeholder="Ex: CONT-001"
+                readonly
+                class="w-full border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-500 cursor-not-allowed"
+                placeholder="Gerado ao salvar"
               />
             </FormField>
             <FormField id="counting-plan-name" label="Nome" required>
@@ -49,9 +49,12 @@
                 <option value="">Selecione...</option>
                 <option value="DAILY">Diária</option>
                 <option value="WEEKLY">Semanal</option>
+                <option value="BIWEEKLY">Quinzenal</option>
                 <option value="MONTHLY">Mensal</option>
                 <option value="QUARTERLY">Trimestral</option>
-                <option value="YEARLY">Anual</option>
+                <option value="SEMIANNUAL">Semestral</option>
+                <option value="ANNUAL">Anual</option>
+                <option value="ON_DEMAND">Sob Demanda</option>
               </select>
             </FormField>
             <FormField id="counting-plan-priority" label="Prioridade" required>
@@ -61,6 +64,52 @@
                 <option :value="10">10 - Alta</option>
               </select>
             </FormField>
+          </div>
+        </div>
+
+        <!-- Tolerância e Recontagem -->
+        <div class="mb-6">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Tolerância e Recontagem</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField id="counting-plan-tolerance-percent" label="Tolerância (%)" hint="Diferença percentual aceitável antes de virar divergência">
+              <input
+                v-model.number="form.tolerancePercent"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                class="w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </FormField>
+            <FormField id="counting-plan-tolerance-qty" label="Tolerância (Quantidade)" hint="Diferença em quantidade aceitável antes de virar divergência">
+              <input
+                v-model.number="form.toleranceQty"
+                type="number"
+                min="0"
+                step="1"
+                class="w-full border-gray-300 rounded-md shadow-sm"
+              />
+            </FormField>
+          </div>
+          <div class="mt-4 space-y-2">
+            <label class="flex items-center space-x-2">
+              <input
+                id="counting-plan-require-recount"
+                v-model="form.requireRecount"
+                type="checkbox"
+                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span class="text-sm text-gray-700">Exigir recontagem para itens com divergência fora da tolerância</span>
+            </label>
+            <label class="flex items-center space-x-2">
+              <input
+                id="counting-plan-allow-blind-count"
+                v-model="form.allowBlindCount"
+                type="checkbox"
+                class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span class="text-sm text-gray-700">Permitir contagem cega (não mostra a quantidade do sistema ao contador)</span>
+            </label>
           </div>
         </div>
 
@@ -253,6 +302,10 @@ const form = ref({
   startDate: '',
   endDate: '',
   description: '',
+  tolerancePercent: 0,
+  toleranceQty: 0,
+  requireRecount: true,
+  allowBlindCount: true,
 });
 
 const isPaused = ref(false);
@@ -279,6 +332,10 @@ const loadPlan = async (id: string) => {
       startDate: plan.startDate ? new Date(plan.startDate).toISOString().split('T')[0] : '',
       endDate: plan.endDate ? new Date(plan.endDate).toISOString().split('T')[0] : '',
       description: plan.description || '',
+      tolerancePercent: plan.tolerancePercent != null ? Number(plan.tolerancePercent) : 0,
+      toleranceQty: plan.toleranceQty ?? 0,
+      requireRecount: plan.requireRecount ?? true,
+      allowBlindCount: plan.allowBlindCount ?? true,
     };
     
     // Definir status de pausa
@@ -412,9 +469,12 @@ const generatePDF = async () => {
     const frequencyLabels: Record<string, string> = {
       'DAILY': 'Diária',
       'WEEKLY': 'Semanal',
+      'BIWEEKLY': 'Quinzenal',
       'MONTHLY': 'Mensal',
       'QUARTERLY': 'Trimestral',
-      'YEARLY': 'Anual'
+      'SEMIANNUAL': 'Semestral',
+      'ANNUAL': 'Anual',
+      'ON_DEMAND': 'Sob Demanda'
     };
     
     doc.text(`Código: ${form.value.code}`, 15, yPos);

@@ -43,7 +43,7 @@
         <div class="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p class="text-sm text-gray-600">Localização</p>
-            <p class="font-semibold">{{ currentItem.location?.code }}</p>
+            <p class="font-semibold">{{ currentItem.storagePosition?.code || '-' }}</p>
           </div>
           <div>
             <p class="text-sm text-gray-600">Qtd. Sistema</p>
@@ -176,7 +176,15 @@ const notes = ref('');
 
 const currentItem = computed(() => items.value?.[currentIndex.value]);
 const totalItems = computed(() => items.value?.length || 0);
-const countedItems = computed(() => items.value?.filter(i => i.status === 'COUNTED').length || 0);
+// Conta qualquer item que já saiu de PENDING (COUNTED, ADJUSTED, RECOUNTED...),
+// não só COUNTED — um item dentro da tolerância vai direto para ADJUSTED
+// (aceito automaticamente) e nunca passa por COUNTED. Contar só COUNTED
+// subestimava o progresso sempre que havia item sem divergência. Mesmo
+// critério do backend (countingSessionService/countingItemService): "não
+// PENDING e não CANCELLED" é que define "já processado".
+const countedItems = computed(
+  () => items.value?.filter(i => i.status !== 'PENDING' && i.status !== 'CANCELLED').length || 0
+);
 const progress = computed(() => totalItems.value > 0 ? Math.round((countedItems.value / totalItems.value) * 100) : 0);
 
 onMounted(async () => {
@@ -194,11 +202,15 @@ const loadSession = async () => {
     // Get items from store
     items.value = countingStore.items || [];
     
-    // Find first pending item
+    // Posiciona no primeiro PENDING — e, se não houver nenhum (sessão sem
+    // itens pendentes desde o carregamento, não só depois de contar todos
+    // aqui na tela), manda currentIndex pro fim explicitamente. Sem o `else`,
+    // currentIndex ficava no valor inicial (0) e currentItem apontava pro
+    // primeiro item da lista mesmo já processado — a tela mostrava um item
+    // "pra contar" que na verdade já estava concluído, em vez de cair direto
+    // no estado "Inventário Concluído!".
     const pendingIndex = items.value.findIndex(i => i.status === 'PENDING');
-    if (pendingIndex >= 0) {
-      currentIndex.value = pendingIndex;
-    }
+    currentIndex.value = pendingIndex >= 0 ? pendingIndex : items.value.length;
   } catch (err: any) {
     console.error('Erro ao carregar sessão:', err);
     error.value = err.response?.data?.message || err.message || 'Erro ao carregar sessão';
@@ -233,14 +245,26 @@ const nextItem = () => {
   countedQty.value = null;
   notes.value = '';
 
-  // Find next pending item
-  const nextPending = items.value.findIndex((i, idx) => idx > currentIndex.value && i.status === 'PENDING');
-  if (nextPending >= 0) {
-    currentIndex.value = nextPending;
-  } else {
-    // No more pending items
-    currentIndex.value = items.value.length;
+  // Busca circular a partir do item SEGUINTE ao atual, dando a volta pro
+  // início da lista se preciso — "Pular" (skipItem) não persiste nada no
+  // backend, o item pulado continua PENDING lá. A busca precisa de duas
+  // propriedades ao mesmo tempo: (1) nunca reexibir o item recém-pulado
+  // imediatamente (por isso começa em +1, não em 0), e (2) ainda assim
+  // revisitar itens pulados mais cedo, em vez de só andar pra frente — uma
+  // busca só-pra-frente nunca voltava pra eles: ao chegar no fim da lista, a
+  // tela mostrava "Concluído!" com itens ainda pendentes escondidos "atrás",
+  // e "Finalizar Sessão" falhava (o backend rejeita sessão com item PENDING).
+  const total = items.value.length;
+  for (let offset = 1; offset <= total; offset++) {
+    const idx = (currentIndex.value + offset) % total;
+    if (items.value[idx]?.status === 'PENDING') {
+      currentIndex.value = idx;
+      return;
+    }
   }
+
+  // Nenhum item PENDING sobrando de verdade.
+  currentIndex.value = total;
 };
 
 const completeSession = async () => {

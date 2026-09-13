@@ -11,6 +11,9 @@ import {
   createTestPositions,
   createTestPositionBalance,
   setTestLicensedModule,
+  createTestManager,
+  createTestCountingSession,
+  createTestCountingItem,
 } from '../helpers/fixtures';
 
 /**
@@ -469,5 +472,37 @@ describe('counting-session.service — contagem por endereço (Fase 3 do WMS)', 
       expect(movement.fromPositionId).toBeNull();
       expect(movement.toPositionId).toBeNull();
     });
+  });
+});
+
+/**
+ * `generateReport()` — achado numa auditoria de UX (a revisão encontrou que a
+ * grade de divergências do frontend não tinha como acionar "Recontar"/"Aceitar"
+ * num item específico porque a resposta do relatório nunca incluía o `id` do
+ * item, só dados de exibição). Sem o `id`, a tela simplesmente não tem como
+ * identificar QUAL item o usuário quer recontar/aceitar.
+ */
+describe('CountingSessionService.generateReport', () => {
+  afterEach(async () => {
+    await cleanDatabase();
+  });
+
+  afterAll(async () => {
+    await disconnectTestDb();
+  });
+
+  it('inclui o id do item em cada divergência do relatório', async () => {
+    const manager = await createTestManager();
+    const product = await createTestProduct();
+    const plan = await createTestCountingPlan(manager.id, { status: 'ACTIVE' });
+    const session = await createTestCountingSession(plan.id);
+    const item = await createTestCountingItem(session.id, product.id, 10);
+    await testPrisma.countingItem.update({
+      where: { id: item.id },
+      data: { countedQty: 7, difference: -3, differencePercent: -30, hasDifference: true, status: 'COUNTED' },
+    });
+    const report = await countingSessionService.generateReport(session.id);
+    expect(report.divergences).toHaveLength(1);
+    expect(report.divergences[0].id).toBe(item.id);
   });
 });

@@ -261,11 +261,13 @@ export interface CountingReport {
     totalDifferenceValue: number;
   };
   divergences: Array<{
+    id: string;
     product: {
       code: string;
       name: string;
       type: string;
     };
+    storagePosition?: { id: string; code: string } | null;
     systemQty: number;
     countedQty?: number;
     finalQty?: number;
