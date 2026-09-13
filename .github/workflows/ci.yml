@@ -148,3 +148,14 @@ jobs:
       - name: Build (informativo - erros pre-existentes, ver nota acima)
         run: npm run build
         continue-on-error: true
+
+      # BLOQUEANTE (sem continue-on-error): ao contrario do type-check/build
+      # acima, a suite de testes (Vitest + Vue Test Utils) nao tem falhas
+      # pre-existentes - passa limpa hoje. O cronograma de modernizacao
+      # (docs/fase-2026-09-modernizacao/02_CRONOGRAMA_IMPLEMENTACOES.md,
+      # item 3.6) ja registrava "rodar suite de testes em todo PR, backend e
+      # frontend" como feito, mas o job so tinha o step do backend ate esta
+      # auditoria adicionar este step - a suite do frontend nunca rodou em
+      # CI antes disso, so manualmente a cada PR.
+      - name: Testes (Vitest)
+        run: npm run test
