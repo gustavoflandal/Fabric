@@ -336,6 +336,19 @@ export async function createTestPositions(
   return { warehouse, structure, positions };
 }
 
+let customerCounter = 0;
+
+/**
+ * Expedição: cliente de teste — o titular do `SalesOrder`. Standalone, como
+ * `createTestSupplier()`: o pedido de venda não exige nada além de existir.
+ */
+export async function createTestCustomer() {
+  customerCounter += 1;
+  return testPrisma.customer.create({
+    data: { code: `CLI-TEST-${customerCounter}`, name: `Cliente de Teste ${customerCounter}` },
+  });
+}
+
 let supplierCounter = 0;
 let orderCounter = 0;
 
