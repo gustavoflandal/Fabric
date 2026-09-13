@@ -1,4 +1,4 @@
-import { createYardVisitSchema } from '../../src/validators/yard-visit.validator';
+import { createYardVisitSchema, listYardVisitQuerySchema } from '../../src/validators/yard-visit.validator';
 
 /**
  * Achado IMPORTANTE #2/#3 da revisão final de branch da Etapa 2 (Agendamento
@@ -65,5 +65,35 @@ describe('createYardVisitSchema — supplierId condicional', () => {
     });
 
     expect(error).toBeUndefined();
+  });
+});
+
+/**
+ * Achado IMPORTANTE #2 da revisão final de branch da Etapa 4 (Operação de
+ * Doca): `listYardVisitQuerySchema` ficou defasado depois que os status
+ * AT_DOCK/COMPLETED foram adicionados à visita — `GET /yard-visits?status=AT_DOCK`
+ * respondia 400 "Erro de validação" mesmo sendo um status válido do fluxo.
+ */
+describe('listYardVisitQuerySchema — status inclui todo o ciclo de vida da visita', () => {
+  it('aceita status=AT_DOCK', () => {
+    const { error } = listYardVisitQuerySchema.validate({ status: 'AT_DOCK' });
+    expect(error).toBeUndefined();
+  });
+
+  it('aceita status=COMPLETED', () => {
+    const { error } = listYardVisitQuerySchema.validate({ status: 'COMPLETED' });
+    expect(error).toBeUndefined();
+  });
+
+  it('continua aceitando os status pré-existentes (SCHEDULED, CHECKED_IN, IN_YARD, CANCELLED)', () => {
+    for (const status of ['SCHEDULED', 'CHECKED_IN', 'IN_YARD', 'CANCELLED']) {
+      const { error } = listYardVisitQuerySchema.validate({ status });
+      expect(error).toBeUndefined();
+    }
+  });
+
+  it('rejeita um status inválido', () => {
+    const { error } = listYardVisitQuerySchema.validate({ status: 'NAO_EXISTE' });
+    expect(error).toBeDefined();
   });
 });

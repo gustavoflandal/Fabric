@@ -27,6 +27,8 @@
             <option value="SCHEDULED">Agendado</option>
             <option value="CHECKED_IN">Check-in feito</option>
             <option value="IN_YARD">No pátio</option>
+            <option value="AT_DOCK">Na doca</option>
+            <option value="COMPLETED">Concluída</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
         </FormField>
@@ -86,7 +88,7 @@
             <button @click="openAllocateModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Alocar Vaga</button>
             <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
           </template>
-          <template v-else-if="asItem(item).status === 'CHECKED_IN' && !warehouseUsesYard[asItem(item).warehouseId]">
+          <template v-else-if="asItem(item).status === 'CHECKED_IN' && warehouseUsesYard[asItem(item).warehouseId] === false">
             <button @click="openMoveToDockModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Mover para Doca</button>
             <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
           </template>

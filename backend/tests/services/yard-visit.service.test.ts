@@ -290,6 +290,23 @@ describe('YardVisitService', () => {
       const stillExists = await testPrisma.yardVisit.findUnique({ where: { id: visit.id } });
       expect(stillExists).not.toBeNull();
     });
+
+    it('rejeita cancelar uma visita já COMPLETED — status terminal', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: false, delayToleranceMinutes: 15 } });
+      const dock = await testPrisma.yardDock.create({ data: { warehouseId: warehouse.id, code: 'DOCA-CANCEL-01', serviceType: 'RECEBIMENTO' } });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'D-Terminal', cpf: '55566677788', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'TRM1234', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+      await yardVisitService.moveToDock(visit.id, dock.id);
+      await yardVisitService.complete(visit.id);
+
+      await expect(yardVisitService.cancel(visit.id)).rejects.toThrow('Esta visita já foi finalizada');
+    });
   });
 
   describe('update', () => {

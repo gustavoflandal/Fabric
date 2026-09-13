@@ -28,7 +28,7 @@ export interface CheckInYardVisitDto {
 
 export interface YardVisitFilters {
   warehouseId?: string;
-  status?: 'SCHEDULED' | 'CHECKED_IN' | 'CANCELLED';
+  status?: 'SCHEDULED' | 'CHECKED_IN' | 'IN_YARD' | 'AT_DOCK' | 'COMPLETED' | 'CANCELLED';
   serviceType?: 'RECEBIMENTO' | 'EXPEDICAO' | 'MULTIUSO';
   vehicleId?: string;
 }
@@ -332,6 +332,9 @@ export class YardVisitService {
     if (!visit) throw new AppError(404, 'Visita não encontrada');
     if (visit.status === 'CANCELLED') {
       throw new AppError(400, 'Esta visita já está cancelada');
+    }
+    if (visit.status === 'COMPLETED') {
+      throw new AppError(400, 'Esta visita já foi finalizada');
     }
     const updated = await prisma.yardVisit.update({ where: { id }, data: { status: 'CANCELLED' } });
     return { ...updated, punctuality: null };

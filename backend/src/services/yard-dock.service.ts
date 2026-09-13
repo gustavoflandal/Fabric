@@ -113,6 +113,10 @@ export class YardDockService {
   }
 
   async delete(id: string) {
+    const activeVisit = await prisma.yardVisit.findFirst({ where: { yardDockId: id, status: 'AT_DOCK' } });
+    if (activeVisit) {
+      throw new AppError(400, 'Não é possível excluir uma doca com um veículo nela');
+    }
     return prisma.yardDock.delete({ where: { id } });
   }
 }
