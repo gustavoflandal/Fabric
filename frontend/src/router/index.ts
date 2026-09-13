@@ -266,6 +266,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/yard/areas',
+    name: 'yard-areas',
+    component: () => import('../views/yard/YardAreaListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/yard/areas/:areaId/spots',
+    name: 'yard-area-spots',
+    component: () => import('../views/yard/YardSpotListView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/maintenance/equipment',
     name: 'maintenance-equipment',
     component: () => import('../views/maintenance/EquipmentListView.vue'),

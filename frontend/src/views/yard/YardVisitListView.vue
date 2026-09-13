@@ -26,6 +26,7 @@
             <option value="">Todos</option>
             <option value="SCHEDULED">Agendado</option>
             <option value="CHECKED_IN">Check-in feito</option>
+            <option value="IN_YARD">No pátio</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
         </FormField>
@@ -82,6 +83,13 @@
             <button @click="handleDelete(asItem(item))" class="text-red-600 hover:text-red-900">Excluir</button>
           </template>
           <template v-else-if="asItem(item).status === 'CHECKED_IN'">
+            <button
+              v-if="warehouseUsesYard[asItem(item).warehouseId]"
+              @click="openAllocateModal(asItem(item))"
+              class="text-primary-600 hover:text-primary-900"
+            >
+              Alocar Vaga
+            </button>
             <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
           </template>
         </td>
@@ -171,6 +179,22 @@
         </div>
       </form>
     </AppModal>
+
+    <AppModal v-model="showAllocateModal" title="Alocar Vaga" @close="closeAllocateModal">
+      <form id="allocate-spot-form" @submit.prevent="handleConfirmAllocate" class="space-y-4">
+        <FormField id="allocate-spot-select" label="Vaga livre" required>
+          <select v-model="allocateSpotId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
+            <option value="">Selecione...</option>
+            <option v-for="spot in freeSpotsForAllocation" :key="spot.id" :value="spot.id">{{ spot.area?.code }} — {{ spot.code }}</option>
+          </select>
+        </FormField>
+        <p v-if="freeSpotsForAllocation.length === 0" class="text-sm text-yellow-600">Nenhuma vaga livre neste armazém no momento.</p>
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="closeAllocateModal" class="flex-1">Cancelar</Button>
+          <Button type="submit" :disabled="freeSpotsForAllocation.length === 0" class="flex-1">Alocar</Button>
+        </div>
+      </form>
+    </AppModal>
   </AppLayout>
 </template>
 
@@ -182,6 +206,9 @@ import { useSupplierStore } from '@/stores/supplier.store'
 import { useDriverStore } from '@/stores/driver.store'
 import { useVehicleStore } from '@/stores/vehicle.store'
 import purchaseOrderService, { type PurchaseOrder } from '@/services/purchase-order.service'
+import yardWarehouseParamsService from '@/services/yard-warehouse-params.service'
+import yardAreaService from '@/services/yard-area.service'
+import yardSpotService, { type YardSpot } from '@/services/yard-spot.service'
 import type { YardVisit, YardVisitStatus, PunctualityStatus } from '@/services/yard-visit.service'
 import AppLayout from '@/components/common/AppLayout.vue'
 import AppModal from '@/components/common/AppModal.vue'
@@ -196,11 +223,13 @@ import { confirmDialog } from '@/composables/useConfirm'
 const STATUS_LABELS: Record<YardVisitStatus, string> = {
   SCHEDULED: 'Agendado',
   CHECKED_IN: 'Check-in feito',
+  IN_YARD: 'No pátio',
   CANCELLED: 'Cancelado',
 }
 const STATUS_TONES: Record<YardVisitStatus, 'success' | 'warning' | 'danger'> = {
   SCHEDULED: 'warning',
   CHECKED_IN: 'success',
+  IN_YARD: 'success',
   CANCELLED: 'danger',
 }
 const PUNCTUALITY_LABELS: Record<Exclude<PunctualityStatus, null>, string> = {
@@ -234,6 +263,11 @@ const checkInData = ref({ driverId: '', vehicleId: '' })
 const confirmedPurchaseOrders = ref<PurchaseOrder[]>([])
 const filters = ref({ warehouseId: '', status: '' })
 const pagination = ref({ page: 1, limit: 100, total: 0, pages: 0 })
+const warehouseUsesYard = ref<Record<string, boolean>>({})
+const showAllocateModal = ref(false)
+const allocatingVisit = ref<YardVisit | null>(null)
+const allocateSpotId = ref('')
+const freeSpotsForAllocation = ref<YardSpot[]>([])
 const formData = ref({
   warehouseId: '',
   serviceType: 'RECEBIMENTO' as YardVisit['serviceType'],
@@ -245,6 +279,14 @@ const formData = ref({
   vehicleId: '',
 })
 
+const loadWarehouseUsesYard = async (warehouseIds: string[]) => {
+  const unique = [...new Set(warehouseIds)].filter((id) => !(id in warehouseUsesYard.value))
+  for (const id of unique) {
+    const result = await yardWarehouseParamsService.getByWarehouseId(id)
+    warehouseUsesYard.value[id] = result.data.data.useYard
+  }
+}
+
 const loadVisits = async () => {
   try {
     loading.value = true
@@ -255,6 +297,7 @@ const loadVisits = async () => {
     })
     visitList.value = result.data
     pagination.value = result.pagination
+    await loadWarehouseUsesYard(visitList.value.map((v) => v.warehouseId))
   } catch (e: any) {
     error.value = e.response?.data?.message || 'Erro ao carregar visitas'
   } finally {
@@ -311,6 +354,32 @@ const openCheckInModal = (visit: YardVisit) => {
   showCheckInModal.value = true
 }
 const closeCheckInModal = () => { showCheckInModal.value = false; checkingInVisit.value = null }
+
+const openAllocateModal = async (visit: YardVisit) => {
+  allocatingVisit.value = visit
+  allocateSpotId.value = ''
+  showAllocateModal.value = true
+  const areasResult = await yardAreaService.getAll(1, 500, { warehouseId: visit.warehouseId })
+  const areas = areasResult.data.data
+  const spotsByArea = await Promise.all(
+    areas.map((area: any) => yardSpotService.getAll(1, 500, { areaId: area.id }))
+  )
+  const allSpots = spotsByArea.flatMap((r) => r.data.data)
+  freeSpotsForAllocation.value = allSpots.filter((s: YardSpot) => !s.blocked && s.active && !s.visits?.length)
+}
+const closeAllocateModal = () => { showAllocateModal.value = false; allocatingVisit.value = null }
+
+const handleConfirmAllocate = async () => {
+  if (!allocatingVisit.value || !allocateSpotId.value) return
+  try {
+    await yardVisitStore.allocateSpot(allocatingVisit.value.id, allocateSpotId.value)
+    toast.success('Vaga alocada com sucesso!')
+    closeAllocateModal()
+    await loadVisits()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao alocar vaga')
+  }
+}
 
 const handleSubmit = async () => {
   try {

@@ -1,6 +1,6 @@
 import api from './api.service'
 
-export type YardVisitStatus = 'SCHEDULED' | 'CHECKED_IN' | 'CANCELLED'
+export type YardVisitStatus = 'SCHEDULED' | 'CHECKED_IN' | 'IN_YARD' | 'CANCELLED'
 export type PunctualityStatus = 'NO_HORARIO' | 'ANTECIPADO' | 'ATRASADO' | null
 
 export interface WarehouseRef {
@@ -36,6 +36,7 @@ export interface YardVisit {
   notes: string | null
   driverId: string | null
   vehicleId: string | null
+  yardSpotId: string | null
   checkedInAt: string | null
   punctuality: PunctualityStatus
   createdAt: string
@@ -106,6 +107,10 @@ class YardVisitService {
 
   async cancel(id: string) {
     return api.patch(`${this.basePath}/${id}/cancel`)
+  }
+
+  async allocateSpot(id: string, yardSpotId: string) {
+    return api.patch(`${this.basePath}/${id}/allocate-spot`, { yardSpotId })
   }
 }
 
