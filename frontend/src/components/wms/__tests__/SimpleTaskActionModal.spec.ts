@@ -10,8 +10,8 @@ vi.mock('@/services/warehouse-task.service', () => ({
 
 const task = {
   id: 't1', type: 'CONFERENCIA' as const, status: 'IN_PROGRESS' as const, reference: 'r1',
-  referenceType: 'PURCHASE_RECEIPT', sequence: 2, assignedTo: 'me', assignee: null,
-  productId: null, quantity: null, fromPositionId: null, toPositionId: null,
+  referenceType: 'PURCHASE_RECEIPT', sequence: 2, priority: 0, assignedTo: 'me', assignee: null,
+  productId: null, lotId: null, quantity: null, fromPositionId: null, toPositionId: null,
   version: 0, createdAt: '', startedAt: null, completedAt: null,
 }
 
