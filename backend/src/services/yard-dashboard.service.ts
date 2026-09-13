@@ -1,3 +1,4 @@
+import { YardVisitStatus } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 
@@ -67,7 +68,7 @@ export class YardDashboardService {
     }
 
     const mode: 'REALTIME' | 'HISTORICAL' = days ? 'HISTORICAL' : 'REALTIME';
-    const OPEN_STATUSES = ['CHECKED_IN', 'IN_YARD', 'AT_DOCK'] as const;
+    const OPEN_STATUSES: YardVisitStatus[] = ['CHECKED_IN', 'IN_YARD', 'AT_DOCK'];
     // Em modo histórico, o filtro por `createdAt` sozinho deixaria de fora uma
     // visita que já está aberta (ex: AT_DOCK) mas começou ANTES da janela de
     // `days` — subestimando totals.patio/totals.doca (e a ocupação derivada
