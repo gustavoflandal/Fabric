@@ -276,10 +276,11 @@ Em `backend/src/services/yard-visit.service.ts` (já existente), adicionar os m�
     const occupied = await prisma.yardVisit.findFirst({ where: { yardDockId, status: 'AT_DOCK' } });
     if (occupied) throw new AppError(400, 'Doca já está ocupada');
 
-    return prisma.yardVisit.update({
+    const updated = await prisma.yardVisit.update({
       where: { id },
       data: { status: 'AT_DOCK', yardDockId, dockArrivedAt: new Date() },
     });
+    return this.attachPunctuality(updated);
   }
 
   async startLoading(id: string) {
@@ -288,7 +289,8 @@ Em `backend/src/services/yard-visit.service.ts` (já existente), adicionar os m�
     if (visit.status !== 'AT_DOCK') throw new AppError(400, 'Só é possível iniciar carga/descarga com a visita na doca');
     if (visit.loadingStartedAt) throw new AppError(400, 'Carga/descarga já foi iniciada');
 
-    return prisma.yardVisit.update({ where: { id }, data: { loadingStartedAt: new Date() } });
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { loadingStartedAt: new Date() } });
+    return this.attachPunctuality(updated);
   }
 
   async endLoading(id: string) {
@@ -298,7 +300,8 @@ Em `backend/src/services/yard-visit.service.ts` (já existente), adicionar os m�
     if (!visit.loadingStartedAt) throw new AppError(400, 'Carga/descarga ainda não foi iniciada');
     if (visit.loadingEndedAt) throw new AppError(400, 'Carga/descarga já foi concluída');
 
-    return prisma.yardVisit.update({ where: { id }, data: { loadingEndedAt: new Date() } });
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { loadingEndedAt: new Date() } });
+    return this.attachPunctuality(updated);
   }
 
   async complete(id: string) {
@@ -306,7 +309,8 @@ Em `backend/src/services/yard-visit.service.ts` (já existente), adicionar os m�
     if (!visit) throw new AppError(404, 'Visita não encontrada');
     if (visit.status !== 'AT_DOCK') throw new AppError(400, 'Só é possível finalizar/liberar com a visita na doca');
 
-    return prisma.yardVisit.update({ where: { id }, data: { status: 'COMPLETED', completedAt: new Date() } });
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { status: 'COMPLETED', completedAt: new Date() } });
+    return this.attachPunctuality(updated);
   }
 ```
 
