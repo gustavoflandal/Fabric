@@ -242,6 +242,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/wms/transfers',
+    name: 'wms-transfers',
+    component: () => import('../views/wms/StockTransferView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/yard/docks',
     name: 'yard-docks',
     component: () => import('../views/yard/YardDockListView.vue'),
