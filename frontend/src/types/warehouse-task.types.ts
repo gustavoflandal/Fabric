@@ -11,6 +11,11 @@ export const WAREHOUSE_TASK_TYPES = [
   'SEGREGACAO',
   'AMOSTRAGEM',
   'ALOCACAO',
+  // Fase 4b/5 (F4.8/F4.10) — tipos do fluxo de SAÍDA (separação/reposição), já
+  // existentes no enum Prisma (schema.prisma linha ~1594). O frontend estava
+  // desatualizado; nenhuma mudança de backend foi necessária para isto.
+  'PICKING',
+  'REPLENISHMENT',
 ] as const
 
 export type WarehouseTaskType = (typeof WAREHOUSE_TASK_TYPES)[number]
@@ -23,6 +28,8 @@ export const WAREHOUSE_TASK_TYPE_LABELS: Record<WarehouseTaskType, string> = {
   SEGREGACAO: 'Segregação',
   AMOSTRAGEM: 'Amostragem',
   ALOCACAO: 'Alocação',
+  PICKING: 'Separação',
+  REPLENISHMENT: 'Reposição',
 }
 
 export type WarehouseTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
@@ -30,7 +37,26 @@ export type WarehouseTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CAN
 export interface WarehouseTaskAssignee {
   id: string
   name: string
-  email: string
+  email?: string
+}
+
+export interface WarehouseTaskProductRef {
+  id: string
+  code: string
+  name: string
+}
+
+// Fase 5 — o lote que a tarefa movimenta (FEFO no picking). `null`/ausente
+// para produto sem `lotTracked`.
+export interface WarehouseTaskLotRef {
+  id: string
+  lotNumber: string
+  expiresAt: string | null
+}
+
+export interface WarehouseTaskPositionRef {
+  id: string
+  code: string
 }
 
 export interface WarehouseTask {
@@ -40,16 +66,40 @@ export interface WarehouseTask {
   reference: string | null
   referenceType: string | null
   sequence: number | null
+  // F4.8/F4.10 — urgência declarada da tarefa (DESC na fila de `GET /my`).
+  priority: number
   assignedTo: string | null
-  assignee: WarehouseTaskAssignee | null
+  // NEM TODO endpoint que devolve `WarehouseTask` inclui a relação `assignee`
+  // (ex.: `GET /warehouse-tasks/my` hoje não a seleciona) — por isso opcional,
+  // e não apenas nullable. Ver a nota em `PickingView.vue::responsavelLabel`.
+  assignee?: WarehouseTaskAssignee | null
   productId: string | null
+  product?: WarehouseTaskProductRef | null
+  lotId: string | null
+  lot?: WarehouseTaskLotRef | null
+  // `Decimal(18,4)` serializado como STRING pelo backend (decisão D2) — nunca
+  // `number` na borda, para não perder precisão.
   quantity: string | null
   fromPositionId: string | null
+  fromPosition?: WarehouseTaskPositionRef | null
   toPositionId: string | null
+  toPosition?: WarehouseTaskPositionRef | null
   version: number
   createdAt: string
   startedAt: string | null
   completedAt: string | null
+}
+
+// F4.11 — resposta de `POST /warehouse-tasks/:id/scan`. Sempre HTTP 200,
+// mesmo com `ok: false` (ver a nota completa em `warehouse-task.service.ts`
+// do backend, `scanTask`).
+export interface WarehouseTaskScanResult {
+  taskId: string
+  code: string
+  match: 'POSITION' | 'PRODUCT' | null
+  ok: boolean
+  message: string
+  expected: { position: string | null; product: string | null }
 }
 
 export interface ReceiptOperation {
