@@ -46,6 +46,7 @@ import yardVisitRoutes from './yard-visit.routes';
 import yardAreaRoutes from './yard-area.routes';
 import yardSpotRoutes from './yard-spot.routes';
 import yardDashboardRoutes from './yard-dashboard.routes';
+import helpRoutes from './help.routes';
 import { requireModule } from '../middleware/module.middleware';
 
 const router = Router();
@@ -169,6 +170,12 @@ router.use('/system', systemRoutes);
 // (WMS/COMPRAS): igual /system e /counting, disponível sempre que a
 // permissão assistente_ia:usar for concedida.
 router.use('/assistant', assistantRoutes);
+
+// Manual do usuário (botão de Ajuda, presente em toda tela). Mesmo arquivo
+// Markdown servido aqui é o que o script de indexação (ai-index-docs.ts)
+// embute no ChromaDB para o assistente de IA — fonte única, sem duplicação.
+// Sem requireModule: conteúdo cross-módulo, qualquer usuário autenticado acessa.
+router.use('/help', helpRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {
