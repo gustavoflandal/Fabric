@@ -1,6 +1,6 @@
 import api from './api.service'
 
-export type YardVisitStatus = 'SCHEDULED' | 'CHECKED_IN' | 'IN_YARD' | 'CANCELLED'
+export type YardVisitStatus = 'SCHEDULED' | 'CHECKED_IN' | 'IN_YARD' | 'AT_DOCK' | 'COMPLETED' | 'CANCELLED'
 export type PunctualityStatus = 'NO_HORARIO' | 'ANTECIPADO' | 'ATRASADO' | null
 
 export interface WarehouseRef {
@@ -37,6 +37,11 @@ export interface YardVisit {
   driverId: string | null
   vehicleId: string | null
   yardSpotId: string | null
+  yardDockId: string | null
+  dockArrivedAt: string | null
+  loadingStartedAt: string | null
+  loadingEndedAt: string | null
+  completedAt: string | null
   checkedInAt: string | null
   punctuality: PunctualityStatus
   createdAt: string
@@ -111,6 +116,22 @@ class YardVisitService {
 
   async allocateSpot(id: string, yardSpotId: string) {
     return api.patch(`${this.basePath}/${id}/allocate-spot`, { yardSpotId })
+  }
+
+  async moveToDock(id: string, yardDockId: string) {
+    return api.patch(`${this.basePath}/${id}/move-to-dock`, { yardDockId })
+  }
+
+  async startLoading(id: string) {
+    return api.patch(`${this.basePath}/${id}/start-loading`)
+  }
+
+  async endLoading(id: string) {
+    return api.patch(`${this.basePath}/${id}/end-loading`)
+  }
+
+  async complete(id: string) {
+    return api.patch(`${this.basePath}/${id}/complete`)
   }
 }
 

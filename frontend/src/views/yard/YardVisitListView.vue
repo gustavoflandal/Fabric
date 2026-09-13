@@ -27,6 +27,8 @@
             <option value="SCHEDULED">Agendado</option>
             <option value="CHECKED_IN">Check-in feito</option>
             <option value="IN_YARD">No pátio</option>
+            <option value="AT_DOCK">Na doca</option>
+            <option value="COMPLETED">Concluída</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
         </FormField>
@@ -82,15 +84,37 @@
             <button @click="openEditModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Editar</button>
             <button @click="handleDelete(asItem(item))" class="text-red-600 hover:text-red-900">Excluir</button>
           </template>
-          <template v-else-if="asItem(item).status === 'CHECKED_IN'">
+          <template v-else-if="asItem(item).status === 'CHECKED_IN' && warehouseUsesYard[asItem(item).warehouseId]">
+            <button @click="openAllocateModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Alocar Vaga</button>
+            <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
+          </template>
+          <template v-else-if="asItem(item).status === 'CHECKED_IN' && warehouseUsesYard[asItem(item).warehouseId] === false">
+            <button @click="openMoveToDockModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Mover para Doca</button>
+            <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
+          </template>
+          <template v-else-if="asItem(item).status === 'IN_YARD'">
+            <button @click="openMoveToDockModal(asItem(item))" class="text-primary-600 hover:text-primary-900">Mover para Doca</button>
+            <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
+          </template>
+          <template v-else-if="asItem(item).status === 'AT_DOCK'">
             <button
-              v-if="warehouseUsesYard[asItem(item).warehouseId]"
-              @click="openAllocateModal(asItem(item))"
+              v-if="!asItem(item).loadingStartedAt"
+              @click="handleStartLoading(asItem(item))"
               class="text-primary-600 hover:text-primary-900"
             >
-              Alocar Vaga
+              Iniciar Carga/Descarga
             </button>
-            <button @click="handleCancel(asItem(item))" class="text-yellow-600 hover:text-yellow-900">Cancelar</button>
+            <button
+              v-else-if="!asItem(item).loadingEndedAt"
+              @click="handleEndLoading(asItem(item))"
+              class="text-primary-600 hover:text-primary-900"
+            >
+              Concluir Carga/Descarga
+            </button>
+            <button @click="handleComplete(asItem(item))" class="text-green-600 hover:text-green-900">Finalizar e Liberar</button>
+          </template>
+          <template v-else-if="asItem(item).status === 'COMPLETED'">
+            <span class="text-sm text-gray-500 dark:text-gray-400">{{ formatDuration(asItem(item).checkedInAt, asItem(item).completedAt) }}</span>
           </template>
         </td>
       </template>
@@ -195,6 +219,21 @@
         </div>
       </form>
     </AppModal>
+
+    <AppModal v-model="showMoveToDockModal" title="Mover para Doca" @close="closeMoveToDockModal">
+      <form id="move-to-dock-form" @submit.prevent="handleConfirmMoveToDock" class="space-y-4">
+        <FormField id="move-to-dock-select" label="Doca livre" required>
+          <select v-model="moveToDockId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
+            <option value="">Selecione...</option>
+            <option v-for="dock in availableDocksForMove" :key="dock.id" :value="dock.id">{{ dock.code }}</option>
+          </select>
+        </FormField>
+        <div class="flex gap-3 pt-4">
+          <Button type="button" variant="outline" @click="closeMoveToDockModal" class="flex-1">Cancelar</Button>
+          <Button type="submit" class="flex-1">Mover</Button>
+        </div>
+      </form>
+    </AppModal>
   </AppLayout>
 </template>
 
@@ -209,6 +248,7 @@ import purchaseOrderService, { type PurchaseOrder } from '@/services/purchase-or
 import yardWarehouseParamsService from '@/services/yard-warehouse-params.service'
 import yardAreaService from '@/services/yard-area.service'
 import yardSpotService, { type YardSpot } from '@/services/yard-spot.service'
+import yardDockService, { type YardDock } from '@/services/yard-dock.service'
 import type { YardVisit, YardVisitStatus, PunctualityStatus } from '@/services/yard-visit.service'
 import AppLayout from '@/components/common/AppLayout.vue'
 import AppModal from '@/components/common/AppModal.vue'
@@ -224,12 +264,16 @@ const STATUS_LABELS: Record<YardVisitStatus, string> = {
   SCHEDULED: 'Agendado',
   CHECKED_IN: 'Check-in feito',
   IN_YARD: 'No pátio',
+  AT_DOCK: 'Na doca',
+  COMPLETED: 'Concluída',
   CANCELLED: 'Cancelado',
 }
 const STATUS_TONES: Record<YardVisitStatus, 'success' | 'warning' | 'danger'> = {
   SCHEDULED: 'warning',
   CHECKED_IN: 'success',
   IN_YARD: 'success',
+  AT_DOCK: 'success',
+  COMPLETED: 'success',
   CANCELLED: 'danger',
 }
 const PUNCTUALITY_LABELS: Record<Exclude<PunctualityStatus, null>, string> = {
@@ -268,6 +312,10 @@ const showAllocateModal = ref(false)
 const allocatingVisit = ref<YardVisit | null>(null)
 const allocateSpotId = ref('')
 const freeSpotsForAllocation = ref<YardSpot[]>([])
+const showMoveToDockModal = ref(false)
+const movingVisit = ref<YardVisit | null>(null)
+const moveToDockId = ref('')
+const availableDocksForMove = ref<YardDock[]>([])
 const formData = ref({
   warehouseId: '',
   serviceType: 'RECEBIMENTO' as YardVisit['serviceType'],
@@ -379,6 +427,69 @@ const handleConfirmAllocate = async () => {
   } catch (err: any) {
     toast.error(err.response?.data?.message || 'Erro ao alocar vaga')
   }
+}
+
+const openMoveToDockModal = async (visit: YardVisit) => {
+  movingVisit.value = visit
+  moveToDockId.value = ''
+  showMoveToDockModal.value = true
+  const result = await yardDockService.getAll(1, 100, { warehouseId: visit.warehouseId, active: true })
+  availableDocksForMove.value = (result.data.data as YardDock[]).filter(
+    (d) => d.serviceType === 'MULTIUSO' || visit.serviceType === 'MULTIUSO' || d.serviceType === visit.serviceType
+  )
+}
+const closeMoveToDockModal = () => { showMoveToDockModal.value = false; movingVisit.value = null }
+
+const handleConfirmMoveToDock = async () => {
+  if (!movingVisit.value || !moveToDockId.value) return
+  try {
+    await yardVisitStore.moveToDock(movingVisit.value.id, moveToDockId.value)
+    toast.success('Visita movida para a doca com sucesso!')
+    closeMoveToDockModal()
+    await loadVisits()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao mover para a doca')
+  }
+}
+
+const handleStartLoading = async (visit: YardVisit) => {
+  try {
+    await yardVisitStore.startLoading(visit.id)
+    toast.success('Carga/descarga iniciada!')
+    await loadVisits()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao iniciar carga/descarga')
+  }
+}
+
+const handleEndLoading = async (visit: YardVisit) => {
+  try {
+    await yardVisitStore.endLoading(visit.id)
+    toast.success('Carga/descarga concluída!')
+    await loadVisits()
+  } catch (err: any) {
+    toast.error(err.response?.data?.message || 'Erro ao concluir carga/descarga')
+  }
+}
+
+const handleComplete = async (visit: YardVisit) => {
+  if (await confirmDialog('Confirma finalizar e liberar esta visita?')) {
+    try {
+      await yardVisitStore.completeVisit(visit.id)
+      toast.success('Visita finalizada e doca liberada!')
+      await loadVisits()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Erro ao finalizar visita')
+    }
+  }
+}
+
+const formatDuration = (start: string | null, end: string | null) => {
+  if (!start || !end) return '-'
+  const minutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60_000)
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return hours > 0 ? `${hours}h${remainingMinutes.toString().padStart(2, '0')}min` : `${remainingMinutes}min`
 }
 
 const handleSubmit = async () => {

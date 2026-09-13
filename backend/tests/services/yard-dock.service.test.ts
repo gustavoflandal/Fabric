@@ -1,4 +1,4 @@
-import { cleanDatabase, disconnectTestDb } from '../helpers/db';
+import { cleanDatabase, disconnectTestDb, testPrisma } from '../helpers/db';
 import { createTestPositions } from '../helpers/fixtures';
 import yardDockService from '../../src/services/yard-dock.service';
 
@@ -120,5 +120,34 @@ describe('YardDockService', () => {
 
     const updated = await yardDockService.update(dock.id, { storagePositionId: positions[0].id });
     expect(updated.storagePositionId).toBe(positions[0].id);
+  });
+
+  describe('delete', () => {
+    it('rejeita excluir uma doca com uma visita AT_DOCK nela', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      const dock = await yardDockService.create({ code: 'DOCA-10', serviceType: 'RECEBIMENTO', warehouseId: warehouse.id });
+      await testPrisma.yardVisit.create({
+        data: {
+          warehouseId: warehouse.id,
+          serviceType: 'RECEBIMENTO',
+          scheduledAt: new Date(),
+          status: 'AT_DOCK',
+          yardDockId: dock.id,
+        },
+      });
+
+      await expect(yardDockService.delete(dock.id)).rejects.toThrow(
+        'Não é possível excluir uma doca com um veículo nela'
+      );
+    });
+
+    it('permite excluir uma doca sem visita ativa', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      const dock = await yardDockService.create({ code: 'DOCA-11', serviceType: 'RECEBIMENTO', warehouseId: warehouse.id });
+
+      await expect(yardDockService.delete(dock.id)).resolves.toBeDefined();
+      const stillExists = await testPrisma.yardDock.findUnique({ where: { id: dock.id } });
+      expect(stillExists).toBeNull();
+    });
   });
 });

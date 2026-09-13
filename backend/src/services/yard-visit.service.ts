@@ -28,7 +28,7 @@ export interface CheckInYardVisitDto {
 
 export interface YardVisitFilters {
   warehouseId?: string;
-  status?: 'SCHEDULED' | 'CHECKED_IN' | 'CANCELLED';
+  status?: 'SCHEDULED' | 'CHECKED_IN' | 'IN_YARD' | 'AT_DOCK' | 'COMPLETED' | 'CANCELLED';
   serviceType?: 'RECEBIMENTO' | 'EXPEDICAO' | 'MULTIUSO';
   vehicleId?: string;
 }
@@ -266,11 +266,75 @@ export class YardVisitService {
     return this.attachPunctuality(updated);
   }
 
+  async moveToDock(id: string, yardDockId: string) {
+    const visit = await prisma.yardVisit.findUnique({ where: { id } });
+    if (!visit) throw new AppError(404, 'Visita não encontrada');
+
+    if (visit.status === 'CHECKED_IN') {
+      const params = await yardWarehouseParamsService.getByWarehouseId(visit.warehouseId);
+      if (params.useYard) {
+        throw new AppError(400, 'Este armazém usa pátio — aloque uma vaga antes de mover para a doca');
+      }
+    } else if (visit.status !== 'IN_YARD') {
+      throw new AppError(400, 'Só é possível mover para a doca a partir do pátio ou, sem uso de pátio, direto do check-in');
+    }
+
+    const dock = await prisma.yardDock.findUnique({ where: { id: yardDockId } });
+    if (!dock) throw new AppError(400, 'Doca informada não existe');
+    if (!dock.active) throw new AppError(400, 'Doca está inativa');
+    if (dock.warehouseId !== visit.warehouseId) throw new AppError(400, 'A doca informada pertence a outro armazém');
+    if (dock.serviceType !== 'MULTIUSO' && visit.serviceType !== 'MULTIUSO' && dock.serviceType !== visit.serviceType) {
+      throw new AppError(400, 'Tipo de serviço da doca incompatível com a visita');
+    }
+
+    const occupied = await prisma.yardVisit.findFirst({ where: { yardDockId, status: 'AT_DOCK' } });
+    if (occupied) throw new AppError(400, 'Doca já está ocupada');
+
+    const updated = await prisma.yardVisit.update({
+      where: { id },
+      data: { status: 'AT_DOCK', yardDockId, dockArrivedAt: new Date() },
+    });
+    return this.attachPunctuality(updated);
+  }
+
+  async startLoading(id: string) {
+    const visit = await prisma.yardVisit.findUnique({ where: { id } });
+    if (!visit) throw new AppError(404, 'Visita não encontrada');
+    if (visit.status !== 'AT_DOCK') throw new AppError(400, 'Só é possível iniciar carga/descarga com a visita na doca');
+    if (visit.loadingStartedAt) throw new AppError(400, 'Carga/descarga já foi iniciada');
+
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { loadingStartedAt: new Date() } });
+    return this.attachPunctuality(updated);
+  }
+
+  async endLoading(id: string) {
+    const visit = await prisma.yardVisit.findUnique({ where: { id } });
+    if (!visit) throw new AppError(404, 'Visita não encontrada');
+    if (visit.status !== 'AT_DOCK') throw new AppError(400, 'Só é possível concluir carga/descarga com a visita na doca');
+    if (!visit.loadingStartedAt) throw new AppError(400, 'Carga/descarga ainda não foi iniciada');
+    if (visit.loadingEndedAt) throw new AppError(400, 'Carga/descarga já foi concluída');
+
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { loadingEndedAt: new Date() } });
+    return this.attachPunctuality(updated);
+  }
+
+  async complete(id: string) {
+    const visit = await prisma.yardVisit.findUnique({ where: { id } });
+    if (!visit) throw new AppError(404, 'Visita não encontrada');
+    if (visit.status !== 'AT_DOCK') throw new AppError(400, 'Só é possível finalizar/liberar com a visita na doca');
+
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { status: 'COMPLETED', completedAt: new Date() } });
+    return this.attachPunctuality(updated);
+  }
+
   async cancel(id: string) {
     const visit = await prisma.yardVisit.findUnique({ where: { id } });
     if (!visit) throw new AppError(404, 'Visita não encontrada');
     if (visit.status === 'CANCELLED') {
       throw new AppError(400, 'Esta visita já está cancelada');
+    }
+    if (visit.status === 'COMPLETED') {
+      throw new AppError(400, 'Esta visita já foi finalizada');
     }
     const updated = await prisma.yardVisit.update({ where: { id }, data: { status: 'CANCELLED' } });
     return { ...updated, punctuality: null };

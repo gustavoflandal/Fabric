@@ -8,6 +8,7 @@ import {
   checkInYardVisitSchema,
   createYardVisitSchema,
   listYardVisitQuerySchema,
+  moveToDockYardVisitSchema,
   updateYardVisitSchema,
 } from '../validators/yard-visit.validator';
 
@@ -46,6 +47,15 @@ router.patch(
   validate(allocateSpotYardVisitSchema),
   yardVisitController.allocateSpot
 );
+router.patch(
+  '/:id/move-to-dock',
+  requirePermission('yard', 'executar'),
+  validate(moveToDockYardVisitSchema),
+  yardVisitController.moveToDock
+);
+router.patch('/:id/start-loading', requirePermission('yard', 'executar'), yardVisitController.startLoading);
+router.patch('/:id/end-loading', requirePermission('yard', 'executar'), yardVisitController.endLoading);
+router.patch('/:id/complete', requirePermission('yard', 'executar'), yardVisitController.complete);
 router.patch('/:id/cancel', requirePermission('yard', 'gerenciar'), yardVisitController.cancel);
 
 export default router;
