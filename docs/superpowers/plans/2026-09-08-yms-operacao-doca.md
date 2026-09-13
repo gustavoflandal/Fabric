@@ -627,7 +627,7 @@ Adicionar, antes do `</AppLayout>` de fechamento, o modal de mover pra doca:
     <AppModal v-model="showMoveToDockModal" title="Mover para Doca" @close="closeMoveToDockModal">
       <form id="move-to-dock-form" @submit.prevent="handleConfirmMoveToDock" class="space-y-4">
         <FormField id="move-to-dock-select" label="Doca livre" required>
-          <select v-model="moveToDockId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
+          <select v-model="moveToDockId" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100">
             <option value="">Selecione...</option>
             <option v-for="dock in availableDocksForMove" :key="dock.id" :value="dock.id">{{ dock.code }}</option>
           </select>
