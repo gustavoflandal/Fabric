@@ -108,6 +108,14 @@
           label="Lote"
           hint="ID do lote de origem (obrigatório na prática para produto com controle de lote)"
         >
+          <!--
+            Débito técnico conhecido: campo de texto livre para o UUID do lote,
+            não um seletor. Não existe hoje nenhum endpoint de backend para
+            buscar/listar lotes por produto+posição (só telas que CRIAM lote no
+            recebimento) — construir um seletor de verdade é trabalho de
+            backend novo, fora do escopo desta tela. Fica documentado aqui pra
+            não virar só uma nota perdida de relatório de implementação.
+          -->
           <input
             v-model="form.lotId"
             type="text"
@@ -224,7 +232,7 @@ const resolveToPosition = async () => {
 
 const loadProducts = async () => {
   try {
-    await productStore.fetchProducts(1, 200);
+    await productStore.fetchProducts(1, 1000, { active: true });
     products.value = productStore.products;
   } catch (e) {
     toast.error((e as ApiError).response?.data?.message || 'Erro ao carregar produtos');
