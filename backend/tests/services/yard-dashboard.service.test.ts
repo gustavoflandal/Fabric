@@ -117,4 +117,29 @@ describe('YardDashboardService', () => {
   it('rejeita chamar sem warehouseId', async () => {
     await expect(yardDashboardService.getDashboard('')).rejects.toThrow('Armazém é obrigatório');
   });
+
+  it('modo histórico: visita aberta iniciada antes da janela de days ainda entra nos totais/ocupação', async () => {
+    const warehouse = await setupWarehouseWithParams();
+    const supplier = await createTestSupplier();
+    const driver = await driverService.create({ name: 'D5', cpf: '55555555555', supplierId: supplier.id });
+    const vehicle = await vehicleService.create({ plate: 'DSH5555', type: 'TRUCK', supplierId: supplier.id });
+    const visit = await yardVisitService.create({
+      warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+    });
+    await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+    // Simula uma visita que começou muito antes da janela de `days` consultada,
+    // mas que continua aberta (CHECKED_IN) até agora — é exatamente o cenário
+    // que o `OR` no `where` de getDashboard existe para cobrir: sem ele, esta
+    // visita ficaria de fora dos totais/ocupação em modo histórico com days=7.
+    await testPrisma.yardVisit.update({
+      where: { id: visit.id },
+      data: { createdAt: new Date(Date.now() - 100 * 24 * 60 * 60 * 1000) },
+    });
+
+    const dashboard = await yardDashboardService.getDashboard(warehouse.id, 7);
+
+    expect(dashboard.mode).toBe('HISTORICAL');
+    expect(dashboard.totals.portaria).toBe(1);
+    expect(dashboard.visits.some((v) => v.id === visit.id)).toBe(true);
+  });
 });
