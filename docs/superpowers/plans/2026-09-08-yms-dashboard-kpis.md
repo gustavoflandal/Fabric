@@ -215,7 +215,7 @@ export interface YardDashboardVisitRow {
 }
 
 const LOCATION_BY_STATUS: Record<string, YardDashboardVisitRow['currentLocation']> = {
-  SCHEDULED: 'PORTARIA', // não deveria aparecer na grade (nem tempo real nem histórico filtram SCHEDULED), mantido só por completude do map
+  SCHEDULED: 'PORTARIA', // não aparece em modo tempo real (filtrado), mas PODE aparecer em modo histórico (que não filtra por status) — mantido no map por isso, não só por completude
   CHECKED_IN: 'PORTARIA',
   IN_YARD: 'PATIO',
   AT_DOCK: 'DOCA',
@@ -262,9 +262,21 @@ export class YardDashboardService {
     }
 
     const mode: 'REALTIME' | 'HISTORICAL' = days ? 'HISTORICAL' : 'REALTIME';
+    const OPEN_STATUSES = ['CHECKED_IN', 'IN_YARD', 'AT_DOCK'] as const;
+    // Em modo histórico, o filtro por `createdAt` sozinho deixaria de fora uma
+    // visita que já está aberta (ex: AT_DOCK) mas começou ANTES da janela de
+    // `days` — subestimando totals.patio/totals.doca (e a ocupação derivada
+    // deles) em relação ao estado real agora. O `OR` garante que toda visita
+    // atualmente aberta sempre entra, além de tudo criado dentro da janela.
     const where = days
-      ? { warehouseId, createdAt: { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) } }
-      : { warehouseId, status: { in: ['CHECKED_IN', 'IN_YARD', 'AT_DOCK'] as const } };
+      ? {
+          warehouseId,
+          OR: [
+            { createdAt: { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) } },
+            { status: { in: OPEN_STATUSES } },
+          ],
+        }
+      : { warehouseId, status: { in: OPEN_STATUSES } };
 
     const [visits, params, activeSpots, activeDocks] = await Promise.all([
       prisma.yardVisit.findMany({
