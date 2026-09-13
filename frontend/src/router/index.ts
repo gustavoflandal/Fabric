@@ -236,6 +236,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/wms/locations',
+    name: 'wms-locations',
+    component: () => import('../views/wms/StoragePositionsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/yard/docks',
     name: 'yard-docks',
     component: () => import('../views/yard/YardDockListView.vue'),

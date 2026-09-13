@@ -114,7 +114,43 @@ export interface StoragePosition {
   id: string;
   code: string;
   structureId?: string;
+  warehouseCode: string;
+  streetCode: string;
   floor: number;
   position: number;
+  positionType?: string;
   blocked: boolean;
+  isPickingArea: boolean;
+  /**
+   * Relação expandida pela busca (Tarefa 1, `GET /storage-positions`) — o
+   * mesmo `include` que o service usa para a view não precisar de uma segunda
+   * chamada só para mostrar o nome do armazém.
+   */
+  structure?: {
+    warehouseId: string;
+    warehouse: Pick<Warehouse, 'code' | 'name'>;
+  };
+}
+
+/** Filtros de `GET /storage-positions` (Tarefa 1 — tela de Localizações). */
+export interface StoragePositionFilters {
+  warehouseId?: string;
+  streetCode?: string;
+  blocked?: boolean | string;
+  isPickingArea?: boolean | string;
+  occupied?: boolean | string;
+  code?: string;
+}
+
+/** Uma linha do histórico de movimentação de um endereço (F2.4). */
+export interface StoragePositionMovement {
+  id: string;
+  type: 'IN' | 'OUT' | 'TRANSFER' | 'ADJUSTMENT';
+  direction: 'IN' | 'OUT';
+  quantity: number;
+  createdAt: string;
+  product: { id: string; code: string; name: string };
+  user?: { id: string; name: string };
+  fromPosition?: { id: string; code: string } | null;
+  toPosition?: { id: string; code: string } | null;
 }
