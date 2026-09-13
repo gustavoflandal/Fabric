@@ -18,7 +18,6 @@
 | [`06_ROADMAP_IMPLEMENTACAO.md`](./06_ROADMAP_IMPLEMENTACAO.md) | Roadmap original por fases |
 | [`07_ESTRUTURA_PROJETO.md`](./07_ESTRUTURA_PROJETO.md) | Estrutura de pastas do repositório |
 | [`DOCUMENTACAO_TECNICA.md`](./DOCUMENTACAO_TECNICA.md) | Arquitetura, API, modelos, fluxos — visão consolidada |
-| [`GUIA_USUARIO.md`](./GUIA_USUARIO.md) | Manual do usuário final |
 | [`README.md`](./README.md) | Apresentação do projeto |
 
 ## Referência com conteúdo revisado nesta faxina
@@ -34,6 +33,7 @@
 
 | Documento | Conteúdo |
 |---|---|
+| [`operacao/GUIA_USUARIO.md`](./operacao/GUIA_USUARIO.md) | Manual do usuário final — todas as telas e fluxos do sistema (PCP, WMS, Compras, Contagem, Manutenção, YMS). Fonte única servida pelo botão de Ajuda em toda tela (`GET /api/v1/help`) e indexada no ChromaDB para o assistente de IA — atualizar aqui é o suficiente para os dois lugares refletirem a mudança. |
 | [`SETUP.md`](./SETUP.md) | Setup inicial do ambiente de desenvolvimento |
 | [`BACKUP_GUIDE.md`](./BACKUP_GUIDE.md) | Backup e restauração do banco (`npm run backup`/`restore`) |
 | [`INSTALACAO_PDF.md`](./INSTALACAO_PDF.md) | Dependência de geração de PDF (`jspdf`) |
