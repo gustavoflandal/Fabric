@@ -26,6 +26,7 @@
             <option value="">Todos</option>
             <option value="SCHEDULED">Agendado</option>
             <option value="CHECKED_IN">Check-in feito</option>
+            <option value="IN_YARD">No pátio</option>
             <option value="CANCELLED">Cancelado</option>
           </select>
         </FormField>
@@ -358,10 +359,10 @@ const openAllocateModal = async (visit: YardVisit) => {
   allocatingVisit.value = visit
   allocateSpotId.value = ''
   showAllocateModal.value = true
-  const areasResult = await yardAreaService.getAll(1, 100, { warehouseId: visit.warehouseId })
+  const areasResult = await yardAreaService.getAll(1, 500, { warehouseId: visit.warehouseId })
   const areas = areasResult.data.data
   const spotsByArea = await Promise.all(
-    areas.map((area: any) => yardSpotService.getAll(1, 100, { areaId: area.id }))
+    areas.map((area: any) => yardSpotService.getAll(1, 500, { areaId: area.id }))
   )
   const allSpots = spotsByArea.flatMap((r) => r.data.data)
   freeSpotsForAllocation.value = allSpots.filter((s: YardSpot) => !s.blocked && s.active && !s.visits?.length)

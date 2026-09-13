@@ -81,7 +81,7 @@ export const allocateSpotYardVisitSchema = Joi.object({
 
 export const listYardVisitQuerySchema = Joi.object({
   warehouseId: Joi.string().uuid(),
-  status: Joi.string().valid('SCHEDULED', 'CHECKED_IN', 'CANCELLED'),
+  status: Joi.string().valid('SCHEDULED', 'CHECKED_IN', 'IN_YARD', 'CANCELLED'),
   serviceType: Joi.string().valid('RECEBIMENTO', 'EXPEDICAO', 'MULTIUSO'),
   vehicleId: Joi.string().uuid(),
   page: Joi.number().integer().min(1),
