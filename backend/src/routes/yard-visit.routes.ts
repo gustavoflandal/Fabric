@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.middleware';
 import { requirePermission } from '../middleware/permission.middleware';
 import { validate, validateQuery } from '../middleware/validation.middleware';
 import {
+  allocateSpotYardVisitSchema,
   checkInYardVisitSchema,
   createYardVisitSchema,
   listYardVisitQuerySchema,
@@ -38,6 +39,12 @@ router.patch(
   requirePermission('yard', 'executar'),
   validate(checkInYardVisitSchema),
   yardVisitController.checkIn
+);
+router.patch(
+  '/:id/allocate-spot',
+  requirePermission('yard', 'executar'),
+  validate(allocateSpotYardVisitSchema),
+  yardVisitController.allocateSpot
 );
 router.patch('/:id/cancel', requirePermission('yard', 'gerenciar'), yardVisitController.cancel);
 

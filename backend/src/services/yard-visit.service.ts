@@ -239,6 +239,32 @@ export class YardVisitService {
     return this.attachPunctuality(updated);
   }
 
+  async allocateSpot(id: string, yardSpotId: string) {
+    const visit = await prisma.yardVisit.findUnique({ where: { id } });
+    if (!visit) throw new AppError(404, 'Visita não encontrada');
+    if (visit.status !== 'CHECKED_IN') {
+      throw new AppError(400, 'Só é possível alocar vaga para visitas que já fizeram check-in');
+    }
+
+    const params = await yardWarehouseParamsService.getByWarehouseId(visit.warehouseId);
+    if (!params.useYard) {
+      throw new AppError(400, 'Este armazém não utiliza a etapa de pátio');
+    }
+
+    const spot = await prisma.yardSpot.findUnique({ where: { id: yardSpotId }, include: { area: true } });
+    if (!spot) throw new AppError(400, 'Vaga informada não existe');
+    if (spot.blocked || !spot.active) throw new AppError(400, 'Vaga está bloqueada');
+    if (spot.area.blocked || !spot.area.active) throw new AppError(400, 'Área da vaga está bloqueada');
+    if (spot.area.warehouseId !== visit.warehouseId) {
+      throw new AppError(400, 'A vaga informada pertence a outro armazém');
+    }
+
+    const occupied = await prisma.yardVisit.findFirst({ where: { yardSpotId, status: 'IN_YARD' } });
+    if (occupied) throw new AppError(400, 'Vaga já está ocupada');
+
+    return prisma.yardVisit.update({ where: { id }, data: { status: 'IN_YARD', yardSpotId } });
+  }
+
   async cancel(id: string) {
     const visit = await prisma.yardVisit.findUnique({ where: { id } });
     if (!visit) throw new AppError(404, 'Visita não encontrada');

@@ -69,6 +69,15 @@ export class YardVisitController {
     }
   }
 
+  async allocateSpot(req: Request, res: Response, next: NextFunction) {
+    try {
+      const visit = await yardVisitService.allocateSpot(req.params.id, req.body.yardSpotId);
+      res.status(200).json({ status: 'success', data: visit });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async cancel(req: Request, res: Response, next: NextFunction) {
     try {
       const visit = await yardVisitService.cancel(req.params.id);

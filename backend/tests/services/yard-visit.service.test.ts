@@ -341,4 +341,117 @@ describe('YardVisitService', () => {
 
     expect(result.data).toHaveLength(1);
   });
+
+  describe('allocateSpot', () => {
+    it('aloca uma visita CHECKED_IN numa vaga livre, mudando o status para IN_YARD', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: true, delayToleranceMinutes: 15 } });
+      const area = await testPrisma.yardArea.create({ data: { warehouseId: warehouse.id, code: 'SETOR-X', name: 'Setor X' } });
+      const spot = await testPrisma.yardSpot.create({ data: { areaId: area.id, code: 'SETOR-X-01' } });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'M-Alocacao', cpf: '12312312312', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'ALO1234', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+
+      const allocated = await yardVisitService.allocateSpot(visit.id, spot.id);
+
+      expect(allocated.status).toBe('IN_YARD');
+      expect(allocated.yardSpotId).toBe(spot.id);
+    });
+
+    it('rejeita alocar vaga de uma visita que ainda não fez check-in (SCHEDULED)', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: true, delayToleranceMinutes: 15 } });
+      const area = await testPrisma.yardArea.create({ data: { warehouseId: warehouse.id, code: 'SETOR-Y', name: 'Setor Y' } });
+      const spot = await testPrisma.yardSpot.create({ data: { areaId: area.id, code: 'SETOR-Y-01' } });
+      const supplier = await createTestSupplier();
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+
+      await expect(yardVisitService.allocateSpot(visit.id, spot.id)).rejects.toThrow(
+        'Só é possível alocar vaga para visitas que já fizeram check-in'
+      );
+    });
+
+    it('rejeita alocar vaga quando o armazém não usa pátio (useYard: false)', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: false, delayToleranceMinutes: 15 } });
+      const area = await testPrisma.yardArea.create({ data: { warehouseId: warehouse.id, code: 'SETOR-Z', name: 'Setor Z' } });
+      const spot = await testPrisma.yardSpot.create({ data: { areaId: area.id, code: 'SETOR-Z-01' } });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'M-SemPatio', cpf: '32132132132', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'SPT1234', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+
+      await expect(yardVisitService.allocateSpot(visit.id, spot.id)).rejects.toThrow(
+        'Este armazém não utiliza a etapa de pátio'
+      );
+    });
+
+    it('rejeita alocar uma vaga bloqueada', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: true, delayToleranceMinutes: 15 } });
+      const area = await testPrisma.yardArea.create({ data: { warehouseId: warehouse.id, code: 'SETOR-W', name: 'Setor W' } });
+      const spot = await testPrisma.yardSpot.create({ data: { areaId: area.id, code: 'SETOR-W-01', blocked: true, blockedReason: 'Buraco' } });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'M-VagaBloq', cpf: '45645645645', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'BLQ1234', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+
+      await expect(yardVisitService.allocateSpot(visit.id, spot.id)).rejects.toThrow('Vaga está bloqueada');
+    });
+
+    it('rejeita alocar uma vaga já ocupada por outra visita IN_YARD', async () => {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: true, delayToleranceMinutes: 15 } });
+      const area = await testPrisma.yardArea.create({ data: { warehouseId: warehouse.id, code: 'SETOR-V', name: 'Setor V' } });
+      const spot = await testPrisma.yardSpot.create({ data: { areaId: area.id, code: 'SETOR-V-01' } });
+      const supplier = await createTestSupplier();
+      const driver1 = await driverService.create({ name: 'D1', cpf: '65465465465', supplierId: supplier.id });
+      const vehicle1 = await vehicleService.create({ plate: 'OCU1111', type: 'TRUCK', supplierId: supplier.id });
+      const visit1 = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit1.id, { driverId: driver1.id, vehicleId: vehicle1.id });
+      await yardVisitService.allocateSpot(visit1.id, spot.id);
+
+      const driver2 = await driverService.create({ name: 'D2', cpf: '65465465466', supplierId: supplier.id });
+      const vehicle2 = await vehicleService.create({ plate: 'OCU2222', type: 'TRUCK', supplierId: supplier.id });
+      const visit2 = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit2.id, { driverId: driver2.id, vehicleId: vehicle2.id });
+
+      await expect(yardVisitService.allocateSpot(visit2.id, spot.id)).rejects.toThrow('Vaga já está ocupada');
+    });
+
+    it('rejeita alocar uma vaga de área de OUTRO armazém', async () => {
+      const { warehouse: wh1 } = await createTestPositions(1, { positionType: 'DOCA' });
+      const { warehouse: wh2 } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: wh1.id, useYard: true, delayToleranceMinutes: 15 } });
+      const areaOfWh2 = await testPrisma.yardArea.create({ data: { warehouseId: wh2.id, code: 'SETOR-OUTRO', name: 'Setor de outro armazém' } });
+      const spotOfWh2 = await testPrisma.yardSpot.create({ data: { areaId: areaOfWh2.id, code: 'SETOR-OUTRO-01' } });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'M-Cross', cpf: '78978978978', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'CRS1234', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: wh1.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+
+      await expect(yardVisitService.allocateSpot(visit.id, spotOfWh2.id)).rejects.toThrow(
+        'A vaga informada pertence a outro armazém'
+      );
+    });
+  });
 });
