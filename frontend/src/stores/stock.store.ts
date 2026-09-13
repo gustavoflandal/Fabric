@@ -5,6 +5,7 @@ import stockService, {
   type StockMovement,
   type StockSummary,
   type RegisterMovementDto,
+  type TransferStockDto,
 } from '@/services/stock.service';
 
 export const useStockStore = defineStore('stock', () => {
@@ -152,6 +153,20 @@ export const useStockStore = defineStore('stock', () => {
     }
   }
 
+  async function transfer(data: TransferStockDto) {
+    loading.value = true;
+    error.value = null;
+    try {
+      const movement = await stockService.transfer(data);
+      return movement;
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Erro ao transferir estoque';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     balances,
     summary,
@@ -168,5 +183,6 @@ export const useStockStore = defineStore('stock', () => {
     registerExit,
     registerAdjustment,
     reserveForOrder,
+    transfer,
   };
 });

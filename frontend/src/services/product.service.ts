@@ -17,6 +17,8 @@ export interface Product {
   standardCost?: number;
   lastCost?: number;
   averageCost?: number;
+  /** Controle de lote — quando `true`, movimentações do produto exigem/aceitam `lotId` (Tarefa 2). */
+  lotTracked?: boolean;
   active: boolean;
   createdAt: string;
   updatedAt: string;

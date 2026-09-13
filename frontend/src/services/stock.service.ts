@@ -38,6 +38,18 @@ export interface RegisterMovementDto {
   reference?: string;
 }
 
+/** Payload de `POST /stock/transfer` (transferência interna entre endereços — Tarefa 2). */
+export interface TransferStockDto {
+  productId: string;
+  fromPositionId: string;
+  toPositionId: string;
+  quantity: number;
+  reason: string;
+  reference?: string;
+  notes?: string;
+  lotId?: string | null;
+}
+
 class StockService {
   private readonly basePath = '/stock';
 
@@ -94,6 +106,12 @@ class StockService {
 
   async reserveForOrder(orderId: string): Promise<any> {
     const response = await api.post(`${this.basePath}/reserve/${orderId}`);
+    return response.data.data;
+  }
+
+  /** Tarefa 2 — transferência interna entre dois endereços (`POST /stock/transfer`). */
+  async transfer(data: TransferStockDto): Promise<StockMovement> {
+    const response = await api.post(`${this.basePath}/transfer`, data);
     return response.data.data;
   }
 }
