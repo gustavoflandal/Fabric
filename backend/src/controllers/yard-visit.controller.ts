@@ -86,6 +86,42 @@ export class YardVisitController {
       next(error);
     }
   }
+
+  async moveToDock(req: Request, res: Response, next: NextFunction) {
+    try {
+      const visit = await yardVisitService.moveToDock(req.params.id, req.body.yardDockId);
+      res.status(200).json({ status: 'success', data: visit });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async startLoading(req: Request, res: Response, next: NextFunction) {
+    try {
+      const visit = await yardVisitService.startLoading(req.params.id);
+      res.status(200).json({ status: 'success', data: visit });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async endLoading(req: Request, res: Response, next: NextFunction) {
+    try {
+      const visit = await yardVisitService.endLoading(req.params.id);
+      res.status(200).json({ status: 'success', data: visit });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async complete(req: Request, res: Response, next: NextFunction) {
+    try {
+      const visit = await yardVisitService.complete(req.params.id);
+      res.status(200).json({ status: 'success', data: visit });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export default new YardVisitController();

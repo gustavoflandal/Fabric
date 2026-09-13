@@ -458,4 +458,108 @@ describe('YardVisitService', () => {
       );
     });
   });
+
+  describe('operação de doca', () => {
+    async function setupCheckedInVisitAtDock() {
+      const { warehouse } = await createTestPositions(1, { positionType: 'DOCA' });
+      await testPrisma.yardWarehouseParams.create({ data: { warehouseId: warehouse.id, useYard: false, delayToleranceMinutes: 15 } });
+      const dock = await testPrisma.yardDock.create({ data: { warehouseId: warehouse.id, code: 'DOCA-OP-01', serviceType: 'RECEBIMENTO' } });
+      const supplier = await createTestSupplier();
+      const driver = await driverService.create({ name: 'M-Doca', cpf: '11133355577', supplierId: supplier.id });
+      const vehicle = await vehicleService.create({ plate: 'DCK1234', type: 'TRUCK', supplierId: supplier.id });
+      const visit = await yardVisitService.create({
+        warehouseId: warehouse.id, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit.id, { driverId: driver.id, vehicleId: vehicle.id });
+      return { warehouse, dock, visit };
+    }
+
+    it('move uma visita CHECKED_IN direto pra doca quando o armazém não usa pátio', async () => {
+      const { dock, visit } = await setupCheckedInVisitAtDock();
+
+      const moved = await yardVisitService.moveToDock(visit.id, dock.id);
+
+      expect(moved.status).toBe('AT_DOCK');
+      expect(moved.yardDockId).toBe(dock.id);
+      expect(moved.dockArrivedAt).not.toBeNull();
+    });
+
+    it('rejeita mover pra uma doca com tipo de serviço incompatível', async () => {
+      const { warehouse, visit } = await setupCheckedInVisitAtDock();
+      const expeditionDock = await testPrisma.yardDock.create({ data: { warehouseId: warehouse.id, code: 'DOCA-OP-02', serviceType: 'EXPEDICAO' } });
+
+      await expect(yardVisitService.moveToDock(visit.id, expeditionDock.id)).rejects.toThrow(
+        'Tipo de serviço da doca incompatível com a visita'
+      );
+    });
+
+    it('permite mover pra uma doca MULTIUSO independente do tipo de serviço da visita', async () => {
+      const { warehouse, visit } = await setupCheckedInVisitAtDock();
+      const multiDock = await testPrisma.yardDock.create({ data: { warehouseId: warehouse.id, code: 'DOCA-OP-03', serviceType: 'MULTIUSO' } });
+
+      await expect(yardVisitService.moveToDock(visit.id, multiDock.id)).resolves.toMatchObject({ status: 'AT_DOCK' });
+    });
+
+    it('rejeita mover pra uma doca já ocupada por outra visita', async () => {
+      const { dock, visit: visit1 } = await setupCheckedInVisitAtDock();
+      await yardVisitService.moveToDock(visit1.id, dock.id);
+
+      // Segunda visita CHECKED_IN no MESMO armazém do dock já ocupado por visit1.
+      const supplier = await createTestSupplier();
+      const driver2 = await driverService.create({ name: 'D2', cpf: '22244466688', supplierId: supplier.id });
+      const vehicle2 = await vehicleService.create({ plate: 'DCK5678', type: 'TRUCK', supplierId: supplier.id });
+      const visit2 = await yardVisitService.create({
+        warehouseId: dock.warehouseId, serviceType: 'RECEBIMENTO', supplierId: supplier.id, scheduledAt: new Date(),
+      });
+      await yardVisitService.checkIn(visit2.id, { driverId: driver2.id, vehicleId: vehicle2.id });
+
+      await expect(yardVisitService.moveToDock(visit2.id, dock.id)).rejects.toThrow('Doca já está ocupada');
+    });
+
+    it('inicia e conclui a carga/descarga, e finaliza com checkout preenchendo completedAt', async () => {
+      const { dock, visit } = await setupCheckedInVisitAtDock();
+      await yardVisitService.moveToDock(visit.id, dock.id);
+
+      const started = await yardVisitService.startLoading(visit.id);
+      expect(started.loadingStartedAt).not.toBeNull();
+
+      const ended = await yardVisitService.endLoading(visit.id);
+      expect(ended.loadingEndedAt).not.toBeNull();
+
+      const completed = await yardVisitService.complete(visit.id);
+      expect(completed.status).toBe('COMPLETED');
+      expect(completed.completedAt).not.toBeNull();
+    });
+
+    it('rejeita iniciar carga duas vezes', async () => {
+      const { dock, visit } = await setupCheckedInVisitAtDock();
+      await yardVisitService.moveToDock(visit.id, dock.id);
+      await yardVisitService.startLoading(visit.id);
+
+      await expect(yardVisitService.startLoading(visit.id)).rejects.toThrow('Carga/descarga já foi iniciada');
+    });
+
+    it('rejeita concluir carga sem ter iniciado', async () => {
+      const { dock, visit } = await setupCheckedInVisitAtDock();
+      await yardVisitService.moveToDock(visit.id, dock.id);
+
+      await expect(yardVisitService.endLoading(visit.id)).rejects.toThrow('Carga/descarga ainda não foi iniciada');
+    });
+
+    it('permite checkout mesmo sem carga formalmente iniciada/concluída', async () => {
+      const { dock, visit } = await setupCheckedInVisitAtDock();
+      await yardVisitService.moveToDock(visit.id, dock.id);
+
+      await expect(yardVisitService.complete(visit.id)).resolves.toMatchObject({ status: 'COMPLETED' });
+    });
+
+    it('libera a doca (volta a ficar livre) depois do checkout', async () => {
+      const { dock, visit } = await setupCheckedInVisitAtDock();
+      await yardVisitService.moveToDock(visit.id, dock.id);
+      await yardVisitService.complete(visit.id);
+
+      const occupied = await testPrisma.yardVisit.findFirst({ where: { yardDockId: dock.id, status: 'AT_DOCK' } });
+      expect(occupied).toBeNull();
+    });
+  });
 });

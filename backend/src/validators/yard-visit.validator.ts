@@ -79,6 +79,13 @@ export const allocateSpotYardVisitSchema = Joi.object({
   }),
 });
 
+export const moveToDockYardVisitSchema = Joi.object({
+  yardDockId: Joi.string().uuid().required().messages({
+    'string.guid': 'ID da doca inválido',
+    'any.required': 'Doca é obrigatória',
+  }),
+});
+
 export const listYardVisitQuerySchema = Joi.object({
   warehouseId: Joi.string().uuid(),
   status: Joi.string().valid('SCHEDULED', 'CHECKED_IN', 'IN_YARD', 'CANCELLED'),
