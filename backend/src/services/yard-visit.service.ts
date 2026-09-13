@@ -262,7 +262,8 @@ export class YardVisitService {
     const occupied = await prisma.yardVisit.findFirst({ where: { yardSpotId, status: 'IN_YARD' } });
     if (occupied) throw new AppError(400, 'Vaga já está ocupada');
 
-    return prisma.yardVisit.update({ where: { id }, data: { status: 'IN_YARD', yardSpotId } });
+    const updated = await prisma.yardVisit.update({ where: { id }, data: { status: 'IN_YARD', yardSpotId } });
+    return this.attachPunctuality(updated);
   }
 
   async cancel(id: string) {

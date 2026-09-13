@@ -360,6 +360,10 @@ describe('YardVisitService', () => {
 
       expect(allocated.status).toBe('IN_YARD');
       expect(allocated.yardSpotId).toBe(spot.id);
+      // Mesma classe de achado corrigido na review final da Etapa 2 (create/update/cancel
+      // devolviam registro cru): allocateSpot deve devolver enriquecido com punctuality,
+      // igual checkIn() já faz, já que a UI provavelmente exibe o resultado imediatamente.
+      expect(allocated.punctuality).not.toBeUndefined();
     });
 
     it('rejeita alocar vaga de uma visita que ainda não fez check-in (SCHEDULED)', async () => {
