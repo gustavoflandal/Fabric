@@ -785,8 +785,6 @@ O módulo **Compras** cobre o ciclo completo de aquisição de materiais: pedir 
 
 **Este módulo precisa estar licenciado na sua instalação.** Se os itens **Orçamentos de Compra**, **Pedidos de Compra** e **Recebimentos** não aparecem no menu, fale com o administrador do sistema: eles dependem do módulo **COMPRAS** estar habilitado para o seu ambiente.
 
-> ⚠️ **Observação conhecida**: tanto o orçamento quanto o pedido de compra têm um status **Aprovado** que precisa ser alcançado antes de "Gerar Pedido" (a partir de um orçamento) ou "Confirmar" (um pedido) funcionarem — mas, no momento, a interface não oferece nenhum botão para mover um orçamento ou pedido para esse status a partir do status inicial (Pendente). Se você tentar gerar um pedido ou confirmar algo que ainda não foi aprovado, o sistema recusa a ação. Até essa lacuna ser resolvida, a aprovação precisa ser feita por um administrador diretamente no banco de dados ou por outro meio combinado com a equipe técnica.
-
 ### Orçamentos de Compra
 
 Tela onde você registra as cotações pedidas a fornecedores e acompanha o retorno deles antes de fechar um pedido de compra.
@@ -824,6 +822,16 @@ Tela onde você registra as cotações pedidas a fornecedores e acompanha o reto
 2. A tela mostra Número, Status, Fornecedor, Data de Solicitação, Data de Validade, Valor Total e, quando aplicável, quem aprovou e as Observações
 3. Na parte inferior aparece a tabela de itens, com Produto, Quantidade, Preço Unit., Desconto e Total de cada linha
 
+#### Aprovar ou rejeitar um orçamento
+
+Um orçamento recém-criado (ou já **Enviado**/**Recebido**) precisa ser aprovado antes de virar pedido de compra.
+
+1. Na lista (ou no modal **Ver**), clique em **Aprovar** ou **Rejeitar**
+2. Confirme a pergunta
+3. O status muda para **Aprovado** ou **Rejeitado**, conforme a escolha
+
+Os botões só aparecem enquanto o orçamento ainda não chegou a um status final (**Aprovado**, **Rejeitado** ou **Expirado**).
+
 #### Gerar pedido de compra a partir de um orçamento
 
 Só é possível para orçamentos com status **Aprovado**.
@@ -852,7 +860,8 @@ Tela onde ficam os pedidos formais de compra — criados manualmente ou gerados 
 
 1. Acesse **Pedidos de Compra**
 2. Use **Buscar** e o filtro **Status** para localizar um pedido:
-   - **Pendente**: pedido criado, aguardando andamento
+   - **Pendente**: pedido criado, aguardando aprovação
+   - **Aprovado**: pedido aprovado internamente — é este status que libera o botão **Confirmar**
    - **Confirmado**: pedido confirmado com o fornecedor, aguardando entrega — é este status que faz o pedido aparecer na tela de **Novo Recebimento**
    - **Parcial**: parte da quantidade pedida já foi recebida
    - **Recebido**: toda a quantidade pedida já foi recebida
@@ -877,9 +886,15 @@ Tela onde ficam os pedidos formais de compra — criados manualmente ou gerados 
 2. A tela mostra Número, Status, Fornecedor, Data do Pedido, Data Esperada, Valor Total e, quando aplicável, quem aprovou e as Observações
 3. A tabela de itens traz, por linha, Produto, Quantidade pedida, **Recebido** (quanto já entrou por recebimentos anteriores), Preço Unit. e Total — é a forma mais rápida de ver o que ainda falta chegar de um pedido
 
+#### Aprovar um pedido
+
+1. Na lista, clique em **Aprovar** (disponível para pedidos **Pendentes**) — ou, no modal **Ver**, clique em **Aprovar Pedido**
+2. Confirme a pergunta "Aprovar este pedido? Depois de aprovado, ele poderá ser confirmado com o fornecedor."
+3. O status muda para **Aprovado**
+
 #### Confirmar um pedido
 
-1. Na lista, clique em **Confirmar** (disponível para pedidos **Pendentes**) — ou, no modal **Ver**, clique em **Confirmar Pedido**
+1. Na lista, clique em **Confirmar** (disponível para pedidos **Aprovados**) — ou, no modal **Ver**, clique em **Confirmar Pedido**
 2. Confirme a pergunta "Confirmar este pedido?"
 3. O status muda para **Confirmado**
 
@@ -1004,17 +1019,21 @@ Esta é a tela de cadastro completo dos planos — a "central de regras" da cont
 
 1. Clique em **+ Novo Plano** (no Dashboard ou na lista de Planos).
 2. Preencha as **Informações Básicas**:
-   - **Código**: um identificador para o plano. Obrigatório para salvar o formulário, mas serve apenas de referência — ao gravar, o sistema sempre atribui o código definitivo no padrão `CONT-AAAA-NNN` (ano + sequencial), então o texto digitado aqui não é o que aparecerá depois nas listagens.
+   - **Código**: gerado automaticamente pelo sistema (padrão `CONT-AAAA-NNN`, ano + sequencial) — o campo fica somente leitura e mostra "Gerado ao salvar" até a primeira gravação do plano.
    - **Nome**: nome descritivo do plano (ex: "Inventário Mensal - Matéria-Prima"). Obrigatório.
 3. Preencha as **Configurações**:
-   - **Tipo**: obrigatório. Opções: **Inventário Completo** (conta todo o escopo definido), **Inventário Parcial** (um recorte específico), **Inventário Cíclico** (repetido periodicamente, geralmente por categoria ou criticidade) ou **Inventário Cego** (a contagem não mostra a quantidade do sistema para o operador, reduzindo o viés de "contar o que o sistema diz").
-   - **Frequência**: obrigatório. Define de quanto em quanto tempo o sistema deve gerar uma nova sessão automaticamente a partir deste plano: Diária, Semanal, Mensal, Trimestral ou Anual.
+   - **Tipo**: obrigatório. Opções: **Inventário Completo** (conta todo o escopo definido), **Pontual** (um recorte específico), **Cíclica** (repetido periodicamente, geralmente por categoria ou criticidade) ou **Inventário Cego** (a contagem não mostra a quantidade do sistema para o operador, reduzindo o viés de "contar o que o sistema diz").
+   - **Frequência**: obrigatório. Define de quanto em quanto tempo o sistema deve gerar uma nova sessão automaticamente a partir deste plano: Diária, Semanal, Quinzenal, Mensal, Trimestral, Semestral, Anual ou Sob Demanda.
    - **Prioridade**: obrigatório. 1 = Baixa, 5 = Média, 10 = Alta.
-4. Preencha o **Agendamento**:
+4. Preencha **Tolerância e Recontagem**:
+   - **Tolerância (%)** e **Tolerância (Qtd)**: margem aceita entre o contado e o esperado antes de um item ser tratado como divergência — um item só é sinalizado quando ultrapassa AMBOS os limites ao mesmo tempo.
+   - **Exigir recontagem**: quando marcado, um item com divergência precisa passar por recontagem ou ser explicitamente aceito antes de entrar em um ajuste de estoque.
+   - **Permitir contagem cega**: controla se o operador vê a quantidade esperada do sistema durante a contagem (ver também o tipo **Inventário Cego** acima).
+5. Preencha o **Agendamento**:
    - **Data de Início**: obrigatória. A partir de quando o plano passa a gerar sessões.
    - **Data de Término**: opcional. Se preenchida, o plano deixa de gerar novas sessões após essa data.
-5. **Descrição**: campo livre opcional para detalhar o objetivo do plano.
-6. Na seção **Produtos do Plano**, clique em **+ Adicionar Produtos** para abrir o seletor de produtos:
+6. **Descrição**: campo livre opcional para detalhar o objetivo do plano.
+7. Na seção **Produtos do Plano**, clique em **+ Adicionar Produtos** para abrir o seletor de produtos:
    - Use o campo de busca para localizar produtos por nome ou código.
    - Clique em **Selecionar** em cada produto desejado (o botão muda para "Selecionado").
    - Clique em **Confirmar** para trazer os produtos escolhidos para o plano.
@@ -1110,17 +1129,25 @@ Mostra o resultado consolidado de uma sessão já concluída, com foco nas diver
 - **Divergências**: quantos itens tiveram diferença relevante entre o contado e o esperado.
 - **Acurácia**: percentual de itens que bateram com o sistema.
 
-**Tabela de Divergências Encontradas**: lista, para cada item divergente, o produto, a localização, a quantidade do sistema, a quantidade contada, a diferença (em unidades e percentual) e o status do item (Pendente, Contado, Recontado, Aceito ou Cancelado). Se não houver nenhuma divergência, a tela mostra uma mensagem de parabéns no lugar da tabela.
+**Tabela de Divergências Encontradas**: lista, para cada item divergente, o produto, a localização, a quantidade do sistema, a quantidade contada, a diferença (em unidades e percentual) e o status do item (Pendente, Aguardando revisão, Recontado, Ajustado ou Cancelado). Se não houver nenhuma divergência, a tela mostra uma mensagem de parabéns no lugar da tabela.
+
+#### Recontar ou aceitar uma divergência
+
+Um item que chegou à tabela com status **Aguardando revisão** precisa de uma decisão antes de poder entrar em um ajuste de estoque:
+
+1. Na linha do item, clique em **Recontar** para abrir o modal de recontagem — informe a nova quantidade contada e clique em **Confirmar Recontagem**. O item passa para o status **Recontado**.
+2. Ou clique em **Aceitar** para confirmar a primeira contagem como definitiva sem recontar fisicamente — confirme a pergunta. O item também passa para **Recontado**.
+3. Itens já **Recontados** ou **Ajustados** não mostram mais nenhum botão de ação nessa tabela.
 
 #### Ajustar o estoque a partir das divergências
 
 1. Quando a sessão tem divergências, o botão **Ajustar Estoque** aparece no topo da tela.
 2. Ao clicar, confirme a ação na caixa de diálogo.
-3. O sistema gera movimentações de ajuste de estoque (entrada para sobra, saída para quebra) para cada item divergente já revisado, alinhando o saldo do sistema ao que foi fisicamente contado.
+3. O sistema gera movimentações de ajuste de estoque (entrada para sobra, saída para quebra) para cada item com status **Recontado**, alinhando o saldo do sistema ao que foi fisicamente contado. Itens que ainda estão **Aguardando revisão** (não recontados nem aceitos) são ignorados pelo ajuste — recontá-los ou aceitá-los primeiro é o que os torna elegíveis.
 
 #### Exportar o relatório
 
-O botão **Exportar** está reservado para uma funcionalidade futura — por enquanto ele apenas avisa que a exportação será implementada em breve.
+O botão **Exportar** gera um arquivo CSV (compatível com Excel/LibreOffice) com todas as divergências da sessão — produto, código, localização, quantidade do sistema, quantidade contada, diferença e status — e inicia o download automaticamente.
 
 ---
 
