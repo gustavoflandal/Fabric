@@ -12,7 +12,7 @@ const DOCS_DIR = path.join(__dirname, '..', '..', 'docs', 'operacao');
  * páginas no texto concatenado — não é conteúdo do documento, removido antes
  * do chunking para não vazar para uma citação de fonte.
  */
-async function extractText(buffer: Buffer): Promise<string> {
+async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: buffer });
   try {
     const result = await parser.getText();
@@ -22,27 +22,41 @@ async function extractText(buffer: Buffer): Promise<string> {
   }
 }
 
+/**
+ * Markdown é lido como texto puro — o embedding model lida bem com marcações
+ * leves (#, -, **), e mantê-las ajuda a preservar títulos/ênfase dentro dos
+ * chunks. Sem parsing/renderização nenhuma aqui, só normalização de fim de
+ * linha (Windows CRLF viraria ruído no meio de uma frase quebrada em chunk).
+ */
+function extractTextFromMarkdown(buffer: Buffer): string {
+  return buffer.toString('utf-8').replace(/\r\n/g, '\n').trim();
+}
+
+async function extractText(buffer: Buffer, file: string): Promise<string> {
+  return file.toLowerCase().endsWith('.md') ? extractTextFromMarkdown(buffer) : extractTextFromPdf(buffer);
+}
+
 export interface IndexSummaryEntry {
   file: string;
   chunks: number;
   /** Presente apenas quando o PROCESSAMENTO do arquivo lançou uma exceção
    * (PDF corrompido, falha de embedding, etc.) — distinto do caso "0 chunks
-   * porque o PDF não tem camada de texto", que é um resultado válido. */
+   * porque o arquivo não tem texto extraível", que é um resultado válido. */
   error?: string;
 }
 
 /**
- * Processa um único PDF: extrai texto, chunka e embute cada chunk. Não toca
- * no ChromaDB — isso é responsabilidade de `indexDocuments()`, que só reseta
- * a coleção depois que TODOS os arquivos tiverem sido processados (ver nota
- * abaixo).
+ * Processa um único arquivo (PDF ou Markdown): extrai texto, chunka e embute
+ * cada chunk. Não toca no ChromaDB — isso é responsabilidade de
+ * `indexDocuments()`, que só reseta a coleção depois que TODOS os arquivos
+ * tiverem sido processados (ver nota abaixo).
  */
 async function processFile(docsDir: string, file: string): Promise<{ summary: IndexSummaryEntry; chunks: DocumentChunk[] }> {
   const buffer = fs.readFileSync(path.join(docsDir, file));
-  const text = await extractText(buffer);
+  const text = await extractText(buffer, file);
 
   if (text.length === 0) {
-    console.error(`❌ ${file}: sem camada de texto (PDF escaneado?) — não indexado`);
+    console.error(`❌ ${file}: sem texto extraído (PDF escaneado sem camada de texto, ou .md vazio) — não indexado`);
     return { summary: { file, chunks: 0 }, chunks: [] };
   }
 
@@ -64,7 +78,7 @@ async function processFile(docsDir: string, file: string): Promise<{ summary: In
 }
 
 /**
- * Reindexa todos os PDFs de `docsDir` no ChromaDB.
+ * Reindexa todos os arquivos (`.pdf`/`.md`) de `docsDir` no ChromaDB.
  *
  * IMPORTANTE (achado da revisão final de branch inteira): `resetCollection()`
  * só é chamado DEPOIS que todos os arquivos tiverem sido processados (texto
@@ -79,7 +93,7 @@ async function processFile(docsDir: string, file: string): Promise<{ summary: In
 export async function indexDocuments(
   docsDir: string = DOCS_DIR
 ): Promise<IndexSummaryEntry[]> {
-  const files = fs.readdirSync(docsDir).filter((f) => f.toLowerCase().endsWith('.pdf'));
+  const files = fs.readdirSync(docsDir).filter((f) => /\.(pdf|md)$/i.test(f));
   const summary: IndexSummaryEntry[] = [];
   const allChunks: DocumentChunk[] = [];
 

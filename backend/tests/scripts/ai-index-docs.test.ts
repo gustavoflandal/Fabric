@@ -24,7 +24,7 @@ describe('ai-index-docs.indexDocuments', () => {
     mockedUpsertChunks.mockResolvedValue(undefined);
   });
 
-  it('ignora arquivos que não são .pdf', async () => {
+  it('ignora arquivos que não são .pdf nem .md', async () => {
     MockedPDFParse.mockImplementation(
       () =>
         ({
@@ -37,6 +37,43 @@ describe('ai-index-docs.indexDocuments', () => {
     const summary = await indexDocuments('/fake/docs');
 
     expect(summary.map((s) => s.file)).toEqual(['manual-a.pdf', 'manual-escaneado.pdf']);
+  });
+
+  it('indexa um .md como texto puro, sem passar pelo pdf-parse', async () => {
+    mockedFs.readdirSync.mockReturnValue(['GUIA_USUARIO.md'] as any);
+    mockedFs.readFileSync.mockReturnValue(Buffer.from('# Título\r\n\r\nConteúdo do manual.'));
+
+    const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
+    const summary = await indexDocuments('/fake/docs');
+
+    // Confirma que o caminho do PDF nem foi tentado para o .md.
+    expect(MockedPDFParse).not.toHaveBeenCalled();
+    expect(summary).toEqual([{ file: 'GUIA_USUARIO.md', chunks: 1 }]);
+    // chunkText normaliza whitespace (inclusive quebras de linha) antes de
+    // cortar em blocos — mesmo comportamento já usado no caminho do PDF.
+    expect(mockedEmbed).toHaveBeenCalledWith('# Título Conteúdo do manual.');
+    expect(mockedUpsertChunks).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'GUIA_USUARIO.md::0', metadata: { arquivo: 'GUIA_USUARIO.md', indice: 0 } }),
+    ]);
+  });
+
+  it('mistura .pdf e .md no mesmo diretório e indexa os dois', async () => {
+    mockedFs.readdirSync.mockReturnValue(['manual-a.pdf', 'GUIA_USUARIO.md'] as any);
+    mockedFs.readFileSync.mockReturnValue(Buffer.from('conteudo qualquer'));
+    MockedPDFParse.mockImplementation(
+      () =>
+        ({
+          getText: jest.fn().mockResolvedValue({ text: 'Passo 1: faça isso.' }),
+          destroy: jest.fn().mockResolvedValue(undefined),
+        }) as any
+    );
+
+    const { indexDocuments } = await import('../../src/../scripts/ai-index-docs');
+    const summary = await indexDocuments('/fake/docs');
+
+    expect(summary.map((s) => s.file).sort()).toEqual(['GUIA_USUARIO.md', 'manual-a.pdf']);
+    expect(mockedResetCollection).toHaveBeenCalledTimes(1);
+    expect(mockedUpsertChunks).toHaveBeenCalledTimes(1);
   });
 
   it('indexa um PDF com texto: extrai, faz chunk, embute cada chunk e envia ao ChromaDB', async () => {
