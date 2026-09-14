@@ -1,3 +1,5 @@
+import type { BadgeTone } from '@/components/common/StatusBadge.vue'
+
 // Os 7 tipos do motor de workflow dinâmico (PR #9). SEGREGACAO/AMOSTRAGEM
 // ainda não existem no enum do backend deste branch (só depois do PR #9
 // mesclar) — mantidos aqui porque é um superconjunto seguro: nenhuma tarefa
@@ -33,6 +35,28 @@ export const WAREHOUSE_TASK_TYPE_LABELS: Record<WarehouseTaskType, string> = {
 }
 
 export type WarehouseTaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+
+// Rótulo e cor do status da tarefa, num lugar só. Nasceram inline em
+// `PickingView.vue` e subiram para cá quando a tela de detalhe do romaneio
+// (`views/sales/ShipmentDetailView.vue`) passou a exibir as MESMAS tarefas de
+// separação — duas cópias divergiriam no primeiro ajuste de texto.
+//
+// O `import type` de `StatusBadge.vue` é só para o tipo `BadgeTone` (a união de
+// tons do badge), apagado na compilação: este módulo continua sem dependência
+// de runtime em componente nenhum.
+export const WAREHOUSE_TASK_STATUS_LABELS: Record<WarehouseTaskStatus, string> = {
+  PENDING: 'Pendente',
+  IN_PROGRESS: 'Em andamento',
+  COMPLETED: 'Concluída',
+  CANCELLED: 'Cancelada',
+}
+
+export const WAREHOUSE_TASK_STATUS_TONES: Record<WarehouseTaskStatus, BadgeTone> = {
+  PENDING: 'neutral',
+  IN_PROGRESS: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'danger',
+}
 
 export interface WarehouseTaskAssignee {
   id: string
