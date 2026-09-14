@@ -99,6 +99,29 @@ export const PRODUCTION_ORDER_TASK_REFERENCE_TYPE = 'PRODUCTION_ORDER';
  */
 export const REPLENISHMENT_TASK_REFERENCE_TYPE = 'REPLENISHMENT';
 
+/**
+ * EXPEDIÇÃO — `referenceType` da tarefa de `PICKING` quando quem consome o
+ * material é um ROMANEIO (`reference` = `Shipment.id`), e não uma ordem de
+ * produção.
+ *
+ * Mesmo formato e mesma disciplina de `PRODUCTION_ORDER_TASK_REFERENCE_TYPE`:
+ * o id, nunca o `shipmentNumber`. A tradução para o número legível acontece no
+ * único ponto onde ela importa — a `reference` do `StockMovement` gravado na
+ * conclusão da tarefa (ver `warehouse-task-execution.service.ts`).
+ */
+export const SHIPMENT_TASK_REFERENCE_TYPE = 'SHIPMENT';
+
+/**
+ * Os destinos possíveis de uma tarefa de `PICKING`. Separar material para uma
+ * ordem de produção e separar para um romaneio de expedição são o MESMO
+ * trabalho físico — alguém vai até um endereço, tira uma quantidade de um lote
+ * e o saldo é debitado na conclusão. O que muda é apenas para QUEM o material
+ * vai, e isso é exatamente um par (`reference`, `referenceType`).
+ */
+export type PickingReference =
+  | { referenceId: string; referenceType: typeof PRODUCTION_ORDER_TASK_REFERENCE_TYPE }
+  | { referenceId: string; referenceType: typeof SHIPMENT_TASK_REFERENCE_TYPE };
+
 /** Status a partir dos quais uma tarefa ainda pode ser concluída. */
 export const OPEN_STATUSES: WarehouseTaskStatus[] = [
   WarehouseTaskStatus.PENDING,
@@ -358,10 +381,25 @@ export const createReceiptTaskChain = async (
  * atravessasse dois lotes do mesmo endereço não teria como ser executada por
  * uma única movimentação — e, pior, esconderia do operador QUAL lote sair, que
  * é justamente a informação pela qual esta fase existe.
+ *
+ * ✅ EXPEDIÇÃO — A REFERÊNCIA DEIXOU DE SER FIXA. Até aqui a função recebia um
+ * `productionOrderId` e gravava `referenceType: 'PRODUCTION_ORDER'` embutido no
+ * corpo; agora recebe o par (`referenceId`, `referenceType`) inteiro e o
+ * propaga. NADA MAIS MUDOU: o chamador de produção
+ * (`stock.service.ts::reserveForOrder()`) passa
+ * `{ referenceId: order.id, referenceType: 'PRODUCTION_ORDER' }` e produz
+ * exatamente as mesmas linhas de antes.
+ *
+ * Por que generalizar em vez de duplicar a função para o romaneio: o corpo
+ * inteiro (uma tarefa por produto × posição × lote, `sequence` nula, prioridade
+ * zero, status PENDING) é sobre a GRANULARIDADE do trabalho físico de separar,
+ * que não depende de quem pediu o material. Uma cópia divergiria na primeira
+ * vez que essa granularidade mudasse — e a granularidade é justamente a parte
+ * cara de acertar, documentada nos dois parágrafos acima.
  */
 export const createPickingTasks = async (
   tx: TransactionClient,
-  productionOrderId: string,
+  reference: PickingReference,
   allocations: {
     productId: string;
     storagePositionId: string;
@@ -377,8 +415,8 @@ export const createPickingTasks = async (
     data: allocations.map((allocation) => ({
       type: WarehouseTaskType.PICKING,
       status: WarehouseTaskStatus.PENDING,
-      reference: productionOrderId,
-      referenceType: PRODUCTION_ORDER_TASK_REFERENCE_TYPE,
+      reference: reference.referenceId,
+      referenceType: reference.referenceType,
       productId: allocation.productId,
       lotId: allocation.lotId ?? null,
       quantity: allocation.quantity,
@@ -1093,6 +1131,7 @@ export default {
   RECEIPT_TASK_CHAIN,
   RECEIPT_TASK_REFERENCE_TYPE,
   PRODUCTION_ORDER_TASK_REFERENCE_TYPE,
+  SHIPMENT_TASK_REFERENCE_TYPE,
   REPLENISHMENT_TASK_REFERENCE_TYPE,
   STOCK_MOVING_TASK_TYPES,
   createReceiptTaskChain,

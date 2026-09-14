@@ -43,6 +43,11 @@ async function main() {
     { code: 'WMS', enabled: true, core: false },
     { code: 'YMS', enabled: true, core: false },
     { code: 'MANUTENCAO', enabled: true, core: false },
+    // EXPEDICAO nasce habilitado NESTE ambiente — as rotas /sales-orders e
+    // /shipments estão atrás de requireModule('EXPEDICAO') e responderiam 404
+    // se a linha viesse desabilitada. Depende de WMS na prática (a separação do
+    // romaneio é executada pelas rotas de tarefa do WMS).
+    { code: 'EXPEDICAO', enabled: true, core: false },
   ];
 
   for (const { code, enabled, core } of licensedModules) {
@@ -161,6 +166,26 @@ async function main() {
     // YMS (Pátio - Etapa 2: Agendamento e Check-in)
     { resource: 'yard', action: 'executar', description: 'Criar agendamentos e fazer check-in de veículos no pátio' },
 
+    // Expedição — Pedidos de Venda
+    { resource: 'pedidos_venda', action: 'visualizar', description: 'Visualizar pedidos de venda' },
+    { resource: 'pedidos_venda', action: 'criar', description: 'Criar pedidos de venda' },
+    { resource: 'pedidos_venda', action: 'editar', description: 'Editar pedidos de venda em rascunho' },
+    // Ação PRÓPRIA de exclusão, e não `editar` reaproveitado: segue o resto
+    // deste módulo, que já separa `confirmar` e `cancelar` em ações finas.
+    // Excluir o documento é uma decisão diferente de corrigi-lo, então tem
+    // permissão própria — e, como toda ação de exclusão neste seed, fica só com
+    // o ADMIN (ver a regra geral declarada no bloco de permissões de MANAGER).
+    { resource: 'pedidos_venda', action: 'excluir', description: 'Excluir pedidos de venda em rascunho' },
+    { resource: 'pedidos_venda', action: 'confirmar', description: 'Confirmar pedidos de venda' },
+    { resource: 'pedidos_venda', action: 'cancelar', description: 'Cancelar pedidos de venda' },
+
+    // Expedição — Romaneios
+    { resource: 'expedicao', action: 'visualizar', description: 'Visualizar romaneios de expedição' },
+    { resource: 'expedicao', action: 'criar', description: 'Criar romaneios de expedição' },
+    { resource: 'expedicao', action: 'separar', description: 'Iniciar a separação de um romaneio (gera tarefas de picking)' },
+    { resource: 'expedicao', action: 'despachar', description: 'Despachar romaneios de expedição' },
+    { resource: 'expedicao', action: 'cancelar', description: 'Cancelar romaneios de expedição' },
+
     // Fornecedores
     { resource: 'suppliers', action: 'create', description: 'Criar fornecedores' },
     { resource: 'suppliers', action: 'read', description: 'Visualizar fornecedores' },
@@ -207,6 +232,7 @@ async function main() {
     { resource: 'modules', action: 'view_wms', description: 'Acessar módulo WMS' },
     { resource: 'modules', action: 'view_yms', description: 'Acessar módulo YMS' },
     { resource: 'modules', action: 'view_manutencao', description: 'Acessar módulo Manutenção' },
+    { resource: 'modules', action: 'view_expedicao', description: 'Acessar módulo Expedição' },
 
     // Permissões específicas utilizadas no frontend
     { resource: 'pcp', action: 'dashboard.view', description: 'Visualizar dashboard do PCP' },
@@ -530,7 +556,16 @@ async function main() {
     assistente_ia: ['usar'],
     manutencao: ['visualizar', 'executar', 'gerenciar'],
     yard: ['visualizar', 'executar', 'gerenciar'],
-    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
+    // Expedição: o MANAGER é o dono do documento de venda e do romaneio — cria,
+    // confirma, libera separação, despacha e cancela. `excluir` NÃO entra
+    // (correção de revisão): a regra geral declarada acima é "MANAGER não
+    // recebe nenhuma ação de exclusão", e `pedidos_compra:excluir` — o
+    // documento equivalente do outro lado do fluxo — também fica só com o
+    // ADMIN. O gerente cancela o pedido, que é a operação reversível e
+    // auditável; apagar o registro é do administrador.
+    pedidos_venda: ['visualizar', 'criar', 'editar', 'confirmar', 'cancelar'],
+    expedicao: ['visualizar', 'criar', 'separar', 'despachar', 'cancelar'],
+    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao', 'view_expedicao'],
     audit_logs: ['read'],
     roles: ['read'],
     users: ['read'],
@@ -568,7 +603,14 @@ async function main() {
     assistente_ia: ['usar'],
     manutencao: ['visualizar', 'executar'],
     yard: ['visualizar', 'executar'],
-    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao'],
+    // Expedição: o OPERATOR CONSULTA o pedido de venda (é o documento que
+    // explica o que está separando) mas não o cria nem o cancela; no romaneio
+    // ele faz o trabalho de chão — libera a separação e despacha. Criar e
+    // cancelar romaneio continuam sendo decisão de supervisão, mesmo critério
+    // que já separa `tarefas_armazem:executar` de `:atribuir`.
+    pedidos_venda: ['visualizar'],
+    expedicao: ['visualizar', 'separar', 'despachar'],
+    modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao', 'view_expedicao'],
   };
 
   const permissionIdByKey = new Map(

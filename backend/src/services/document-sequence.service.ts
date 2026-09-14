@@ -54,6 +54,10 @@ export const SEQUENCE_PREFIXES = {
   PURCHASE_RECEIPT: 'REC',
   /** `PurchaseOrder.orderNumber` → `PC-2026-0001` */
   PURCHASE_ORDER: 'PC',
+  /** EXPEDIÇÃO — `SalesOrder.orderNumber` → `PV-2026-0001` */
+  SALES_ORDER: 'PV',
+  /** EXPEDIÇÃO — `Shipment.shipmentNumber` → `EXP-2026-0001` */
+  SHIPMENT: 'EXP',
 } as const;
 
 export type SequencePrefix =

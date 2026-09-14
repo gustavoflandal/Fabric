@@ -46,6 +46,8 @@ import yardVisitRoutes from './yard-visit.routes';
 import yardAreaRoutes from './yard-area.routes';
 import yardSpotRoutes from './yard-spot.routes';
 import yardDashboardRoutes from './yard-dashboard.routes';
+import salesOrderRoutes from './sales-order.routes';
+import shipmentRoutes from './shipment.routes';
 import helpRoutes from './help.routes';
 import { requireModule } from '../middleware/module.middleware';
 
@@ -156,6 +158,20 @@ router.use('/yard-visits', requireModule('YMS'), yardVisitRoutes);
 router.use('/yard-areas', requireModule('YMS'), yardAreaRoutes);
 router.use('/yard-spots', requireModule('YMS'), yardSpotRoutes);
 router.use('/yard-dashboard', requireModule('YMS'), yardDashboardRoutes);
+
+// ============================================
+// MÓDULO EXPEDIÇÃO (licenciável por instalação)
+// ============================================
+// Pedido de Venda -> Romaneio -> separação (reaproveita o picking orientado a
+// tarefa do WMS) -> despacho. Mesmo padrão de montagem dos módulos acima.
+//
+// A separação do romaneio cria `WarehouseTask` de PICKING, executadas por
+// `/warehouse-tasks/*`, que estão atrás de `requireModule('WMS')` — na prática
+// EXPEDICAO depende de WMS licenciado. A dependência é respeitada pela ausência
+// da rota que executaria a tarefa (mesma leitura da seção 3.5 de
+// 04_ARQUITETURA_MODULAR_LICENCIAMENTO.md), não por uma checagem a mais aqui.
+router.use('/sales-orders', requireModule('EXPEDICAO'), salesOrderRoutes);
+router.use('/shipments', requireModule('EXPEDICAO'), shipmentRoutes);
 
 // Rotas de notificações
 router.use('/notifications', notificationRoutes);

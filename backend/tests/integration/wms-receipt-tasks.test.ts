@@ -387,10 +387,11 @@ describe('Integração: recebimento orientado a tarefa (Fase 4a, F4.1-F4.5)', ()
       });
 
       // As quatro primeiras etapas são concluídas direto no banco, e não por
-      // HTTP: o caminho HTTP delas já tem teste próprio acima, e o
-      // `generalLimiter` (100 requisições por IP na janela, e o store é
-      // compartilhado por todo o arquivo de teste) tornaria o arranjo o maior
-      // consumidor de requisições da suíte.
+      // HTTP: o caminho HTTP delas já tem teste próprio acima, e repeti-lo aqui
+      // tornaria este arranjo o maior consumidor de requisições da suíte à toa.
+      // (O `generalLimiter` continua com store por IP compartilhado pelo
+      // arquivo inteiro, mas o teto em ambiente `test` deixou de ser 100 —
+      // ver a nota em `rate-limit.middleware.ts`.)
       await testPrisma.warehouseTask.updateMany({
         where: { id: { in: tasks.slice(0, 4).map((t) => t.id) } },
         data: { status: 'COMPLETED', startedAt: new Date(), completedAt: new Date() },

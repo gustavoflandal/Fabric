@@ -61,6 +61,12 @@ model User {
   // Fase 4 do modulo de Manutencao: ordens de manutencao atribuidas a este usuario.
   maintenanceOrders MaintenanceOrder[]
 
+  // Expedicao: FKs de auditoria dos dois documentos do modulo, mesmo padrao
+  // nomeado de `PurchaseOrderCreator` acima (relacao nomeada porque `User` ja
+  // participa de varias relacoes com o mesmo model em outros fluxos).
+  salesOrdersCreated SalesOrder[] @relation("SalesOrderCreator")
+  shipmentsCreated   Shipment[]   @relation("ShipmentCreator")
+
   @@map("users")
 }
 
@@ -264,6 +270,8 @@ model Customer {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  salesOrders SalesOrder[]
+
   @@map("customers")
 }
 
@@ -346,6 +354,8 @@ model Product {
   warehouseTasks        WarehouseTask[]
   storageRules          StorageRule[]
   lots                  Lot[]
+  salesOrderItems       SalesOrderItem[]
+  shipmentItems         ShipmentItem[]
 
   @@index([type])
   @@index([active])
@@ -391,6 +401,7 @@ model Lot {
   positionBalances StockPositionBalance[]
   movements        StockMovement[]
   warehouseTasks   WarehouseTask[]
+  shipmentItems    ShipmentItem[]
 
   @@unique([productId, lotNumber])
   // O indice do FEFO: `planPickingFromPositions()` ordena os candidatos por
@@ -1367,11 +1378,13 @@ model Warehouse {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  structures WarehouseStructure[]
-  yardParams YardWarehouseParams?
-  yardDocks  YardDock[]
-  yardVisits YardVisit[]
-  yardAreas  YardArea[]
+  structures  WarehouseStructure[]
+  yardParams  YardWarehouseParams?
+  yardDocks   YardDock[]
+  yardVisits  YardVisit[]
+  yardAreas   YardArea[]
+  salesOrders SalesOrder[]
+  shipments   Shipment[]
 
   @@map("warehouses")
 }
@@ -2222,4 +2235,150 @@ model YardSpot {
 
   @@unique([areaId, code])
   @@map("yard_spots")
+}
+
+// ============================================
+// EXPEDIÇÃO - PEDIDOS DE VENDA E ROMANEIOS
+// ============================================
+//
+// O fluxo completo: Cliente -> SalesOrder -> confirma -> Shipment (romaneio,
+// gerado A PARTIR do pedido e admitindo expedicao PARCIAL) -> separacao
+// (reaproveita o picking orientado a tarefa do WMS, F4.8) -> despacho.
+//
+// DECISAO CENTRAL DO MODULO: a BAIXA DE ESTOQUE acontece na EXECUCAO da tarefa
+// de PICKING (`POST /warehouse-tasks/:id/execute`), exatamente como ja acontece
+// para a ordem de producao — a unica coisa que muda e o `referenceType` da
+// tarefa ('SHIPMENT' em vez de 'PRODUCTION_ORDER'). "Despachar" o romaneio e
+// uma TRANSICAO DE STATUS que confirma que o material ja separado saiu
+// fisicamente; NAO cria um segundo `StockMovement` e NAO existe posicao de
+// staging/area de expedicao. Um segundo movimento no despacho debitaria duas
+// vezes o mesmo material; uma posicao de staging exigiria um TRANSFER a mais
+// por romaneio sem que ninguem consultasse esse saldo intermediario.
+//
+// Por que `Shipment` e um model proprio e nao um campo em `SalesOrder`: um
+// pedido pode virar VARIOS romaneios (expedicao parcial), e cada romaneio tem
+// o seu proprio ciclo de separacao/despacho. `ShipmentItem.quantity` e o que
+// foi prometido NAQUELE romaneio; `SalesOrderItem.shippedQty` e o acumulado
+// dos romaneios ja despachados.
+
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  SEPARATING
+  READY_TO_SHIP
+  SHIPPED
+  CANCELLED
+}
+
+enum ShipmentStatus {
+  PENDING
+  SEPARATING
+  READY
+  DISPATCHED
+  CANCELLED
+}
+
+model SalesOrder {
+  id               String           @id @default(uuid())
+  orderNumber      String           @unique
+  customerId       String
+  warehouseId      String
+  status           SalesOrderStatus @default(DRAFT)
+  orderDate        DateTime         @default(now())
+  expectedShipDate DateTime?
+  totalValue       Float            @default(0)
+  // @db.Text, e nao o VARCHAR(191) padrao do Prisma: o validator aceita ate 500
+  // caracteres, entao uma observacao de 192-500 passava na validacao e estourava
+  // no INSERT (MySQL 1406) como 500 Internal Server Error para uma entrada que o
+  // proprio servidor tinha acabado de dizer que era valida. Mesmo tipo de
+  // `PurchaseOrder.notes`.
+  notes            String?          @db.Text
+  createdBy        String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  customer  Customer         @relation(fields: [customerId], references: [id])
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  creator   User             @relation("SalesOrderCreator", fields: [createdBy], references: [id])
+  items     SalesOrderItem[]
+  shipments Shipment[]
+
+  @@index([customerId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([orderDate])
+  @@index([createdBy])
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id         String @id @default(uuid())
+  orderId    String
+  productId  String
+  quantity   Float
+  unitPrice  Float
+  totalPrice Float
+  // `pickedQty`/`shippedQty` sao os mesmos "quanto ja andou" de
+  // `PurchaseOrderItem.receivedQty`, do lado da SAIDA. Ambos so crescem, e o
+  // que fecha o pedido e `shippedQty >= quantity` em TODOS os itens.
+  pickedQty  Float  @default(0)
+  shippedQty Float  @default(0)
+
+  order         SalesOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id])
+  shipmentItems ShipmentItem[]
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("sales_order_items")
+}
+
+model Shipment {
+  id             String         @id @default(uuid())
+  shipmentNumber String         @unique
+  salesOrderId   String
+  warehouseId    String
+  status         ShipmentStatus @default(PENDING)
+  dispatchedAt   DateTime?
+  // @db.Text pelo mesmo motivo de `SalesOrder.notes` (validator aceita 500).
+  notes          String?        @db.Text
+  createdBy      String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  salesOrder SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  warehouse  Warehouse      @relation(fields: [warehouseId], references: [id])
+  creator    User           @relation("ShipmentCreator", fields: [createdBy], references: [id])
+  items      ShipmentItem[]
+
+  @@index([salesOrderId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([createdBy])
+  @@map("shipments")
+}
+
+model ShipmentItem {
+  id               String  @id @default(uuid())
+  shipmentId       String
+  salesOrderItemId String
+  productId        String
+  quantity         Float
+  // O lote so e conhecido na SEPARACAO (o FEFO escolhe) — nasce nulo e e
+  // informativo: a verdade da rastreabilidade continua sendo o `lotId` da
+  // `WarehouseTask`/`StockMovement` que efetivamente debitou o saldo.
+  lotId            String?
+
+  shipment       Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  salesOrderItem SalesOrderItem @relation(fields: [salesOrderItemId], references: [id])
+  product        Product        @relation(fields: [productId], references: [id])
+  // `Restrict` EXPLICITO, mesmo motivo de `WarehouseTask.lot`: apagar um lote
+  // nao pode evaporar a rastreabilidade de um romaneio ja despachado.
+  lot            Lot?           @relation(fields: [lotId], references: [id], onDelete: Restrict)
+
+  @@index([shipmentId])
+  @@index([salesOrderItemId])
+  @@index([productId])
+  @@index([lotId])
+  @@map("shipment_items")
 }
