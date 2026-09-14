@@ -253,6 +253,28 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/wms/PickingView.vue'),
     meta: { requiresAuth: true },
   },
+  // Expedição (módulo licenciável EXPEDICAO). Mesma guarda das demais telas
+  // licenciadas do projeto: `requiresAuth` na rota, gate de MÓDULO no menu
+  // (`canViewExpedicao` no DashboardView) e RBAC real no backend — que também
+  // devolve 404 na rota inteira quando o módulo não está habilitado.
+  {
+    path: '/sales-orders',
+    name: 'sales-orders',
+    component: () => import('../views/sales/SalesOrderListView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/shipments',
+    name: 'shipments',
+    component: () => import('../views/sales/ShipmentListView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/shipments/:id',
+    name: 'shipment-detail',
+    component: () => import('../views/sales/ShipmentDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
   {
     path: '/yard/docks',
     name: 'yard-docks',

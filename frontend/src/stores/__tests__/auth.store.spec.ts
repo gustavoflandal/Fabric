@@ -54,6 +54,32 @@ describe('useAuthStore', () => {
     expect(store.canViewWMS).toBe(true)
   })
 
+  it('canViewExpedicao acompanha a permissão modules.view_expedicao', async () => {
+    vi.mocked(authService.login).mockResolvedValue(mockLoginResponse as any)
+    vi.mocked(authService.getMe).mockResolvedValue(mockMeResponse as any)
+
+    const store = useAuthStore()
+    await store.login({ email: 'admin@fabric.com', password: 'secret' })
+
+    // O usuário do mock só tem WMS — o módulo novo não vaza para quem não o tem.
+    expect(store.canViewExpedicao).toBe(false)
+
+    vi.mocked(authService.getMe).mockResolvedValue({
+      ...mockMeResponse,
+      roles: [
+        {
+          permissions: [
+            ...mockMeResponse.roles[0].permissions,
+            { resource: 'modules', action: 'view_expedicao' },
+          ],
+        },
+      ],
+    } as any)
+    await store.fetchUser()
+
+    expect(store.canViewExpedicao).toBe(true)
+  })
+
   it('login() mantém o usuário autenticado mesmo se a busca de permissões falhar por erro temporário', async () => {
     vi.mocked(authService.login).mockResolvedValue(mockLoginResponse as any)
     vi.mocked(authService.getMe).mockRejectedValue({ response: { status: 500 } })

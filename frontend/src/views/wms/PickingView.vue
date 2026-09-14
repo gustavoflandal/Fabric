@@ -140,6 +140,10 @@ import { useAuthStore } from '@/stores/auth.store'
 import { useToast } from '@/composables/useToast'
 import { confirmDialog } from '@/composables/useConfirm'
 import warehouseTaskService from '@/services/warehouse-task.service'
+import {
+  WAREHOUSE_TASK_STATUS_LABELS,
+  WAREHOUSE_TASK_STATUS_TONES,
+} from '@/types/warehouse-task.types'
 import type { WarehouseTask, WarehouseTaskStatus } from '@/types/warehouse-task.types'
 import type { ApiError } from '@/types/warehouse.types'
 
@@ -180,24 +184,14 @@ function setShowAll(value: boolean): void {
   load()
 }
 
+// Rótulo/tom vêm de `warehouse-task.types.ts` — a tela de detalhe do romaneio
+// exibe as mesmas tarefas de separação e usa exatamente estes mapas.
 function statusLabel(status: WarehouseTaskStatus): string {
-  const labels: Record<WarehouseTaskStatus, string> = {
-    PENDING: 'Pendente',
-    IN_PROGRESS: 'Em andamento',
-    COMPLETED: 'Concluída',
-    CANCELLED: 'Cancelada',
-  }
-  return labels[status] ?? status
+  return WAREHOUSE_TASK_STATUS_LABELS[status] ?? status
 }
 
 function statusTone(status: WarehouseTaskStatus): BadgeTone {
-  const tones: Record<WarehouseTaskStatus, BadgeTone> = {
-    PENDING: 'neutral',
-    IN_PROGRESS: 'warning',
-    COMPLETED: 'success',
-    CANCELLED: 'danger',
-  }
-  return tones[status] ?? 'neutral'
+  return WAREHOUSE_TASK_STATUS_TONES[status] ?? 'neutral'
 }
 
 // `GET /warehouse-tasks/my` hoje não seleciona a relação `assignee` (só

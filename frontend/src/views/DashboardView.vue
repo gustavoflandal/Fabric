@@ -78,6 +78,18 @@
                 YMS
               </button>
               <button
+                v-if="authStore.canViewExpedicao"
+                @click="activeTab = 'expedicao'"
+                :class="[
+                  'py-2 px-1 border-b-2 font-medium text-sm transition-colors',
+                  activeTab === 'expedicao'
+                    ? 'border-primary-500 text-primary-600 dark:text-primary-300'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'
+                ]"
+              >
+                Expedição
+              </button>
+              <button
                 v-if="authStore.canViewManutencao"
                 @click="activeTab = 'manutencao'"
                 :class="[
@@ -338,13 +350,8 @@
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Transferências</p>
               </div>
             </RouterLink>
-            <div class="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 opacity-50 cursor-not-allowed dark:border-gray-700 dark:bg-gray-900">
-              <div class="text-center">
-                <div class="text-3xl mb-2">📤</div>
-                <p class="text-sm font-medium text-gray-500">Expedição</p>
-                <p class="text-xs text-gray-400 mt-1">Em breve</p>
-              </div>
-            </div>
+            <!-- O cartão "Expedição — Em breve" que ficava aqui saiu: o módulo
+                 é real e mora na aba Expedição (Pedidos de Venda + Romaneios). -->
             <RouterLink
               to="/wms/picking"
               class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
@@ -419,6 +426,28 @@
               <div class="text-center">
                 <div class="text-3xl mb-2">📊</div>
                 <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Dashboard</p>
+              </div>
+            </RouterLink>
+          </div>
+
+          <!-- Tab Content: Expedição -->
+          <div v-else-if="activeTab === 'expedicao' && authStore.canViewExpedicao" class="grid grid-cols-3 gap-3">
+            <RouterLink
+              to="/sales-orders"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">🧾</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Pedidos de Venda</p>
+              </div>
+            </RouterLink>
+            <RouterLink
+              to="/shipments"
+              class="p-4 border-2 border-gray-200 rounded-lg hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer dark:border-gray-700 dark:hover:border-primary-500 dark:hover:bg-gray-800"
+            >
+              <div class="text-center">
+                <div class="text-3xl mb-2">📤</div>
+                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">Romaneios</p>
               </div>
             </RouterLink>
           </div>
@@ -499,6 +528,8 @@ onMounted(() => {
     activeTab.value = 'wms'
   } else if (authStore.canViewYMS) {
     activeTab.value = 'yms'
+  } else if (authStore.canViewExpedicao) {
+    activeTab.value = 'expedicao'
   } else if (authStore.canViewManutencao) {
     activeTab.value = 'manutencao'
   }
