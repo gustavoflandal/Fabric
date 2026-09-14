@@ -41,6 +41,7 @@ const EXPEDICAO_PERMISSIONS = [
   { resource: 'pedidos_venda', action: 'visualizar' },
   { resource: 'pedidos_venda', action: 'criar' },
   { resource: 'pedidos_venda', action: 'editar' },
+  { resource: 'pedidos_venda', action: 'excluir' },
   { resource: 'pedidos_venda', action: 'confirmar' },
   { resource: 'pedidos_venda', action: 'cancelar' },
   { resource: 'expedicao', action: 'visualizar' },
@@ -85,6 +86,10 @@ const api = (token: string) => ({
     request(app).post(`/api/v1/shipments/${id}/dispatch`).set('Authorization', `Bearer ${token}`),
   cancelShipment: (id: string) =>
     request(app).post(`/api/v1/shipments/${id}/cancel`).set('Authorization', `Bearer ${token}`),
+  cancelOrder: (id: string) =>
+    request(app)
+      .post(`/api/v1/sales-orders/${id}/cancel`)
+      .set('Authorization', `Bearer ${token}`),
   executeTask: (taskId: string) =>
     request(app)
       .post(`/api/v1/warehouse-tasks/${taskId}/execute`)
@@ -586,6 +591,312 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     const again = await client.confirmOrder(orderId);
     expect(again.status).toBe(400);
   }, 30000);
+
+  // ==========================================================================
+  // CONCORRÊNCIA (correções pós-revisão, achado 1).
+  //
+  // O padrão é o de `stock-concurrency.test.ts`: as requisições saem juntas num
+  // `Promise.all` contra a pilha HTTP inteira, cada uma na sua própria
+  // transação do MySQL real — é o duplo clique no botão, reproduzido.
+  // ==========================================================================
+  it('duas chamadas concorrentes a start-separation criam UM conjunto de tarefas só', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 100, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      items: [{ salesOrderItemId: orderItemId, quantity: 100 }],
+    });
+    const shipmentId = shipmentRes.body.data.id as string;
+
+    // AS DUAS AO MESMO TEMPO. Antes da correção, ambas liam `PENDING` antes de
+    // qualquer uma escrever e ambas criavam um conjunto COMPLETO de tarefas.
+    const [first, second] = await Promise.all([
+      client.startSeparation(shipmentId),
+      client.startSeparation(shipmentId),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 400]);
+
+    const loser = first.status === 400 ? first : second;
+    expect(loser.body.message).toMatch(/romaneio PENDENTE/);
+
+    // O PONTO DO TESTE: UMA tarefa, não duas. Duas fariam o romaneio de 100
+    // unidades debitar 200 quando ambas fossem executadas.
+    const tasks = await testPrisma.warehouseTask.findMany();
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].quantity?.toString()).toBe('100');
+
+    const shipment = await testPrisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
+    expect(shipment.status).toBe('SEPARATING');
+
+    // E a prova física: executar tudo o que existe debita 100, não 200.
+    for (const task of tasks) {
+      await client.executeTask(task.id).expect(200);
+    }
+
+    const balance = await testPrisma.stockBalance.findUniqueOrThrow({
+      where: { productId: product.id },
+    });
+    expect(balance.quantity).toBe(400);
+  }, 40000);
+
+  it('dois romaneios concorrentes não somam mais que o saldo do item', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 100, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    // 60 + 60 = 120 > 100. A validação de disponibilidade rodava FORA da
+    // `$transaction`: as duas liam "nenhum romaneio aberto", as duas concluíam
+    // que cabia, e o pedido de 100 acabava com 120 prometidos.
+    const [first, second] = await Promise.all([
+      client.createShipment({
+        salesOrderId: orderId,
+        items: [{ salesOrderItemId: orderItemId, quantity: 60 }],
+      }),
+      client.createShipment({
+        salesOrderId: orderId,
+        items: [{ salesOrderItemId: orderItemId, quantity: 60 }],
+      }),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([201, 400]);
+
+    const loser = first.status === 400 ? first : second;
+    expect(loser.body.message).toMatch(/indispon[íi]vel/i);
+
+    const shipments = await testPrisma.shipment.findMany({ where: { salesOrderId: orderId } });
+    expect(shipments).toHaveLength(1);
+
+    // E a numeração não queimou/duplicou: o romaneio que sobrou tem número
+    // próprio e único.
+    expect(shipments[0].shipmentNumber).toMatch(/^EXP-\d{4}-\d{4,}$/);
+  }, 40000);
+
+  it('dois despachos concorrentes incrementam shippedQty UMA vez só', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 100, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      items: [{ salesOrderItemId: orderItemId, quantity: 100 }],
+    });
+    const shipmentId = shipmentRes.body.data.id as string;
+
+    await client.startSeparation(shipmentId).expect(200);
+    const task = await testPrisma.warehouseTask.findFirstOrThrow();
+    await client.executeTask(task.id).expect(200);
+
+    const [first, second] = await Promise.all([
+      client.dispatch(shipmentId),
+      client.dispatch(shipmentId),
+    ]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 400]);
+
+    // Antes da correção o `increment` rodava ANTES da escrita do status e o
+    // `update` final não reconferia status nenhum: o item fechava com 200.
+    const item = await testPrisma.salesOrderItem.findUniqueOrThrow({
+      where: { id: orderItemId },
+    });
+    expect(item.shippedQty).toBe(100);
+    expect(item.pickedQty).toBe(100);
+
+    // E nenhum movimento extra: o despacho nunca movimenta estoque.
+    expect(await testPrisma.stockMovement.count()).toBe(1);
+  }, 40000);
+
+  // ==========================================================================
+  // CANCELAMENTO COM TAREFA JÁ CONCLUÍDA (correções pós-revisão, achado 2).
+  // ==========================================================================
+  it('bloqueia o cancelamento do romaneio E do pedido quando já há tarefa CONCLUÍDA', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, warehouse, position } = await setupScenario(0);
+
+    // Dois itens → duas tarefas independentes: uma é executada (estoque sai de
+    // verdade) e a outra fica pendente.
+    const productA = await createTestProduct();
+    const productB = await createTestProduct();
+    await seedStock(productA.id, [{ positionId: position.id, quantity: 200 }]);
+    await seedStock(productB.id, [{ positionId: position.id, quantity: 200 }]);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [
+        { productId: productA.id, quantity: 10, unitPrice: 1 },
+        { productId: productB.id, quantity: 20, unitPrice: 1 },
+      ],
+    });
+    const orderId = created.body.data.id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      items: created.body.data.items.map((item: { id: string; quantity: number }) => ({
+        salesOrderItemId: item.id,
+        quantity: item.quantity,
+      })),
+    });
+    const shipmentId = shipmentRes.body.data.id as string;
+
+    await client.startSeparation(shipmentId).expect(200);
+
+    const tasks = await testPrisma.warehouseTask.findMany({ orderBy: { createdAt: 'asc' } });
+    expect(tasks).toHaveLength(2);
+
+    // A PRIMEIRA É EXECUTADA: `StockMovement` OUT real, material fora do
+    // endereço, fisicamente na doca.
+    await client.executeTask(tasks[0].id).expect(200);
+    expect(await testPrisma.stockMovement.count()).toBe(1);
+
+    // Cancelar o ROMANEIO agora apagaria o último documento que explica onde
+    // aquele material está.
+    const shipmentCancel = await client.cancelShipment(shipmentId);
+    expect(shipmentCancel.status).toBe(400);
+    expect(shipmentCancel.body.message).toBe(
+      '1 tarefa(s) de separação já concluídas debitaram estoque. ' +
+        'Retorne o material ao endereço (ajuste de estoque) antes de cancelar.'
+    );
+
+    // Cancelar o PEDIDO (que cascateia até o romaneio) tem de barrar igual, com
+    // a MESMA mensagem — é o mesmo problema físico visto do outro documento.
+    const orderCancel = await client.cancelOrder(orderId);
+    expect(orderCancel.status).toBe(400);
+    expect(orderCancel.body.message).toBe(shipmentCancel.body.message);
+
+    // NADA foi cancelado por nenhuma das duas tentativas.
+    const shipment = await testPrisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
+    expect(shipment.status).toBe('SEPARATING');
+
+    const order = await testPrisma.salesOrder.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe('SEPARATING');
+
+    const after = await testPrisma.warehouseTask.findMany({ orderBy: { createdAt: 'asc' } });
+    expect(after.map((t) => t.status)).toEqual(['COMPLETED', 'PENDING']);
+  }, 40000);
+
+  // ==========================================================================
+  // DESPACHO SEM TAREFA NENHUMA (correções pós-revisão, achado 5).
+  // ==========================================================================
+  it('recusa o despacho de romaneio sem nenhuma tarefa de separação', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 10, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      items: [{ salesOrderItemId: orderItemId, quantity: 10 }],
+    });
+    const shipmentId = shipmentRes.body.data.id as string;
+
+    // Nenhuma rota produz este estado hoje (a separação sempre cria tarefa),
+    // mas `READY` existe no enum e o despacho o aceita — então o estado
+    // "romaneio despachável sem nenhuma tarefa" é alcançável assim que alguém
+    // introduzir essa transição. Forçado aqui direto no banco.
+    await testPrisma.shipment.update({
+      where: { id: shipmentId },
+      data: { status: 'SEPARATING' },
+    });
+    expect(await testPrisma.warehouseTask.count()).toBe(0);
+
+    const res = await client.dispatch(shipmentId);
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/sem tarefas de separação/);
+
+    // O gate antigo (`filter(...).length > 0` numa lista vazia) deixava passar e
+    // expedia material que ninguém tirou da prateleira.
+    const item = await testPrisma.salesOrderItem.findUniqueOrThrow({
+      where: { id: orderItemId },
+    });
+    expect(item.shippedQty).toBe(0);
+
+    const shipment = await testPrisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
+    expect(shipment.status).toBe('SEPARATING');
+    expect(shipment.dispatchedAt).toBeNull();
+  }, 40000);
+
+  // ==========================================================================
+  // OBSERVAÇÃO LONGA (correções pós-revisão, achado 3).
+  // ==========================================================================
+  it('aceita observação de 500 caracteres em pedido e romaneio (notes é TEXT)', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    // 500 é exatamente o teto do validator. Com `VARCHAR(191)` isto estourava
+    // no INSERT (MySQL 1406) e virava 500 numa entrada declarada válida.
+    const longNote = 'á'.repeat(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      notes: longNote,
+      items: [{ productId: product.id, quantity: 10, unitPrice: 1 }],
+    });
+
+    expect(created.status).toBe(201);
+    expect(created.body.data.notes).toHaveLength(500);
+
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      notes: longNote,
+      items: [{ salesOrderItemId: orderItemId, quantity: 10 }],
+    });
+
+    expect(shipmentRes.status).toBe(201);
+    expect(shipmentRes.body.data.notes).toHaveLength(500);
+
+    // E o que o banco guardou é o texto inteiro, não um truncado silencioso.
+    const persisted = await testPrisma.shipment.findUniqueOrThrow({
+      where: { id: shipmentRes.body.data.id },
+    });
+    expect(persisted.notes).toBe(longNote);
+  }, 40000);
 
   // ==========================================================================
   // MÓDULO NÃO LICENCIADO.

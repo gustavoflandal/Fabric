@@ -63,14 +63,14 @@ router.post(
 
 // Excluir pedido (só DRAFT e sem romaneios).
 //
-// Reaproveita `pedidos_venda:editar` em vez de criar uma ação `excluir`
-// própria: a exclusão aqui só alcança RASCUNHO sem nenhum documento
-// dependente — é a última forma de "desfazer a digitação", não a remoção de um
-// documento que já circulou. (Compras tem `pedidos_compra:excluir` separado
-// porque lá o delete alcança pedido já aprovado.)
+// Ação PRÓPRIA `pedidos_venda:excluir`, não `editar` reaproveitado: é o mesmo
+// critério de Compras (`pedidos_compra:excluir`) e o mesmo deste módulo, que já
+// separa `confirmar` e `cancelar` em ações finas. Quem corrige a digitação de
+// um rascunho não é necessariamente quem pode fazê-lo desaparecer — no seed,
+// `excluir` vai só para o MANAGER.
 router.delete(
   '/:id',
-  requirePermission('pedidos_venda', 'editar'),
+  requirePermission('pedidos_venda', 'excluir'),
   salesOrderController.delete
 );
 

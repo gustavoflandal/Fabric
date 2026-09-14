@@ -2287,7 +2287,12 @@ model SalesOrder {
   orderDate        DateTime         @default(now())
   expectedShipDate DateTime?
   totalValue       Float            @default(0)
-  notes            String?
+  // @db.Text, e nao o VARCHAR(191) padrao do Prisma: o validator aceita ate 500
+  // caracteres, entao uma observacao de 192-500 passava na validacao e estourava
+  // no INSERT (MySQL 1406) como 500 Internal Server Error para uma entrada que o
+  // proprio servidor tinha acabado de dizer que era valida. Mesmo tipo de
+  // `PurchaseOrder.notes`.
+  notes            String?          @db.Text
   createdBy        String
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -2335,7 +2340,8 @@ model Shipment {
   warehouseId    String
   status         ShipmentStatus @default(PENDING)
   dispatchedAt   DateTime?
-  notes          String?
+  // @db.Text pelo mesmo motivo de `SalesOrder.notes` (validator aceita 500).
+  notes          String?        @db.Text
   createdBy      String
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt

@@ -81,6 +81,22 @@ const OPEN_SHIPMENT_STATUSES: ShipmentStatus[] = [
  */
 const QTY_EPSILON = 1e-6;
 
+/**
+ * Mensagem única do bloqueio de cancelamento por tarefa de separação já
+ * CONCLUÍDA. Vive aqui e é importada por `sales-order.service.ts` para que o
+ * cancelamento do PEDIDO e o do ROMANEIO digam exatamente a mesma coisa — são o
+ * mesmo problema físico (material já fora do endereço) visto de dois
+ * documentos, e uma mensagem divergente faria o usuário achar que são causas
+ * diferentes.
+ *
+ * A mensagem é ACIONÁVEL de propósito: diz o que aconteceu (o estoque já foi
+ * debitado), o que fazer (devolver o material ao endereço) e só então o que
+ * será possível (cancelar).
+ */
+export const completedTasksBlockMessage = (count: number) =>
+  `${count} tarefa(s) de separação já concluídas debitaram estoque. ` +
+  'Retorne o material ao endereço (ajuste de estoque) antes de cancelar.';
+
 const shipmentInclude = {
   salesOrder: {
     select: {
@@ -168,95 +184,123 @@ export class ShipmentService {
    * Sem a terceira parcela, dois romaneios abertos do mesmo pedido poderiam
    * cada um pedir a quantidade inteira e só a segunda separação descobriria
    * que o material não existe — na frente do endereço, com o operador parado.
+   *
+   * VALIDAÇÃO DENTRO DA TRANSAÇÃO, SOB LOCK DO PEDIDO (correção de revisão).
+   * A checagem acima rodava FORA da `$transaction`: duas criações concorrentes
+   * do mesmo pedido liam a MESMA lista de romaneios abertos, cada uma concluía
+   * que cabia, e a soma das duas estourava o saldo do item — dupla reserva
+   * silenciosa, descoberta só na separação. Agora a transação inteira é
+   * serializada por pedido com `SELECT ... FOR UPDATE` na linha do
+   * `SalesOrder`.
+   *
+   * POR QUE O LOCK É A PRIMEIRA INSTRUÇÃO (e não a sequência, contrariando a
+   * regra de ordem de lock de `document-sequence.service.ts`): em MySQL
+   * REPEATABLE READ o snapshot de leitura consistente nasce na PRIMEIRA leitura
+   * NÃO-travante da transação. `nextDocumentNumber` termina com um `SELECT`
+   * comum; se ele viesse antes, o snapshot nasceria ANTES de a transação
+   * concorrente ter commitado e as leituras seguintes enxergariam o pedido sem
+   * o romaneio dela — o lock existiria e ainda assim a validação leria dado
+   * velho. Leitura travante (`FOR UPDATE`) não cria snapshot e lê sempre o
+   * último commit, então ela tem de vir primeiro. A inversão é segura: nenhum
+   * outro fluxo trava `document_sequences` antes de `sales_orders` (o
+   * `SalesOrderService.create` pega a sequência `PV` e INSERE uma linha nova,
+   * que não disputa lock com o `FOR UPDATE` de uma linha existente), então não
+   * há ciclo possível — e manter a sequência por último encurta, em vez de
+   * alongar, o tempo em que ela fica travada.
    */
   async create(data: CreateShipmentDto, createdBy: string) {
-    const order = await prisma.salesOrder.findUnique({
-      where: { id: data.salesOrderId },
-      include: {
-        items: true,
-        shipments: {
-          where: { status: { in: OPEN_SHIPMENT_STATUSES } },
-          include: { items: true },
-        },
-      },
-    });
-
-    if (!order) {
-      throw new AppError(404, 'Pedido de venda não encontrado');
-    }
-
-    if (
-      order.status !== SalesOrderStatus.CONFIRMED &&
-      order.status !== SalesOrderStatus.SEPARATING
-    ) {
-      throw new AppError(
-        400,
-        'Só é possível gerar romaneio de pedido CONFIRMADO ou em SEPARAÇÃO. ' +
-          `Status atual: ${order.status}`
-      );
-    }
-
-    // Quanto cada item do pedido já está prometido em romaneios ABERTOS.
-    const reservedByItem = new Map<string, number>();
-    for (const shipment of order.shipments) {
-      for (const item of shipment.items) {
-        reservedByItem.set(
-          item.salesOrderItemId,
-          (reservedByItem.get(item.salesOrderItemId) ?? 0) + item.quantity
-        );
-      }
-    }
-
-    const itemsById = new Map(order.items.map((item) => [item.id, item]));
-    const seen = new Set<string>();
-    const toCreate: {
-      salesOrderItemId: string;
-      productId: string;
-      quantity: number;
-    }[] = [];
-
-    for (const requested of data.items) {
-      const orderItem = itemsById.get(requested.salesOrderItemId);
-
-      if (!orderItem) {
-        throw new AppError(
-          400,
-          `Item ${requested.salesOrderItemId} não pertence ao pedido ${order.orderNumber}`
-        );
-      }
-
-      // O mesmo item duas vezes no payload passaria por cada checagem de saldo
-      // isoladamente e estouraria o teto na soma. Recusar é mais honesto do que
-      // somar silenciosamente as duas linhas.
-      if (seen.has(requested.salesOrderItemId)) {
-        throw new AppError(
-          400,
-          `Item ${requested.salesOrderItemId} aparece mais de uma vez no romaneio`
-        );
-      }
-      seen.add(requested.salesOrderItemId);
-
-      const reserved = reservedByItem.get(orderItem.id) ?? 0;
-      const available = orderItem.quantity - orderItem.shippedQty - reserved;
-
-      if (requested.quantity > available + QTY_EPSILON) {
-        throw new AppError(
-          400,
-          `Quantidade indisponível para o item do pedido ${order.orderNumber}: ` +
-            `pedido ${orderItem.quantity}, já expedido ${orderItem.shippedQty}, ` +
-            `em romaneios abertos ${reserved}, disponível ${available} — ` +
-            `solicitado ${requested.quantity}.`
-        );
-      }
-
-      toCreate.push({
-        salesOrderItemId: orderItem.id,
-        productId: orderItem.productId,
-        quantity: requested.quantity,
-      });
-    }
-
     return prisma.$transaction(async (tx) => {
+      // O LOCK. Serializa todas as criações de romaneio DESTE pedido; pedidos
+      // diferentes seguem em paralelo. Pedido inexistente não casa nenhuma
+      // linha, não trava nada, e cai no 404 logo abaixo.
+      await tx.$executeRaw`SELECT id FROM sales_orders WHERE id = ${data.salesOrderId} FOR UPDATE`;
+
+      const order = await tx.salesOrder.findUnique({
+        where: { id: data.salesOrderId },
+        include: {
+          items: true,
+          shipments: {
+            where: { status: { in: OPEN_SHIPMENT_STATUSES } },
+            include: { items: true },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new AppError(404, 'Pedido de venda não encontrado');
+      }
+
+      if (
+        order.status !== SalesOrderStatus.CONFIRMED &&
+        order.status !== SalesOrderStatus.SEPARATING
+      ) {
+        throw new AppError(
+          400,
+          'Só é possível gerar romaneio de pedido CONFIRMADO ou em SEPARAÇÃO. ' +
+            `Status atual: ${order.status}`
+        );
+      }
+
+      // Quanto cada item do pedido já está prometido em romaneios ABERTOS.
+      const reservedByItem = new Map<string, number>();
+      for (const shipment of order.shipments) {
+        for (const item of shipment.items) {
+          reservedByItem.set(
+            item.salesOrderItemId,
+            (reservedByItem.get(item.salesOrderItemId) ?? 0) + item.quantity
+          );
+        }
+      }
+
+      const itemsById = new Map(order.items.map((item) => [item.id, item]));
+      const seen = new Set<string>();
+      const toCreate: {
+        salesOrderItemId: string;
+        productId: string;
+        quantity: number;
+      }[] = [];
+
+      for (const requested of data.items) {
+        const orderItem = itemsById.get(requested.salesOrderItemId);
+
+        if (!orderItem) {
+          throw new AppError(
+            400,
+            `Item ${requested.salesOrderItemId} não pertence ao pedido ${order.orderNumber}`
+          );
+        }
+
+        // O mesmo item duas vezes no payload passaria por cada checagem de saldo
+        // isoladamente e estouraria o teto na soma. Recusar é mais honesto do que
+        // somar silenciosamente as duas linhas.
+        if (seen.has(requested.salesOrderItemId)) {
+          throw new AppError(
+            400,
+            `Item ${requested.salesOrderItemId} aparece mais de uma vez no romaneio`
+          );
+        }
+        seen.add(requested.salesOrderItemId);
+
+        const reserved = reservedByItem.get(orderItem.id) ?? 0;
+        const available = orderItem.quantity - orderItem.shippedQty - reserved;
+
+        if (requested.quantity > available + QTY_EPSILON) {
+          throw new AppError(
+            400,
+            `Quantidade indisponível para o item do pedido ${order.orderNumber}: ` +
+              `pedido ${orderItem.quantity}, já expedido ${orderItem.shippedQty}, ` +
+              `em romaneios abertos ${reserved}, disponível ${available} — ` +
+              `solicitado ${requested.quantity}.`
+          );
+        }
+
+        toCreate.push({
+          salesOrderItemId: orderItem.id,
+          productId: orderItem.productId,
+          quantity: requested.quantity,
+        });
+      }
+
       const shipmentNumber = await nextDocumentNumber(tx, SEQUENCE_PREFIXES.SHIPMENT);
 
       return tx.shipment.create({
@@ -340,25 +384,52 @@ export class ShipmentService {
    * dois romaneios podem planejar do mesmo endereço; a primeira CONCLUSÃO
    * debita e a segunda falha com "estoque insuficiente na posição", sob o lock
    * de `applyMovement`. O saldo nunca fica negativo.
+   *
+   * A TRANSIÇÃO DE STATUS É REIVINDICADA ATOMICAMENTE, COMO PRIMEIRA OPERAÇÃO
+   * (correção de revisão). Antes, o guard era `findUnique` + checagem em
+   * memória e a escrita do novo status só acontecia no FIM da transação: duas
+   * requisições concorrentes (o duplo clique no botão da tela) liam `PENDING`
+   * as duas, as duas passavam pelo guard e as duas criavam um conjunto COMPLETO
+   * de tarefas de picking. O romaneio de N unidades debitaria 2N quando as
+   * tarefas fossem executadas — estoque real, não só status inconsistente. O
+   * `updateMany` condicional resolve porque o `UPDATE ... WHERE status =
+   * 'PENDING'` é ele próprio o lock: a segunda transação bloqueia nele e, quando
+   * passa, relê a versão commitada e casa ZERO linhas.
    */
   async startSeparation(id: string) {
     return prisma.$transaction(async (tx) => {
-      const shipment = await tx.shipment.findUnique({
+      // A REIVINDICAÇÃO. Vem antes de qualquer leitura: quem não pegar a
+      // transição não planeja nem cria tarefa nenhuma.
+      const claimed = await tx.shipment.updateMany({
+        where: { id, status: ShipmentStatus.PENDING },
+        data: { status: ShipmentStatus.SEPARATING },
+      });
+
+      if (claimed.count === 0) {
+        const existing = await tx.shipment.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+
+        if (!existing) {
+          throw new AppError(404, 'Romaneio não encontrado');
+        }
+
+        throw new AppError(
+          400,
+          'Só é possível iniciar a separação de um romaneio PENDENTE. ' +
+            `Status atual: ${existing.status} (outra requisição pode tê-lo processado primeiro).`
+        );
+      }
+
+      const shipment = await tx.shipment.findUniqueOrThrow({
         where: { id },
         include: { items: true },
       });
 
-      if (!shipment) {
-        throw new AppError(404, 'Romaneio não encontrado');
-      }
-
-      if (shipment.status !== ShipmentStatus.PENDING) {
-        throw new AppError(
-          400,
-          `Só é possível iniciar a separação de um romaneio PENDENTE. Status atual: ${shipment.status}`
-        );
-      }
-
+      // Daqui para baixo, qualquer `throw` desfaz a reivindicação junto com o
+      // resto da transação — o romaneio volta a PENDING e nenhuma tarefa fica
+      // criada. É o "tudo ou nada" descrito acima, agora incluindo o status.
       if (shipment.items.length === 0) {
         throw new AppError(400, 'Romaneio sem itens não pode ser separado');
       }
@@ -416,9 +487,10 @@ export class ShipmentService {
         });
       }
 
-      const updated = await tx.shipment.update({
+      // O status já foi escrito na reivindicação lá em cima; aqui só se relê o
+      // romaneio no shape completo da resposta.
+      const updated = await tx.shipment.findUniqueOrThrow({
         where: { id },
-        data: { status: ShipmentStatus.SEPARATING },
         include: shipmentInclude,
       });
 
@@ -433,29 +505,54 @@ export class ShipmentService {
    * O gate é "toda tarefa deste romaneio está COMPLETED". Tarefa CANCELADA
    * também barra: cancelar uma tarefa significa que aquele material NÃO foi
    * separado, e despachar assim mesmo registraria como expedido algo que
-   * ninguém tirou da prateleira.
+   * ninguém tirou da prateleira. ZERO tarefa também barra (correção de
+   * revisão): `tasks.filter(...)` de uma lista vazia é vazio, então o gate
+   * antigo APROVAVA o romaneio que nunca foi separado — despachava material que
+   * ninguém tirou do endereço e ainda incrementava `shippedQty`.
+   *
+   * A TRANSIÇÃO DE STATUS É REIVINDICADA ATOMICAMENTE, COMO PRIMEIRA OPERAÇÃO
+   * (correção de revisão), pelo mesmo motivo de `startSeparation` e com
+   * consequência pior: os `increment` de `pickedQty`/`shippedQty` rodavam ANTES
+   * da escrita do status, e o `update` final era por `id`, sem reconferir o
+   * status. Duas requisições concorrentes passavam as duas pelo guard e
+   * incrementavam os acumulados DUAS VEZES para o mesmo romaneio — o pedido
+   * fechava como expedido em dobro.
    */
   async dispatch(id: string) {
     return prisma.$transaction(async (tx) => {
-      const shipment = await tx.shipment.findUnique({
-        where: { id },
-        include: { items: true },
+      const dispatchedAt = new Date();
+
+      // A REIVINDICAÇÃO, antes de qualquer leitura e muito antes de qualquer
+      // `increment`. A segunda requisição concorrente casa ZERO linhas.
+      const claimed = await tx.shipment.updateMany({
+        where: {
+          id,
+          status: { in: [ShipmentStatus.SEPARATING, ShipmentStatus.READY] },
+        },
+        data: { status: ShipmentStatus.DISPATCHED, dispatchedAt },
       });
 
-      if (!shipment) {
-        throw new AppError(404, 'Romaneio não encontrado');
-      }
+      if (claimed.count === 0) {
+        const existing = await tx.shipment.findUnique({
+          where: { id },
+          select: { status: true },
+        });
 
-      if (
-        shipment.status !== ShipmentStatus.SEPARATING &&
-        shipment.status !== ShipmentStatus.READY
-      ) {
+        if (!existing) {
+          throw new AppError(404, 'Romaneio não encontrado');
+        }
+
         throw new AppError(
           400,
           'Só é possível despachar um romaneio em SEPARAÇÃO ou PRONTO. ' +
-            `Status atual: ${shipment.status}`
+            `Status atual: ${existing.status} (outra requisição pode tê-lo processado primeiro).`
         );
       }
+
+      const shipment = await tx.shipment.findUniqueOrThrow({
+        where: { id },
+        include: { items: true },
+      });
 
       const tasks = await tx.warehouseTask.findMany({
         where: {
@@ -464,6 +561,16 @@ export class ShipmentService {
         },
         select: { id: true, status: true },
       });
+
+      // Qualquer `throw` daqui para baixo desfaz a reivindicação junto com o
+      // resto da transação: o romaneio volta ao status anterior e `dispatchedAt`
+      // continua nulo.
+      if (tasks.length === 0) {
+        throw new AppError(
+          400,
+          'Romaneio sem tarefas de separação não pode ser despachado'
+        );
+      }
 
       const unfinished = tasks.filter(
         (task) => task.status !== WarehouseTaskStatus.COMPLETED
@@ -476,8 +583,6 @@ export class ShipmentService {
             'de separação ainda não foram concluídas.'
         );
       }
-
-      const dispatchedAt = new Date();
 
       // `pickedQty` e `shippedQty` avançam JUNTOS aqui, e não em dois momentos
       // diferentes, porque o gate acima já provou que tudo o que este romaneio
@@ -492,12 +597,6 @@ export class ShipmentService {
           },
         });
       }
-
-      const updated = await tx.shipment.update({
-        where: { id },
-        data: { status: ShipmentStatus.DISPATCHED, dispatchedAt },
-        include: shipmentInclude,
-      });
 
       // O pedido só fecha quando TODOS os itens estiverem completos — é o que
       // permite o próximo romaneio parcial continuar de onde este parou.
@@ -516,6 +615,13 @@ export class ShipmentService {
           data: { status: SalesOrderStatus.SHIPPED },
         });
       }
+
+      // O status/`dispatchedAt` já foram escritos na reivindicação; aqui só se
+      // relê o romaneio no shape completo da resposta.
+      const updated = await tx.shipment.findUniqueOrThrow({
+        where: { id },
+        include: shipmentInclude,
+      });
 
       return {
         ...updated,
@@ -539,9 +645,17 @@ export class ShipmentService {
    * transação. Deixá-las de pé seria pior do que um registro órfão: um operador
    * concluiria depois a separação de um romaneio cancelado e o `applyMovement`
    * dessa conclusão debitaria estoque de verdade, para um documento que não
-   * existe mais. Tarefa já COMPLETED fica como está — o material realmente saiu
-   * do endereço, e apagar esse fato esconderia uma divergência que o inventário
-   * precisa enxergar.
+   * existe mais.
+   *
+   * TAREFA JÁ COMPLETED BLOQUEIA O CANCELAMENTO (correção de revisão). Antes, a
+   * tarefa concluída era apenas "deixada como está" — e o resultado era pior do
+   * que um registro órfão: aquela tarefa JÁ DEBITOU estoque (`StockMovement`
+   * OUT real, material fora do endereço, fisicamente na doca), e cancelar o
+   * romaneio apagava o último documento aberto que explicava onde o material
+   * estava. Ninguém mais pediria o retorno ao endereço e o inventário só
+   * descobriria a falta na contagem. Agora o cancelamento é RECUSADO enquanto
+   * existir tarefa concluída: o caminho correto é registrar o retorno do
+   * material (ajuste/entrada de estoque) e só então cancelar.
    */
   async cancel(id: string) {
     return prisma.$transaction(async (tx) => {
@@ -557,6 +671,18 @@ export class ShipmentService {
 
       if (shipment.status === ShipmentStatus.CANCELLED) {
         throw new AppError(400, 'Romaneio já está cancelado');
+      }
+
+      const completed = await tx.warehouseTask.count({
+        where: {
+          referenceType: SHIPMENT_TASK_REFERENCE_TYPE,
+          reference: shipment.id,
+          status: WarehouseTaskStatus.COMPLETED,
+        },
+      });
+
+      if (completed > 0) {
+        throw new AppError(400, completedTasksBlockMessage(completed));
       }
 
       await tx.warehouseTask.updateMany({

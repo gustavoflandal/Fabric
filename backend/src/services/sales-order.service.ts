@@ -7,6 +7,7 @@ import {
 import { prisma } from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 import { SEQUENCE_PREFIXES, nextDocumentNumber } from './document-sequence.service';
+import { completedTasksBlockMessage } from './shipment.service';
 import { SHIPMENT_TASK_REFERENCE_TYPE } from './warehouse-task.service';
 
 /**
@@ -320,10 +321,15 @@ export class SalesOrderService {
    *   * e, pior, as tarefas de `PICKING` desses romaneios, cuja conclusão
    *     DEBITA ESTOQUE DE VERDADE (`applyMovement`).
    *
-   * Então o cancelamento desce os três níveis. Tarefa já `COMPLETED` fica como
-   * está — o material realmente saiu do endereço, e apagar esse fato esconderia
-   * uma divergência que o inventário precisa enxergar (mesmo critério de
-   * `shipment.service.ts::cancel()`).
+   * Então o cancelamento desce os três níveis.
+   *
+   * TAREFA JÁ `COMPLETED` BLOQUEIA O CANCELAMENTO (correção de revisão, mesmo
+   * critério e mesma mensagem de `shipment.service.ts::cancel()`). Uma tarefa
+   * concluída já DEBITOU estoque de verdade: o material está fora do endereço,
+   * separado na doca. Cancelar o pedido nesse estado apagaria o último
+   * documento aberto que explica onde ele está, sem pedir o retorno — a falta
+   * só apareceria na contagem. O caminho correto é registrar o retorno do
+   * material ao endereço e só então cancelar.
    */
   async cancel(id: string) {
     const order = await this.getById(id);
@@ -351,6 +357,20 @@ export class SalesOrderService {
 
     return prisma.$transaction(async (tx) => {
       if (openShipmentIds.length > 0) {
+        // O bloqueio vem ANTES de qualquer escrita: se houver material já
+        // separado (tarefa COMPLETED), nada é cancelado.
+        const completed = await tx.warehouseTask.count({
+          where: {
+            referenceType: SHIPMENT_TASK_REFERENCE_TYPE,
+            reference: { in: openShipmentIds },
+            status: WarehouseTaskStatus.COMPLETED,
+          },
+        });
+
+        if (completed > 0) {
+          throw new AppError(400, completedTasksBlockMessage(completed));
+        }
+
         await tx.warehouseTask.updateMany({
           where: {
             referenceType: SHIPMENT_TASK_REFERENCE_TYPE,

@@ -169,7 +169,13 @@ async function main() {
     // Expedição — Pedidos de Venda
     { resource: 'pedidos_venda', action: 'visualizar', description: 'Visualizar pedidos de venda' },
     { resource: 'pedidos_venda', action: 'criar', description: 'Criar pedidos de venda' },
-    { resource: 'pedidos_venda', action: 'editar', description: 'Editar e excluir pedidos de venda em rascunho' },
+    { resource: 'pedidos_venda', action: 'editar', description: 'Editar pedidos de venda em rascunho' },
+    // Ação PRÓPRIA de exclusão, e não `editar` reaproveitado: é o mesmo
+    // critério de Compras (`pedidos_compra:excluir`) e do resto deste módulo,
+    // que já separa `confirmar` e `cancelar` em ações finas. Excluir o
+    // documento é uma decisão diferente de corrigi-lo, então tem permissão
+    // diferente — e fica só com o MANAGER.
+    { resource: 'pedidos_venda', action: 'excluir', description: 'Excluir pedidos de venda em rascunho' },
     { resource: 'pedidos_venda', action: 'confirmar', description: 'Confirmar pedidos de venda' },
     { resource: 'pedidos_venda', action: 'cancelar', description: 'Cancelar pedidos de venda' },
 
@@ -552,7 +558,7 @@ async function main() {
     yard: ['visualizar', 'executar', 'gerenciar'],
     // Expedição: o MANAGER é o dono do documento de venda e do romaneio — cria,
     // confirma, libera separação, despacha e cancela.
-    pedidos_venda: ['visualizar', 'criar', 'editar', 'confirmar', 'cancelar'],
+    pedidos_venda: ['visualizar', 'criar', 'editar', 'excluir', 'confirmar', 'cancelar'],
     expedicao: ['visualizar', 'criar', 'separar', 'despachar', 'cancelar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao', 'view_expedicao'],
     audit_logs: ['read'],
