@@ -11,6 +11,7 @@
             v-model="filters.search"
             type="text"
             placeholder="Número do pedido, cliente..."
+            maxlength="100"
             class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             @input="debouncedFilterChange"
           />

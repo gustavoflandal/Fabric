@@ -6,6 +6,13 @@
     <template #actions>
       <div class="flex gap-2">
         <Button variant="outline" @click="goBack">Voltar</Button>
+        <!--
+          A separação é executada em OUTRA tela (Picking do WMS), então o
+          progresso deste romaneio fica parado desde o `onMounted` até que
+          alguém recarregue — sem isto, "Despachar" fica preso em disabled
+          mesmo depois de todas as tarefas concluídas por outra pessoa.
+        -->
+        <Button variant="outline" :loading="loading" @click="load">Atualizar</Button>
         <Button
           v-if="shipment && shipment.status === 'PENDING'"
           :loading="acting"

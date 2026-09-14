@@ -170,6 +170,9 @@
             O saldo exibido não desconta romaneios abertos do mesmo pedido — o servidor recusa a
             quantidade excedente com o saldo exato.
           </p>
+          <p v-if="selectedOrderHasOpenShipments" class="text-xs text-amber-700 mt-1">
+            Este pedido já tem romaneio(s) aberto(s): o saldo disponível pode ser menor que o exibido.
+          </p>
         </div>
 
         <FormField id="sh-form-notes" label="Observações" hint="Até 500 caracteres">
@@ -265,6 +268,16 @@ const canCancel = (shipment: Shipment) =>
 
 const selectedOrder = computed(
   () => shippableOrders.value.find((order) => order.id === createForm.value.salesOrderId) ?? null
+);
+
+// `shipments[].status` (sem quantidade) é o que o `orderInclude` do backend
+// traz — não dá pra descontar o saldo exato aqui, mas dá pra avisar que ele
+// existe, em vez de deixar o usuário descobrir só no 400 do servidor.
+const selectedOrderHasOpenShipments = computed(
+  () =>
+    (selectedOrder.value?.shipments ?? []).some(
+      (shipment) => shipment.status !== 'DISPATCHED' && shipment.status !== 'CANCELLED'
+    )
 );
 
 const hasQuantityToShip = computed(() =>
@@ -370,7 +383,11 @@ const handleCreate = async () => {
     });
     toast.success('Romaneio criado com sucesso!');
     closeCreateModal();
-    await loadShipments();
+    // Recarrega os pedidos elegíveis junto com a lista: sem isto,
+    // `selectedOrderHasOpenShipments` ficaria com o `shipments[]` de ANTES
+    // desta criação, e um segundo romaneio do MESMO pedido na MESMA sessão
+    // reabriria o modal sem o aviso de saldo reservado que acabou de nascer.
+    await Promise.all([loadShipments(), loadLookups()]);
   } catch (e) {
     toast.error((e as ApiError).response?.data?.message || 'Erro ao criar romaneio');
   } finally {
@@ -388,7 +405,9 @@ const handleCancel = async (shipment: Shipment) => {
   try {
     await shipmentStore.cancelShipment(shipment.id);
     toast.success('Romaneio cancelado com sucesso!');
-    await loadShipments();
+    // Cancelar libera o saldo que este romaneio reservava — mesmo motivo do
+    // `loadLookups()` em `handleCreate`.
+    await Promise.all([loadShipments(), loadLookups()]);
   } catch (e) {
     toast.error((e as ApiError).response?.data?.message || 'Erro ao cancelar romaneio');
   }

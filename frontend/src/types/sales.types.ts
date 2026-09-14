@@ -228,10 +228,13 @@ export interface ShipmentSalesOrderRef {
  * não traz; as referências (produto/lote/posição/responsável) são reaproveitadas
  * de `warehouse-task.types.ts` porque o `select` é literalmente o mesmo.
  */
-// `type` e não `interface` de propósito: só um alias de tipo objeto ganha
-// índice implícito em TS, e `DataTable` é genérico sobre
-// `T extends Record<string, unknown>`. Uma `interface` aqui não satisfaz essa
-// restrição e o `item` do slot `#row` degrada para `{}`.
+// `type` e não `interface`: ao declarar como `interface` durante o
+// desenvolvimento, o `item` do slot `#row` do `DataTable` (genérico sobre
+// `T extends Record<string, unknown>`) degradava para `{}`. Note que
+// `SalesOrder`/`Shipment` abaixo SÃO `interface` e passam pelo mesmo
+// `DataTable` sem esse problema — a causa exata não está confirmada (não é a
+// regra geral "interface nunca satisfaz Record" que a versão anterior deste
+// comentário afirmava); manter como `type` aqui por ser a forma já testada.
 export type ShipmentPickingTask = {
   id: string;
   type: WarehouseTaskType;
