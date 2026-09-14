@@ -26,6 +26,9 @@ export const useAuthStore = defineStore('auth', () => {
   const canViewWMS = computed(() => permissions.value.includes('modules.view_wms'))
   const canViewYMS = computed(() => permissions.value.includes('modules.view_yms'))
   const canViewManutencao = computed(() => permissions.value.includes('modules.view_manutencao'))
+  // Módulo licenciável EXPEDICAO (Pedidos de Venda + Romaneios). A permissão
+  // `modules.view_expedicao` é semeada em `prisma/seed.ts` junto das demais.
+  const canViewExpedicao = computed(() => permissions.value.includes('modules.view_expedicao'))
 
   // Verificar permissões específicas do PCP
   const canViewPCPDashboard = computed(() => permissions.value.includes('pcp.dashboard.view'))
@@ -271,6 +274,7 @@ export const useAuthStore = defineStore('auth', () => {
     canViewWMS,
     canViewYMS,
     canViewManutencao,
+    canViewExpedicao,
     canViewPCPDashboard,
     canPrintCountingPlan,
     // Actions
