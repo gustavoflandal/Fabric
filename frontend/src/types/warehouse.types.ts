@@ -58,6 +58,34 @@ export interface WarehouseFilters {
   search?: string;
 }
 
+/**
+ * Rótulo amigável do `PositionType` do backend (schema Prisma) — sem isto a
+ * tela mostrava o código técnico cru (`PORTA_PALETES`, `MINI_LOAD`) em vez de
+ * um texto legível. Os termos de rack sem tradução consagrada no mercado
+ * brasileiro de armazenagem (`Drive-in`, `Drive-through`, `Push-back`, `Flow
+ * rack`, `Cantilever`, `Mini-load`) ficam como o próprio profissional de WMS
+ * já os conhece — só formatados (maiúscula inicial, hífen) em vez de
+ * SNAKE_CASE.
+ */
+export const POSITION_TYPE_LABELS: Record<string, string> = {
+  PORTA_PALETES: 'Porta-paletes',
+  MINI_PORTA_PALETES: 'Mini porta-paletes',
+  DRIVE_IN: 'Drive-in',
+  DRIVE_THROUGH: 'Drive-through',
+  PUSH_BACK: 'Push-back',
+  FLOW_RACK: 'Flow rack',
+  CANTILEVER: 'Cantilever',
+  MEZANINO: 'Mezanino',
+  AUTOPORTANTE: 'Autoportante',
+  RACKS: 'Racks',
+  CARROSSEL: 'Carrossel',
+  MINI_LOAD: 'Mini-load',
+  ESTANTES_INDUSTRIAIS: 'Estantes industriais',
+  PISO: 'Piso',
+  DOCA: 'Doca',
+  QUARENTENA: 'Quarentena',
+};
+
 /* -------------------------------------------------------------------------- */
 /* Estrutura de armazenagem (rua)                                              */
 /* -------------------------------------------------------------------------- */

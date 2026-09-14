@@ -38,14 +38,14 @@
         class="text-xs border-gray-300 rounded-md"
         @change="updateLeaf({ field: ($event.target as HTMLSelectElement).value as any })"
       >
-        <option v-for="field in CONDITION_FIELDS" :key="field" :value="field">{{ field }}</option>
+        <option v-for="field in CONDITION_FIELDS" :key="field" :value="field">{{ CONDITION_FIELD_LABELS[field] }}</option>
       </select>
       <select
         :value="rule.operator"
         class="text-xs border-gray-300 rounded-md"
         @change="updateLeaf({ operator: ($event.target as HTMLSelectElement).value as any })"
       >
-        <option v-for="op in OPERATORS" :key="op" :value="op">{{ op }}</option>
+        <option v-for="op in OPERATORS" :key="op" :value="op">{{ CONDITION_OPERATOR_LABELS[op] }}</option>
       </select>
       <input
         :value="localLeafValue"
@@ -65,7 +65,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { CONDITION_FIELDS } from '@/types/workflow.types'
+import { CONDITION_FIELDS, CONDITION_FIELD_LABELS, CONDITION_OPERATOR_LABELS } from '@/types/workflow.types'
 import type { ConditionRule, ConditionLeaf, ConditionGroup, ConditionField } from '@/types/workflow.types'
 
 const OPERATORS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains'] as const

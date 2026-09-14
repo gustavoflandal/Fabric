@@ -70,7 +70,7 @@
     <AppModal v-model="detailOpen" title="Detalhe da etapa" size="sm">
       <div v-if="detailTask" class="text-sm text-gray-700 space-y-2">
         <p><strong>Tipo:</strong> {{ WAREHOUSE_TASK_TYPE_LABELS[detailTask.type] }}</p>
-        <p><strong>Status:</strong> {{ detailTask.status }}</p>
+        <p><strong>Status:</strong> {{ WAREHOUSE_TASK_STATUS_LABELS[detailTask.status] ?? detailTask.status }}</p>
         <p v-if="detailTask.assignee"><strong>Responsável:</strong> {{ detailTask.assignee.name }}</p>
         <p v-if="detailTask.completedAt"><strong>Concluída em:</strong> {{ new Date(detailTask.completedAt).toLocaleString('pt-BR') }}</p>
       </div>
@@ -113,7 +113,7 @@ import { useAuthStore } from '@/stores/auth.store'
 import warehouseTaskService from '@/services/warehouse-task.service'
 import purchaseReceiptService from '@/services/purchase-receipt.service'
 import type { PurchaseReceiptItem } from '@/services/purchase-receipt.service'
-import { WAREHOUSE_TASK_TYPE_LABELS } from '@/types/warehouse-task.types'
+import { WAREHOUSE_TASK_TYPE_LABELS, WAREHOUSE_TASK_STATUS_LABELS } from '@/types/warehouse-task.types'
 import type { WarehouseTask, ReceiptOperation, PanelScope } from '@/types/warehouse-task.types'
 import type { OperationItemForDocument } from './operations-panel-items'
 

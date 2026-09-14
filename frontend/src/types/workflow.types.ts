@@ -12,6 +12,31 @@ export const CONDITION_FIELDS = [
 export type ConditionField = (typeof CONDITION_FIELDS)[number]
 export type ConditionOperator = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains'
 
+/** Rótulo amigável de cada campo condicional — sem isto o construtor de
+ * regras do workflow mostrava o caminho técnico cru (`product.weight`) em vez
+ * de um texto legível para quem está configurando a regra. */
+export const CONDITION_FIELD_LABELS: Record<ConditionField, string> = {
+  'product.weight': 'Peso do produto',
+  'product.volume': 'Volume do produto',
+  'product.packagingType': 'Tipo de embalagem',
+  'product.segregationGroup': 'Grupo de segregação',
+  'product.maxStackQty': 'Qtd. máxima de empilhamento',
+  'product.lotTracked': 'Produto controla lote',
+  'product.categoryId': 'Categoria do produto',
+  'order.supplierId': 'Fornecedor do pedido',
+}
+
+/** Rótulo amigável de cada operador — mesmo motivo do mapa acima. */
+export const CONDITION_OPERATOR_LABELS: Record<ConditionOperator, string> = {
+  eq: 'Igual a',
+  ne: 'Diferente de',
+  gt: 'Maior que',
+  gte: 'Maior ou igual a',
+  lt: 'Menor que',
+  lte: 'Menor ou igual a',
+  contains: 'Contém',
+}
+
 export interface ConditionLeaf {
   field: ConditionField
   operator: ConditionOperator

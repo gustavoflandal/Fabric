@@ -157,7 +157,7 @@
 
         <FormField id="ws-form-position-type" label="Tipo de Posição" required>
           <select v-model="formData.positionType" required class="w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500">
-            <option v-for="type in positionTypes" :value="type" :key="type">{{ type }}</option>
+            <option v-for="type in positionTypes" :value="type" :key="type">{{ POSITION_TYPE_LABELS[type] ?? type }}</option>
           </select>
         </FormField>
 
@@ -365,6 +365,7 @@ import { useToast } from '@/composables/useToast';
 import { confirmDialog } from '@/composables/useConfirm';
 import { useDebounce } from '@/composables/useDebounce';
 import { Squares2X2Icon, TrashIcon } from '@heroicons/vue/24/outline';
+import { POSITION_TYPE_LABELS } from '@/types/warehouse.types';
 import type {
   ApiError,
   Pagination,

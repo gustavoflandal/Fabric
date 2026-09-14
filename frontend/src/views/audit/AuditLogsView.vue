@@ -13,7 +13,7 @@
         <div class="text-center">
           <p class="text-sm font-medium text-gray-600">Ação Mais Comum</p>
           <p class="text-xl font-bold text-secondary-600 mt-2">
-            {{ statistics.byAction[0]?.action || '-' }}
+            {{ statistics.byAction[0]?.action ? getActionLabel(statistics.byAction[0].action) : '-' }}
           </p>
           <p class="text-sm text-gray-500">{{ statistics.byAction[0]?.count || 0 }} vezes</p>
         </div>
@@ -495,6 +495,50 @@ const getModuleName = (endpoint: string) => {
     'maintenance': 'Manutenção',
     'reports': 'Relatórios',
     'settings': 'Configurações',
+    // Mapa original cobria só os módulos existentes na época — expandido para
+    // bater com as rotas reais de `backend/src/routes/index.ts`, senão o
+    // fallback (capitalizar o segmento cru da URL) mostrava algo como
+    // "Sales-orders" em vez de um nome de módulo em português.
+    'units-of-measure': 'Unidades de Medida',
+    'suppliers': 'Fornecedores',
+    'work-centers': 'Centros de Trabalho',
+    'warehouses': 'Armazéns',
+    'warehouse-structures': 'Estruturas de Armazenagem',
+    'storage-positions': 'Posições de Armazenagem',
+    'stock-positions': 'Saldo por Posição',
+    'warehouse-tasks': 'Tarefas de Armazém',
+    'storage-rules': 'Regras de Armazenagem',
+    'wms-workflow-templates': 'Workflows do WMS',
+    'product-categories': 'Categorias de Produto',
+    'boms': 'Estruturas de Produto (BOM)',
+    'routings': 'Roteiros de Produção',
+    'production-orders': 'Ordens de Produção',
+    'production-pointings': 'Apontamentos de Produção',
+    'dashboard': 'Painel',
+    'mrp': 'Planejamento de Materiais (MRP)',
+    'stock': 'Estoque',
+    'purchase-quotations': 'Cotações de Compra',
+    'purchase-orders': 'Pedidos de Compra',
+    'purchase-receipts': 'Recebimentos de Compra',
+    'equipment': 'Equipamentos',
+    'maintenance-plans': 'Planos de Manutenção',
+    'maintenance-orders': 'Ordens de Manutenção',
+    'yard-docks': 'Docas do Pátio',
+    'drivers': 'Motoristas',
+    'fleets': 'Frotas',
+    'vehicles': 'Veículos',
+    'yard-warehouse-params': 'Parâmetros do Pátio',
+    'yard-visits': 'Visitas do Pátio',
+    'yard-areas': 'Áreas do Pátio',
+    'yard-spots': 'Vagas do Pátio',
+    'yard-dashboard': 'Painel do Pátio',
+    'sales-orders': 'Pedidos de Venda',
+    'shipments': 'Romaneios',
+    'notifications': 'Notificações',
+    'counting': 'Inventário',
+    'system': 'Configurações do Sistema',
+    'assistant': 'Assistente de IA',
+    'help': 'Ajuda',
   };
 
   // Extrair o módulo do path (ex: /api/v1/users/123 -> users)

@@ -28,7 +28,7 @@
                   v-model="drafts[item.key]"
                   class="rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                 >
-                  <option v-for="option in KEY_ENUM_VALUES[item.key]" :key="option" :value="option">{{ option }}</option>
+                  <option v-for="option in KEY_ENUM_VALUES[item.key]" :key="option" :value="option">{{ ENUM_VALUE_LABELS[item.key]?.[option] ?? option }}</option>
                 </select>
                 <input
                   v-else
@@ -61,7 +61,7 @@ import AppLayout from '@/components/common/AppLayout.vue'
 import FormField from '@/components/common/FormField.vue'
 import { useSystemSettingStore } from '@/stores/system-setting.store'
 import { useToast } from '@/composables/useToast'
-import { groupByCategory, CATEGORY_LABELS, validateSettingInput, KEY_ENUM_VALUES } from './system-settings-form'
+import { groupByCategory, CATEGORY_LABELS, validateSettingInput, KEY_ENUM_VALUES, ENUM_VALUE_LABELS } from './system-settings-form'
 import type { SystemSetting } from '@/types/system-setting.types'
 
 const store = useSystemSettingStore()

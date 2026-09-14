@@ -121,7 +121,7 @@
               :key="entry.type"
               class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 dark:bg-gray-800 dark:border-gray-700"
             >
-              <p class="text-sm text-gray-600 dark:text-gray-400">{{ entry.type }}</p>
+              <p class="text-sm text-gray-600 dark:text-gray-400">{{ WAREHOUSE_TASK_TYPE_LABELS[entry.type] ?? entry.type }}</p>
               <p class="text-3xl font-bold text-red-600 dark:text-red-400">{{ entry.count }}</p>
             </div>
           </div>
@@ -138,7 +138,7 @@
               <tbody>
                 <tr v-for="row in taskKpis?.bottlenecks.affected ?? []" :key="row.receiptId + row.taskType">
                   <td class="px-4 py-2">{{ row.receiptNumber }}</td>
-                  <td class="px-4 py-2">{{ row.taskType }}</td>
+                  <td class="px-4 py-2">{{ WAREHOUSE_TASK_TYPE_LABELS[row.taskType] ?? row.taskType }}</td>
                   <td class="px-4 py-2">{{ row.hoursStuck }}h</td>
                   <td class="px-4 py-2">
                     <RouterLink to="/wms/operations" class="text-primary-600 dark:text-primary-400 hover:underline">Ver no painel</RouterLink>
@@ -179,6 +179,7 @@ import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import wmsKpiService from '@/services/wms-kpi.service'
 import type { WmsTaskKpis, OccupancyResponse } from '@/types/wms-kpi.types'
+import { WAREHOUSE_TASK_TYPE_LABELS } from '@/types/warehouse-task.types'
 import Chart from 'chart.js/auto'
 import { useThemeStore } from '@/stores/theme.store'
 

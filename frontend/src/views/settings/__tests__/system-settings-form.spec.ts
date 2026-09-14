@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { groupByCategory, CATEGORY_LABELS, validateSettingInput, KEY_ENUM_VALUES } from '../system-settings-form'
+import { groupByCategory, CATEGORY_LABELS, validateSettingInput, KEY_ENUM_VALUES, ENUM_VALUE_LABELS } from '../system-settings-form'
 import type { SystemSetting } from '@/types/system-setting.types'
 
 const setting = (overrides: Partial<SystemSetting> = {}): SystemSetting => ({
@@ -33,11 +33,21 @@ describe('system-settings-form', () => {
     })
   })
 
+  describe('ENUM_VALUE_LABELS', () => {
+    it('tem rótulo amigável para todo valor fechado de audit.mode', () => {
+      for (const value of KEY_ENUM_VALUES['audit.mode']) {
+        const label = ENUM_VALUE_LABELS['audit.mode']?.[value]
+        expect(label, `valor "${value}" sem rótulo`).toBeTruthy()
+        expect(label).not.toBe(value)
+      }
+    })
+  })
+
   describe('CATEGORY_LABELS', () => {
     it('tem rótulo amigável para as 3 categorias da v1', () => {
       expect(CATEGORY_LABELS.wms).toBe('WMS')
       expect(CATEGORY_LABELS.auditoria).toBe('Auditoria')
-      expect(CATEGORY_LABELS.rate_limit).toBe('Rate Limiting')
+      expect(CATEGORY_LABELS.rate_limit).toBe('Limite de Requisições')
     })
   })
 

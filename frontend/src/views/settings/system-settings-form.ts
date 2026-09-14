@@ -3,7 +3,7 @@ import type { SystemSetting, SettingType } from '@/types/system-setting.types'
 export const CATEGORY_LABELS: Record<string, string> = {
   wms: 'WMS',
   auditoria: 'Auditoria',
-  rate_limit: 'Rate Limiting',
+  rate_limit: 'Limite de Requisições',
 }
 
 /**
@@ -14,6 +14,20 @@ export const CATEGORY_LABELS: Record<string, string> = {
  */
 export const KEY_ENUM_VALUES: Record<string, readonly string[]> = {
   'audit.mode': ['all', 'write_only', 'errors_only', 'none'],
+}
+
+/**
+ * Rótulo amigável de cada valor de enum acima — sem isto o `<select>` de
+ * `audit.mode` mostrava o código técnico cru (`write_only`) em vez de uma
+ * frase legível. Mesmo semântica de `audit.middleware.ts` (backend).
+ */
+export const ENUM_VALUE_LABELS: Record<string, Record<string, string>> = {
+  'audit.mode': {
+    all: 'Tudo (leituras e gravações)',
+    write_only: 'Somente gravações',
+    errors_only: 'Somente erros',
+    none: 'Desativado',
+  },
 }
 
 /** Agrupa preservando a ordem de chegada dos grupos e dos itens dentro de cada grupo — a lista já vem ordenada por categoria+chave do backend. */

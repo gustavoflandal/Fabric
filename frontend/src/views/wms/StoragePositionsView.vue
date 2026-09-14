@@ -94,7 +94,7 @@
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.streetCode }}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.floor }}/{{ item.position }}</td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ item.positionType }}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ positionTypeLabel(item.positionType) }}</td>
         <td class="px-6 py-4 whitespace-nowrap">
           <StatusBadge :label="item.blocked ? 'Sim' : 'Não'" :tone="item.blocked ? 'danger' : 'success'" />
         </td>
@@ -186,6 +186,7 @@ import FormField from '@/components/common/FormField.vue';
 import StatusBadge from '@/components/common/StatusBadge.vue';
 import { useToast } from '@/composables/useToast';
 import { useDebounce } from '@/composables/useDebounce';
+import { POSITION_TYPE_LABELS } from '@/types/warehouse.types';
 import type {
   ApiError,
   StoragePosition,
@@ -337,6 +338,8 @@ const retryHistory = () => {
 };
 
 const formatDate = (date: string) => new Date(date).toLocaleString('pt-BR');
+
+const positionTypeLabel = (type?: string) => (type ? POSITION_TYPE_LABELS[type] ?? type : '—');
 
 onMounted(() => {
   loadPositions();
