@@ -82,6 +82,20 @@ const OPEN_SHIPMENT_STATUSES: ShipmentStatus[] = [
 const QTY_EPSILON = 1e-6;
 
 /**
+ * Opções das transações que REIVINDICAM ou TRAVAM recurso compartilhado
+ * (`create`, `startSeparation`, `dispatch`, `cancel`) — correção de revisão.
+ *
+ * O padrão "reivindicar primeiro com `updateMany` condicional" transformou o
+ * duplo clique em ESPERA no lock de linha em vez de execução dupla: a segunda
+ * requisição fica parada até a primeira commitar. Com o default do Prisma
+ * (5s de `timeout`, 2s de `maxWait`), uma fila de 3–4 requisições no MESMO
+ * romaneio/pedido — o que uma tela com botão destravado produz — estoura como
+ * `P2028` e vira 500 numa operação que só precisava aguardar. 15s dá folga
+ * para a fila drenar sem transformar o lock numa espera indefinida.
+ */
+const TX_OPTIONS = { timeout: 15000, maxWait: 5000 } as const;
+
+/**
  * Mensagem única do bloqueio de cancelamento por tarefa de separação já
  * CONCLUÍDA. Vive aqui e é importada por `sales-order.service.ts` para que o
  * cancelamento do PEDIDO e o do ROMANEIO digam exatamente a mesma coisa — são o
@@ -211,8 +225,20 @@ export class ShipmentService {
   async create(data: CreateShipmentDto, createdBy: string) {
     return prisma.$transaction(async (tx) => {
       // O LOCK. Serializa todas as criações de romaneio DESTE pedido; pedidos
-      // diferentes seguem em paralelo. Pedido inexistente não casa nenhuma
-      // linha, não trava nada, e cai no 404 logo abaixo.
+      // diferentes seguem em paralelo.
+      //
+      // PEDIDO INEXISTENTE NÃO É UM CASO "SEM LOCK" (correção de revisão — a
+      // versão anterior deste comentário afirmava que não travava nada, e era
+      // factualmente errado): em REPEATABLE READ, uma busca por índice único
+      // que não casa nenhuma linha ainda adquire GAP LOCK, e um INSERT em
+      // `sales_orders` cujo id caísse nesse intervalo ficaria bloqueado. O que
+      // realmente impede o ciclo com `SalesOrderService.create` — que segura a
+      // sequência `PV-...` em `document_sequences` e SÓ DEPOIS insere em
+      // `sales_orders` — é outro fato: o caminho 404 (`if (!order) throw`, logo
+      // abaixo) aborta esta transação ANTES de `nextDocumentNumber` ser
+      // chamado, então ela nunca chega a pedir a sequência enquanto segura o
+      // gap lock. Falta uma das duas pontas do ciclo, e sem ciclo não há
+      // deadlock possível.
       await tx.$executeRaw`SELECT id FROM sales_orders WHERE id = ${data.salesOrderId} FOR UPDATE`;
 
       const order = await tx.salesOrder.findUnique({
@@ -326,7 +352,7 @@ export class ShipmentService {
         },
         include: shipmentInclude,
       });
-    });
+    }, TX_OPTIONS);
   }
 
   async getAll(page = 1, limit = 20, filters?: ShipmentFilters) {
@@ -495,7 +521,7 @@ export class ShipmentService {
       });
 
       return { ...updated, pickingTasks: await listTasks(tx, id) };
-    });
+    }, TX_OPTIONS);
   }
 
   /**
@@ -635,7 +661,7 @@ export class ShipmentService {
             ).status,
         pickingTasks: await listTasks(tx, id),
       };
-    });
+    }, TX_OPTIONS);
   }
 
   /**
@@ -656,27 +682,61 @@ export class ShipmentService {
    * descobriria a falta na contagem. Agora o cancelamento é RECUSADO enquanto
    * existir tarefa concluída: o caminho correto é registrar o retorno do
    * material (ajuste/entrada de estoque) e só então cancelar.
+   *
+   * A TRANSIÇÃO DE STATUS É REIVINDICADA ATOMICAMENTE, COMO PRIMEIRA OPERAÇÃO
+   * (correção de revisão). Este método tinha exatamente a corrida que
+   * `startSeparation`/`dispatch` eliminaram e ficou para trás: `findUnique` +
+   * checagens em memória + `update` por `id`, SEM condição de status na
+   * escrita. Um romaneio em `SEPARATING` cujas tarefas fossem concluídas e
+   * despachadas por outra transação no meio do caminho acabava assim: o
+   * `cancel` lia o snapshot antes do commit do `dispatch`, passava por todos
+   * os guards com dado velho e o `update` final sobrescrevia `DISPATCHED` →
+   * `CANCELLED` sem erro nenhum — DEPOIS de `shippedQty` já ter sido
+   * incrementado de verdade. O `updateMany` condicional resolve pelo mesmo
+   * mecanismo dos outros dois: o `UPDATE ... WHERE status IN (...)` é ele
+   * próprio o lock, e quem chega depois relê a versão commitada e casa ZERO
+   * linhas.
    */
   async cancel(id: string) {
     return prisma.$transaction(async (tx) => {
-      const shipment = await tx.shipment.findUnique({ where: { id } });
+      // A REIVINDICAÇÃO, antes de qualquer leitura. `OPEN_SHIPMENT_STATUSES` é
+      // literalmente o conjunto "romaneio ainda aberto" — e romaneio aberto é
+      // exatamente o que se pode cancelar.
+      const claimed = await tx.shipment.updateMany({
+        where: { id, status: { in: OPEN_SHIPMENT_STATUSES } },
+        data: { status: ShipmentStatus.CANCELLED },
+      });
 
-      if (!shipment) {
-        throw new AppError(404, 'Romaneio não encontrado');
+      if (claimed.count === 0) {
+        const existing = await tx.shipment.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+
+        if (!existing) {
+          throw new AppError(404, 'Romaneio não encontrado');
+        }
+
+        if (existing.status === ShipmentStatus.CANCELLED) {
+          throw new AppError(400, 'Romaneio já está cancelado');
+        }
+
+        throw new AppError(
+          400,
+          'Não é possível cancelar um romaneio já despachado ' +
+            '(outra requisição pode tê-lo processado primeiro).'
+        );
       }
 
-      if (shipment.status === ShipmentStatus.DISPATCHED) {
-        throw new AppError(400, 'Não é possível cancelar um romaneio já despachado');
-      }
-
-      if (shipment.status === ShipmentStatus.CANCELLED) {
-        throw new AppError(400, 'Romaneio já está cancelado');
-      }
-
+      // Só DEPOIS do claim se conta a tarefa concluída: a contagem agora enxerga
+      // o estado de quem realmente ganhou a transição. Qualquer `throw` daqui
+      // para baixo desfaz a reivindicação junto com o resto da transação — o
+      // romaneio volta ao status anterior —, igual ao padrão de
+      // `startSeparation`/`dispatch`.
       const completed = await tx.warehouseTask.count({
         where: {
           referenceType: SHIPMENT_TASK_REFERENCE_TYPE,
-          reference: shipment.id,
+          reference: id,
           status: WarehouseTaskStatus.COMPLETED,
         },
       });
@@ -688,7 +748,7 @@ export class ShipmentService {
       await tx.warehouseTask.updateMany({
         where: {
           referenceType: SHIPMENT_TASK_REFERENCE_TYPE,
-          reference: shipment.id,
+          reference: id,
           status: {
             in: [WarehouseTaskStatus.PENDING, WarehouseTaskStatus.IN_PROGRESS],
           },
@@ -696,14 +756,15 @@ export class ShipmentService {
         data: { status: WarehouseTaskStatus.CANCELLED },
       });
 
-      const updated = await tx.shipment.update({
+      // O status já foi escrito na reivindicação; aqui só se relê o romaneio no
+      // shape completo da resposta.
+      const updated = await tx.shipment.findUniqueOrThrow({
         where: { id },
-        data: { status: ShipmentStatus.CANCELLED },
         include: shipmentInclude,
       });
 
       return { ...updated, pickingTasks: await listTasks(tx, id) };
-    });
+    }, TX_OPTIONS);
   }
 }
 

@@ -598,8 +598,18 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
   // O padrão é o de `stock-concurrency.test.ts`: as requisições saem juntas num
   // `Promise.all` contra a pilha HTTP inteira, cada uma na sua própria
   // transação do MySQL real — é o duplo clique no botão, reproduzido.
+  //
+  // SÃO 5 CHAMADAS, E NÃO 2 (reforço pós-revisão). Com duas, o event loop pode
+  // serializá-las por acaso: a segunda só sai depois de a primeira ter
+  // commitado, cai no guard normal (400) e o teste passa igual contra o código
+  // pré-correção — falso NEGATIVO. Cinco disparos tornam a sobreposição real
+  // muito provável. O valor probatório continua nas asserções de INVARIANTE do
+  // fim (contagem de tarefas, `shippedQty`, `StockMovement`), não no fato de
+  // alguém ter tomado 400.
   // ==========================================================================
-  it('duas chamadas concorrentes a start-separation criam UM conjunto de tarefas só', async () => {
+  const CONCURRENT_CALLS = 5;
+
+  it('chamadas concorrentes a start-separation criam UM conjunto de tarefas só', async () => {
     const { token } = await login();
     const client = api(token);
     const { customer, product, warehouse } = await setupScenario(500);
@@ -619,17 +629,22 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     });
     const shipmentId = shipmentRes.body.data.id as string;
 
-    // AS DUAS AO MESMO TEMPO. Antes da correção, ambas liam `PENDING` antes de
-    // qualquer uma escrever e ambas criavam um conjunto COMPLETO de tarefas.
-    const [first, second] = await Promise.all([
-      client.startSeparation(shipmentId),
-      client.startSeparation(shipmentId),
-    ]);
+    // TODAS AO MESMO TEMPO. Antes da correção, todas liam `PENDING` antes de
+    // qualquer uma escrever e cada uma criava um conjunto COMPLETO de tarefas.
+    const results = await Promise.all(
+      Array.from({ length: CONCURRENT_CALLS }, () => client.startSeparation(shipmentId))
+    );
 
-    expect([first.status, second.status].sort()).toEqual([200, 400]);
+    const winners = results.filter((res) => res.status === 200);
+    const losers = results.filter((res) => res.status !== 200);
+    expect(winners).toHaveLength(1);
+    expect(losers.map((res) => res.status)).toEqual(
+      Array(CONCURRENT_CALLS - 1).fill(400)
+    );
 
-    const loser = first.status === 400 ? first : second;
-    expect(loser.body.message).toMatch(/romaneio PENDENTE/);
+    for (const loser of losers) {
+      expect(loser.body.message).toMatch(/romaneio PENDENTE/);
+    }
 
     // O PONTO DO TESTE: UMA tarefa, não duas. Duas fariam o romaneio de 100
     // unidades debitar 200 quando ambas fossem executadas.
@@ -651,7 +666,7 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     expect(balance.quantity).toBe(400);
   }, 40000);
 
-  it('dois romaneios concorrentes não somam mais que o saldo do item', async () => {
+  it('romaneios concorrentes não somam mais que o saldo do item', async () => {
     const { token } = await login();
     const client = api(token);
     const { customer, product, warehouse } = await setupScenario(500);
@@ -665,24 +680,28 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     const orderItemId = created.body.data.items[0].id as string;
     await client.confirmOrder(orderId).expect(200);
 
-    // 60 + 60 = 120 > 100. A validação de disponibilidade rodava FORA da
-    // `$transaction`: as duas liam "nenhum romaneio aberto", as duas concluíam
-    // que cabia, e o pedido de 100 acabava com 120 prometidos.
-    const [first, second] = await Promise.all([
-      client.createShipment({
-        salesOrderId: orderId,
-        items: [{ salesOrderItemId: orderItemId, quantity: 60 }],
-      }),
-      client.createShipment({
-        salesOrderId: orderId,
-        items: [{ salesOrderItemId: orderItemId, quantity: 60 }],
-      }),
-    ]);
+    // 60 cada, num pedido de 100: SÓ UM cabe. A validação de disponibilidade
+    // rodava FORA da `$transaction`: todas liam "nenhum romaneio aberto", todas
+    // concluíam que cabia, e o pedido de 100 acabava com 300 prometidos.
+    const results = await Promise.all(
+      Array.from({ length: CONCURRENT_CALLS }, () =>
+        client.createShipment({
+          salesOrderId: orderId,
+          items: [{ salesOrderItemId: orderItemId, quantity: 60 }],
+        })
+      )
+    );
 
-    expect([first.status, second.status].sort()).toEqual([201, 400]);
+    const winners = results.filter((res) => res.status === 201);
+    const losers = results.filter((res) => res.status !== 201);
+    expect(winners).toHaveLength(1);
+    expect(losers.map((res) => res.status)).toEqual(
+      Array(CONCURRENT_CALLS - 1).fill(400)
+    );
 
-    const loser = first.status === 400 ? first : second;
-    expect(loser.body.message).toMatch(/indispon[íi]vel/i);
+    for (const loser of losers) {
+      expect(loser.body.message).toMatch(/indispon[íi]vel/i);
+    }
 
     const shipments = await testPrisma.shipment.findMany({ where: { salesOrderId: orderId } });
     expect(shipments).toHaveLength(1);
@@ -692,7 +711,7 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     expect(shipments[0].shipmentNumber).toMatch(/^EXP-\d{4}-\d{4,}$/);
   }, 40000);
 
-  it('dois despachos concorrentes incrementam shippedQty UMA vez só', async () => {
+  it('despachos concorrentes incrementam shippedQty UMA vez só', async () => {
     const { token } = await login();
     const client = api(token);
     const { customer, product, warehouse } = await setupScenario(500);
@@ -716,15 +735,18 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
     const task = await testPrisma.warehouseTask.findFirstOrThrow();
     await client.executeTask(task.id).expect(200);
 
-    const [first, second] = await Promise.all([
-      client.dispatch(shipmentId),
-      client.dispatch(shipmentId),
-    ]);
+    const results = await Promise.all(
+      Array.from({ length: CONCURRENT_CALLS }, () => client.dispatch(shipmentId))
+    );
 
-    expect([first.status, second.status].sort()).toEqual([200, 400]);
+    const winners = results.filter((res) => res.status === 200);
+    expect(winners).toHaveLength(1);
+    expect(results.filter((res) => res.status !== 200).map((res) => res.status)).toEqual(
+      Array(CONCURRENT_CALLS - 1).fill(400)
+    );
 
     // Antes da correção o `increment` rodava ANTES da escrita do status e o
-    // `update` final não reconferia status nenhum: o item fechava com 200.
+    // `update` final não reconferia status nenhum: o item fechava com 500.
     const item = await testPrisma.salesOrderItem.findUniqueOrThrow({
       where: { id: orderItemId },
     });
@@ -733,6 +755,132 @@ describe('Integração: Expedição (pedido de venda → romaneio → separaçã
 
     // E nenhum movimento extra: o despacho nunca movimenta estoque.
     expect(await testPrisma.stockMovement.count()).toBe(1);
+  }, 40000);
+
+  // ==========================================================================
+  // CONCORRÊNCIA DO CANCELAMENTO (correções da SEGUNDA revisão, R1 e R2).
+  //
+  // Os dois `cancel()` ficaram para trás quando o resto do módulo passou a
+  // reivindicar a transição atomicamente: liam um snapshot, validavam em
+  // memória e escreviam sem condição de status. Estes dois testes fixam a
+  // invariante de cada um.
+  // ==========================================================================
+  it('cancelar e despachar o MESMO romaneio ao mesmo tempo: exatamente um efeito vence', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 100, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    const shipmentRes = await client.createShipment({
+      salesOrderId: orderId,
+      items: [{ salesOrderItemId: orderItemId, quantity: 100 }],
+    });
+    const shipmentId = shipmentRes.body.data.id as string;
+
+    await client.startSeparation(shipmentId).expect(200);
+    const task = await testPrisma.warehouseTask.findFirstOrThrow();
+    await client.executeTask(task.id).expect(200);
+    expect(await testPrisma.stockMovement.count()).toBe(1);
+
+    // O romaneio agora é despachável. O `cancel` sai JUNTO com o `dispatch`:
+    // sem o claim atômico, o `update` final do `cancel` — sem condição de
+    // status — sobrescrevia `DISPATCHED` → `CANCELLED` depois de `shippedQty`
+    // já ter sido incrementado de verdade.
+    const [dispatchRes, cancelRes] = await Promise.all([
+      client.dispatch(shipmentId),
+      client.cancelShipment(shipmentId),
+    ]);
+
+    const shipment = await testPrisma.shipment.findUniqueOrThrow({
+      where: { id: shipmentId },
+    });
+    const item = await testPrisma.salesOrderItem.findUniqueOrThrow({
+      where: { id: orderItemId },
+    });
+
+    // A INVARIANTE: um dos dois efeitos, nunca os dois, nunca nenhum.
+    expect([dispatchRes.status, cancelRes.status].filter((s) => s === 200)).toHaveLength(1);
+
+    if (shipment.status === 'DISPATCHED') {
+      expect(dispatchRes.status).toBe(200);
+      expect(cancelRes.status).toBe(400);
+      expect(shipment.dispatchedAt).not.toBeNull();
+      expect(item.shippedQty).toBe(100);
+      expect(item.pickedQty).toBe(100);
+    } else {
+      expect(shipment.status).toBe('CANCELLED');
+      expect(cancelRes.status).toBe(200);
+      expect(dispatchRes.status).toBe(400);
+      expect(shipment.dispatchedAt).toBeNull();
+      // Cancelado significa NÃO expedido: nada pode ter sido acumulado.
+      expect(item.shippedQty).toBe(0);
+    }
+
+    // De qualquer forma, o despacho nunca movimenta estoque: continua o único
+    // movimento, o da execução da tarefa.
+    expect(await testPrisma.stockMovement.count()).toBe(1);
+  }, 40000);
+
+  it('cancelar o PEDIDO enquanto nasce um romaneio novo nunca deixa romaneio órfão vivo', async () => {
+    const { token } = await login();
+    const client = api(token);
+    const { customer, product, warehouse } = await setupScenario(500);
+
+    const created = await client.createOrder({
+      customerId: customer.id,
+      warehouseId: warehouse.id,
+      items: [{ productId: product.id, quantity: 100, unitPrice: 1 }],
+    });
+    const orderId = created.body.data.id as string;
+    const orderItemId = created.body.data.items[0].id as string;
+    await client.confirmOrder(orderId).expect(200);
+
+    // O cancelamento do pedido lia os romaneios FORA de qualquer transação e
+    // cascateava só os que enxergava naquele instante: um romaneio criado entre
+    // a leitura e o commit ficava vivo em `PENDING`, apontando para um pedido
+    // `CANCELLED` — separável e despachável.
+    const [cancelRes, createRes] = await Promise.all([
+      client.cancelOrder(orderId),
+      client.createShipment({
+        salesOrderId: orderId,
+        items: [{ salesOrderItemId: orderItemId, quantity: 60 }],
+      }),
+    ]);
+
+    const order = await testPrisma.salesOrder.findUniqueOrThrow({ where: { id: orderId } });
+    const shipments = await testPrisma.shipment.findMany({ where: { salesOrderId: orderId } });
+
+    if (order.status === 'CANCELLED') {
+      expect(cancelRes.status).toBe(200);
+      // A INVARIANTE: nenhum romaneio ABERTO sobra apontando para o pedido
+      // cancelado. Ou o `create` foi recusado (nenhum romaneio existe), ou ele
+      // nasceu antes e foi alcançado pela cascata.
+      expect(shipments.every((s) => s.status === 'CANCELLED')).toBe(true);
+      if (createRes.status === 201) {
+        expect(shipments).toHaveLength(1);
+      } else {
+        expect(createRes.status).toBe(400);
+        expect(shipments).toHaveLength(0);
+      }
+    } else {
+      // O outro desfecho aceitável: o romaneio nasceu e o cancelamento do
+      // pedido foi RECUSADO — nunca cancelado pela metade.
+      expect(order.status).toBe('CONFIRMED');
+      expect(cancelRes.status).toBe(400);
+      expect(createRes.status).toBe(201);
+      expect(shipments.some((s) => s.status === 'PENDING')).toBe(true);
+    }
+
+    // Nenhum dos dois caminhos movimenta estoque.
+    expect(await testPrisma.stockMovement.count()).toBe(0);
   }, 40000);
 
   // ==========================================================================

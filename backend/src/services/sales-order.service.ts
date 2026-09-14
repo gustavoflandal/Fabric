@@ -92,6 +92,25 @@ const orderInclude = {
   },
 } satisfies Prisma.SalesOrderInclude;
 
+/**
+ * Mensagem única do bloqueio de cancelamento por romaneio JÁ DESPACHADO. Existe
+ * como função porque `cancel()` a emite de DOIS pontos — o guard de leitura e a
+ * divergência de contagem do `updateMany` que recusa `DISPATCHED` (correção de
+ * revisão) —, e as duas são o mesmo problema visto em dois instantes.
+ */
+const dispatchedShipmentsBlockMessage = (count: number) =>
+  `Não é possível cancelar: o pedido já tem ${count} romaneio(s) despachado(s). ` +
+  'Cancele apenas os romaneios ainda não despachados.';
+
+/**
+ * Opções da transação de `cancel()`, que agora roda INTEIRA sob o
+ * `SELECT ... FOR UPDATE` do pedido (correção de revisão) — mesmo raciocínio e
+ * mesmos valores de `shipment.service.ts::TX_OPTIONS`: com o default do Prisma
+ * (5s/2s), uma fila de requisições no mesmo pedido estoura como `P2028` e vira
+ * 500 numa operação que só precisava aguardar o lock.
+ */
+const TX_OPTIONS = { timeout: 15000, maxWait: 5000 } as const;
+
 const assertCustomerExists = async (customerId: string) => {
   const customer = await prisma.customer.findUnique({ where: { id: customerId } });
   if (!customer) throw new AppError(400, 'Cliente informado não existe');
@@ -330,32 +349,85 @@ export class SalesOrderService {
    * documento aberto que explica onde ele está, sem pedir o retorno — a falta
    * só apareceria na contagem. O caminho correto é registrar o retorno do
    * material ao endereço e só então cancelar.
+   *
+   * TUDO RODA DENTRO DA TRANSAÇÃO, SOB O MESMO LOCK DE PEDIDO QUE
+   * `shipment.service.ts::create()` (correção de revisão). Antes, a releitura do
+   * pedido e TODOS os guards — inclusive a montagem de `openShipmentIds` —
+   * rodavam FORA de qualquer transação, e a cascata só alcançava os romaneios
+   * que existiam naquele instante. Duas corridas reais saíam daí:
+   *
+   *   (a) contra `ShipmentService.create`: um romaneio criado ENTRE a leitura e
+   *       o commit do cancelamento não entrava na cascata e ficava órfão — vivo
+   *       em `PENDING`, apontando para um pedido `CANCELLED`, separável e
+   *       despachável. É exatamente o que a cascata existe para impedir. O
+   *       `SELECT ... FOR UPDATE` como PRIMEIRA instrução serializa os dois
+   *       fluxos: ou o romaneio nasce antes e entra na cascata, ou nasce depois
+   *       e é recusado pelo guard de status do `create`.
+   *   (b) contra `ShipmentService.dispatch`: o `updateMany` de romaneios não
+   *       filtrava status, então um romaneio que virasse `DISPATCHED` no meio do
+   *       caminho (com `shippedQty` já incrementado) era sobrescrito para
+   *       `CANCELLED` em silêncio. O lock do PEDIDO não cobre este caso —
+   *       `dispatch` reivindica o romaneio sem tocar em `sales_orders` —, então
+   *       os romaneios passam a ser lidos com `FOR UPDATE` também: o guard de
+   *       "romaneio já despachado" enxerga o último commit e nenhum despacho
+   *       consegue entrar depois disso. O `updateMany` ainda filtra
+   *       `not: DISPATCHED` como segunda trava, e a divergência de contagem
+   *       relança o mesmo guard em vez de ignorar.
+   *
+   * O LOCK É A PRIMEIRA INSTRUÇÃO pelo mesmo motivo documentado em
+   * `shipment.service.ts::create()`: em MySQL REPEATABLE READ o snapshot de
+   * leitura consistente nasce na primeira leitura NÃO-travante da transação, e
+   * `FOR UPDATE` não cria snapshot — lê sempre o último commit. Se a releitura
+   * do pedido viesse antes do lock, ele existiria e ainda assim os guards
+   * leriam dado velho.
    */
   async cancel(id: string) {
-    const order = await this.getById(id);
-
-    if (order.status === SalesOrderStatus.SHIPPED) {
-      throw new AppError(400, 'Não é possível cancelar um pedido já expedido');
-    }
-
-    if (order.status === SalesOrderStatus.CANCELLED) {
-      throw new AppError(400, 'Pedido já está cancelado');
-    }
-
-    const dispatched = order.shipments.filter((s) => s.status === 'DISPATCHED');
-    if (dispatched.length > 0) {
-      throw new AppError(
-        400,
-        `Não é possível cancelar: o pedido já tem ${dispatched.length} romaneio(s) despachado(s). ` +
-          'Cancele apenas os romaneios ainda não despachados.'
-      );
-    }
-
-    const openShipmentIds = order.shipments
-      .filter((shipment) => shipment.status !== ShipmentStatus.CANCELLED)
-      .map((shipment) => shipment.id);
-
     return prisma.$transaction(async (tx) => {
+      // O LOCK. Mesma linha e mesma ordem de `ShipmentService.create` — é o que
+      // faz os dois fluxos se enfileirarem em vez de se cruzarem.
+      await tx.$executeRaw`SELECT id FROM sales_orders WHERE id = ${id} FOR UPDATE`;
+
+      const order = await tx.salesOrder.findUnique({
+        where: { id },
+        select: { status: true },
+      });
+
+      if (!order) {
+        throw new AppError(404, 'Pedido de venda não encontrado');
+      }
+
+      if (order.status === SalesOrderStatus.SHIPPED) {
+        throw new AppError(400, 'Não é possível cancelar um pedido já expedido');
+      }
+
+      if (order.status === SalesOrderStatus.CANCELLED) {
+        throw new AppError(400, 'Pedido já está cancelado');
+      }
+
+      // OS ROMANEIOS TAMBÉM SÃO LIDOS TRAVANDO. O lock do PEDIDO ordena este
+      // cancelamento contra `ShipmentService.create` (cenário (a)), mas não
+      // contra `dispatch`, que nem toca em `sales_orders` antes de reivindicar
+      // o romaneio: um despacho que commitasse depois do snapshot desta
+      // transação nascer ficaria invisível para os guards abaixo, que é o
+      // cenário (b). `FOR UPDATE` resolve os dois lados de uma vez — não lê
+      // snapshot (vê o último commit) e segura a linha, então nenhum `dispatch`
+      // consegue reivindicar estes romaneios até este cancelamento commitar ou
+      // fazer rollback.
+      const shipments = await tx.$queryRaw<{ id: string; status: ShipmentStatus }[]>`
+        SELECT id, status FROM shipments WHERE salesOrderId = ${id} FOR UPDATE
+      `;
+
+      const dispatched = shipments.filter(
+        (shipment) => shipment.status === ShipmentStatus.DISPATCHED
+      );
+      if (dispatched.length > 0) {
+        throw new AppError(400, dispatchedShipmentsBlockMessage(dispatched.length));
+      }
+
+      const openShipmentIds = shipments
+        .filter((shipment) => shipment.status !== ShipmentStatus.CANCELLED)
+        .map((shipment) => shipment.id);
+
       if (openShipmentIds.length > 0) {
         // O bloqueio vem ANTES de qualquer escrita: se houver material já
         // separado (tarefa COMPLETED), nada é cancelado.
@@ -382,10 +454,29 @@ export class SalesOrderService {
           data: { status: WarehouseTaskStatus.CANCELLED },
         });
 
-        await tx.shipment.updateMany({
-          where: { id: { in: openShipmentIds } },
+        // `not: DISPATCHED` é a segunda trava do cenário (b), agora explícita
+        // na própria escrita: um romaneio despachado NUNCA é sobrescrito para
+        // `CANCELLED`, aconteça o que acontecer com a leitura.
+        const cancelled = await tx.shipment.updateMany({
+          where: {
+            id: { in: openShipmentIds },
+            status: { not: ShipmentStatus.DISPATCHED },
+          },
           data: { status: ShipmentStatus.CANCELLED },
         });
+
+        if (cancelled.count !== openShipmentIds.length) {
+          // REDE DE SEGURANÇA. Com a leitura travante acima isto não deveria
+          // acontecer — nenhum romaneio deste pedido muda de status enquanto
+          // esta transação segura as linhas. Se acontecer mesmo assim, é porque
+          // algum romaneio foi despachado por fora deste caminho: o `throw`
+          // desfaz tudo (nada de pedido cancelado pela metade) e a mensagem é a
+          // mesma do guard de cima, porque é o mesmo problema físico.
+          throw new AppError(
+            400,
+            dispatchedShipmentsBlockMessage(openShipmentIds.length - cancelled.count)
+          );
+        }
       }
 
       return tx.salesOrder.update({
@@ -393,7 +484,7 @@ export class SalesOrderService {
         data: { status: SalesOrderStatus.CANCELLED },
         include: orderInclude,
       });
-    });
+    }, TX_OPTIONS);
   }
 
   /**

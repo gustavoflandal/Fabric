@@ -170,11 +170,11 @@ async function main() {
     { resource: 'pedidos_venda', action: 'visualizar', description: 'Visualizar pedidos de venda' },
     { resource: 'pedidos_venda', action: 'criar', description: 'Criar pedidos de venda' },
     { resource: 'pedidos_venda', action: 'editar', description: 'Editar pedidos de venda em rascunho' },
-    // Ação PRÓPRIA de exclusão, e não `editar` reaproveitado: é o mesmo
-    // critério de Compras (`pedidos_compra:excluir`) e do resto deste módulo,
-    // que já separa `confirmar` e `cancelar` em ações finas. Excluir o
-    // documento é uma decisão diferente de corrigi-lo, então tem permissão
-    // diferente — e fica só com o MANAGER.
+    // Ação PRÓPRIA de exclusão, e não `editar` reaproveitado: segue o resto
+    // deste módulo, que já separa `confirmar` e `cancelar` em ações finas.
+    // Excluir o documento é uma decisão diferente de corrigi-lo, então tem
+    // permissão própria — e, como toda ação de exclusão neste seed, fica só com
+    // o ADMIN (ver a regra geral declarada no bloco de permissões de MANAGER).
     { resource: 'pedidos_venda', action: 'excluir', description: 'Excluir pedidos de venda em rascunho' },
     { resource: 'pedidos_venda', action: 'confirmar', description: 'Confirmar pedidos de venda' },
     { resource: 'pedidos_venda', action: 'cancelar', description: 'Cancelar pedidos de venda' },
@@ -557,8 +557,13 @@ async function main() {
     manutencao: ['visualizar', 'executar', 'gerenciar'],
     yard: ['visualizar', 'executar', 'gerenciar'],
     // Expedição: o MANAGER é o dono do documento de venda e do romaneio — cria,
-    // confirma, libera separação, despacha e cancela.
-    pedidos_venda: ['visualizar', 'criar', 'editar', 'excluir', 'confirmar', 'cancelar'],
+    // confirma, libera separação, despacha e cancela. `excluir` NÃO entra
+    // (correção de revisão): a regra geral declarada acima é "MANAGER não
+    // recebe nenhuma ação de exclusão", e `pedidos_compra:excluir` — o
+    // documento equivalente do outro lado do fluxo — também fica só com o
+    // ADMIN. O gerente cancela o pedido, que é a operação reversível e
+    // auditável; apagar o registro é do administrador.
+    pedidos_venda: ['visualizar', 'criar', 'editar', 'confirmar', 'cancelar'],
     expedicao: ['visualizar', 'criar', 'separar', 'despachar', 'cancelar'],
     modules: ['view_general', 'view_pcp', 'view_wms', 'view_yms', 'view_manutencao', 'view_expedicao'],
     audit_logs: ['read'],

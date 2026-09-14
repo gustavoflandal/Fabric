@@ -134,7 +134,16 @@ export function rateLimit(options: RateLimitOptions): RateLimiter {
  */
 export const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: config.nodeEnv === 'development' ? 1000 : 100, // Mais flexível em dev
+  // 'test' entra no limite alto pelo MESMO motivo já registrado no
+  // `authLimiter` logo abaixo: o store é por IP e por processo, então um único
+  // arquivo de integração consome a janela inteira do `localhost` — o de
+  // expedição passou de 100 requisições ao ganhar os testes de concorrência, e
+  // os 4 últimos casos do arquivo começaram a falhar com 429 sem nada a ver com
+  // o que testavam. Um orçamento implícito de ~100 requisições por arquivo é um
+  // acoplamento invisível entre a suíte e um middleware de segurança; PRODUÇÃO
+  // continua com 100.
+  max:
+    config.nodeEnv === 'development' || config.nodeEnv === 'test' ? 1000 : 100,
   message: 'Muitas requisições deste IP. Aguarde 15 minutos e tente novamente.'
 });
 

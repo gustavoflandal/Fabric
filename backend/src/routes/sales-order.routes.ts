@@ -63,11 +63,12 @@ router.post(
 
 // Excluir pedido (só DRAFT e sem romaneios).
 //
-// Ação PRÓPRIA `pedidos_venda:excluir`, não `editar` reaproveitado: é o mesmo
-// critério de Compras (`pedidos_compra:excluir`) e o mesmo deste módulo, que já
-// separa `confirmar` e `cancelar` em ações finas. Quem corrige a digitação de
-// um rascunho não é necessariamente quem pode fazê-lo desaparecer — no seed,
-// `excluir` vai só para o MANAGER.
+// Ação PRÓPRIA `pedidos_venda:excluir`, não `editar` reaproveitado: segue o
+// mesmo critério deste módulo, que já separa `confirmar` e `cancelar` em ações
+// finas. Quem corrige a digitação de um rascunho não é necessariamente quem
+// pode fazê-lo desaparecer — no seed, `excluir` fica só com o ADMIN, como toda
+// ação de exclusão (inclusive `pedidos_compra:excluir`, o documento equivalente
+// do lado de Compras).
 router.delete(
   '/:id',
   requirePermission('pedidos_venda', 'excluir'),
