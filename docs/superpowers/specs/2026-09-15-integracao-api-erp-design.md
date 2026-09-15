@@ -162,6 +162,17 @@ Envelope de resposta/erro idêntico ao resto da API (`{status:'success', data}` 
 - Frontend: spec de `IntegrationClientsView.vue` — listar, criar com escopos selecionados, modal da key exibida uma única vez, revogar — mesmo padrão de teste das demais telas de configuração do projeto.
 - Verificação manual: sem um ERP real disponível nesta entrega, verificação via `curl`/Postman/Insomnia simulando as chamadas que um ERP faria (key no header, corpo JSON) — reportada como tal, não como integração testada contra um ERP real. Teste com o ERP real do cliente fica a cargo do usuário antes de considerar o módulo pronto para uso em produção.
 
+## Documentação (entregável desta etapa, não opcional)
+
+`docs/operacao/GUIA_USUARIO.md` é fonte única — o mesmo arquivo é servido cru pela tela de Ajuda do sistema (`GET /api/v1/help` → `HelpView.vue`, ver `backend/src/controllers/help.controller.ts`) e é o que o assistente de IA indexa no ChromaDB (`npm run ai:index-docs`, dentro de `backend/`) para responder perguntas sobre o sistema. Não existem dois documentos a manter — um só, em três lugares.
+
+Dois capítulos novos, ambos `##` de topo, no mesmo estilo dos capítulos de módulo já existentes (emoji + título, `###` para subseções, passo a passo numerado onde fizer sentido):
+
+- **Capítulo de uso** (`## 🔌 Integração com ERP`, ou emoji equivalente): público END USER/ADMIN — o que é, como cadastrar um Cliente de Integração pela tela `/integration-clients`, o que cada escopo permite, como revogar.
+- **Capítulo técnico separado** (subseção dentro do mesmo capítulo, ex. `### 🔧 Referência técnica da API (para o time de integração do ERP)`), pedido explicitamente pelo usuário como conteúdo à parte, voltado a quem vai IMPLEMENTAR a integração do lado do ERP, não ao usuário final do Fabric: autenticação (header `X-API-Key`, onde conseguir a key), os 5 endpoints (método, path, escopo exigido, corpo de exemplo, resposta de exemplo, códigos de erro), `Idempotency-Key` (como usar, quando replay acontece), e a dependência de módulo em cascata (o que esperar se `EXPEDICAO`/`COMPRAS` estiver desligado).
+
+Último passo do plano de implementação: rodar `npm run ai:index-docs` (dentro de `backend/`) depois de escrever os dois capítulos, para o assistente de IA passar a responder perguntas sobre o módulo novo a partir do manual atualizado — sem isso, o capítulo existe no arquivo mas o assistente continua sem saber dele.
+
 ## Fora de escopo desta entrega
 
 - O Fabric chamar a API de um ERP externo (a direção é sempre ERP → Fabric nesta entrega) — cogitado e descartado pelo usuário na brainstorm.
